@@ -151,7 +151,7 @@ firstread/
 
 | File | What it does / why it exists |
 |---|---|
-| `pyproject.toml` (root) | Declares the workspace members, the shared dev tools (ruff, mypy, pytest, pre-commit, httpx) and their config. One place for tool settings means every member is checked identically. |
+| `pyproject.toml` (root) | Declares the workspace members, the shared dev tools (ruff, mypy, pytest, pre-commit, httpx2) and their config. One place for tool settings means every member is checked identically. |
 | `uv.lock` | Exact versions of every Python package. Committed; CI and Docker install with `--frozen`. |
 | `.python-version` / `.node-version` | Pin Python 3.12 (uv reads it) and Node 24 (fnm and `actions/setup-node` read it). |
 | `packages/core/src/firstread_core/text.py` | First shared helper (`normalize_whitespace`). P1 adds the embedding function here. |
@@ -210,7 +210,7 @@ dependencies = []
 [dependency-groups]
 dev = ["firstread-core", "firstread-api", "firstread-ingest", "firstread-ml",
        "ruff>=0.17.0", "mypy>=2.4.0", "pytest>=9.1.1", "pytest-asyncio>=1.4.0",
-       "httpx>=0.28.1", "pre-commit>=4.7.0"]
+       "httpx2>=2.13.1", "pre-commit>=4.7.0"]
 
 [tool.uv]
 package = false                # virtual root
@@ -479,7 +479,7 @@ Smaller decisions made in this phase:
 2. **`expo install` picked `@types/jest@30` while the SDK pins `jest@29`.** Mismatched types can claim matchers exist that don't. **Fix:** pin `@types/jest@29.5.14`.
 3. **`create-expo-app` adds extra files**: an `AGENTS.md`, a `.claude/settings.json` enabling an Expo plugin, its own `LICENSE`, and lots of example screens and assets. We kept `AGENTS.md` (useful SDK-specific guidance), removed the rest, and removed example-only dependencies.
 4. **npm 11 `allowScripts` warning** for `unrs-resolver` (a native module resolver used by ESLint's import plugin). npm 11 no longer runs unapproved install scripts. ESLint works anyway because the prebuilt binary ships as an optional dependency, so we left the script unapproved.
-5. **Starlette deprecation warning:** `Using httpx with starlette.testclient is deprecated; install httpx2`. It's harmless for now. Switching the dev dependency to `httpx2` is pending the owner's go-ahead, so we kept `httpx` and accept the warning.
+5. **Starlette deprecation warning:** `Using httpx with starlette.testclient is deprecated; install httpx2`. Starlette's TestClient now prefers [`httpx2`](https://github.com/pydantic/httpx2) (the Pydantic-maintained successor). **Fix:** the dev dependency is `httpx2`, not `httpx`; the warning is gone.
 6. **Static web export runs your code in Node.** With `web.output: "static"`, Expo pre-renders every route at build time in Node, where `window`, `document`, `localStorage` and AsyncStorage's web backend don't exist. **Never touch them at module import time**; use them only inside `useEffect` or behind `Platform.OS === 'web' && typeof window !== 'undefined'` checks. (Also recorded in CLAUDE.md.)
 7. **Liveness must not check dependencies.** If `/healthz` checked Postgres, a DB blip would make Cloud Run/Docker restart perfectly healthy API containers.
 8. **Don't log exception messages from DB drivers in health checks.** They can include the DSN, password included. We log only the exception type. There's a test for this.
