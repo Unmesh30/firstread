@@ -45,6 +45,7 @@ Also:
 ## Gotchas
 - Supabase pooler in transaction mode (port 6543) breaks prepared statements: use asyncpg with `statement_cache_size=0`.
 - Expo web on GitHub Pages needs `experiments.baseUrl` = `/firstread` and a `.nojekyll` file.
+- Expo `web.output: "static"` pre-renders routes in Node at build time, so never touch `window`/`localStorage`/`AsyncStorage` at module import time; access them only inside effects or behind platform checks.
 - GitHub scheduled workflows can run late, and are disabled after 60 days without repo activity.
 - Credit GDELT with a link to gdeltproject.org wherever its data appears.
 - Embeddings are L2-normalized, so inner product equals cosine similarity. Use the matching pgvector operator class.
