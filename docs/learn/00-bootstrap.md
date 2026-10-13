@@ -486,7 +486,8 @@ Smaller decisions made in this phase:
 9. **Supabase transaction pooler (port 6543) breaks prepared statements**, so `statement_cache_size=0` is set from day one.
 10. **Ports bound to `127.0.0.1`** so the local Postgres/Redis (with dev passwords) aren't reachable from the café Wi-Fi.
 11. **Not every action has a floating major tag.** CI first failed in 3 s with `Unable to resolve action astral-sh/setup-uv@v10, unable to find version v10`: setup-uv publishes only full tags (`v10.3.0`). **Fix:** pin the release commit SHA with a version comment (`astral-sh/setup-uv@1c37ad0… # v10.3.0`); Dependabot updates SHA pins too. Check with `gh api repos/<owner>/<repo>/git/matching-refs/tags/v10`.
-12. **`check-json` vs `tsconfig.json`**: tsconfig files may contain comments (JSONC), which strict JSON parsers reject, so the pre-commit `check-json` hook excludes it.
+12. **The gitleaks download in CI is checksum-verified.** The `secrets` job checks the tarball against `GITLEAKS_SHA256` (`sha256sum --check --strict`) before extracting, so a tampered or corrupted download fails the job instead of running. **Bumping `GITLEAKS_VERSION` means updating `GITLEAKS_SHA256` too**: take the `linux_x64.tar.gz` line from that release's `gitleaks_<version>_checksums.txt`. Dependabot won't do this for you, because it's a plain download, not an action.
+13. **`check-json` vs `tsconfig.json`**: tsconfig files may contain comments (JSONC), which strict JSON parsers reject, so the pre-commit `check-json` hook excludes it.
 
 ---
 
