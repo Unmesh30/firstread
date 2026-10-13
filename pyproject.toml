@@ -1,0 +1,79 @@
+[project]
+name = "firstread"
+version = "0.0.0"
+description = "FirstRead monorepo root (uv workspace)."
+requires-python = ">=3.12,<3.13"
+dependencies = []
+
+[dependency-groups]
+dev = [
+  "firstread-core",
+  "firstread-api",
+  "firstread-ingest",
+  "firstread-ml",
+  "ruff>=0.17.0",
+  "mypy>=2.4.0",
+  "pytest>=9.1.1",
+  "pytest-asyncio>=1.4.0",
+  "httpx>=0.28.1",
+  "pre-commit>=4.7.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/core", "services/api", "services/ingest", "ml"]
+
+[tool.uv.sources]
+firstread-core = { workspace = true }
+firstread-api = { workspace = true }
+firstread-ingest = { workspace = true }
+firstread-ml = { workspace = true }
+
+# ---------- ruff ----------
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+extend-exclude = ["apps", "data"]
+
+[tool.ruff.lint]
+select = ["E", "W", "F", "I", "B", "UP", "SIM", "RUF", "N", "ASYNC", "S", "PT"]
+ignore = []
+
+[tool.ruff.lint.per-file-ignores]
+"**/tests/**" = ["S101"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["firstread_core", "firstread_api", "firstread_ingest", "firstread_ml"]
+
+# ---------- mypy ----------
+[tool.mypy]
+python_version = "3.12"
+files = [
+  "packages/core/src", "packages/core/tests",
+  "services/api/src", "services/api/tests",
+  "services/ingest/src", "services/ingest/tests",
+  "ml/src", "ml/tests",
+]
+strict = true
+warn_unreachable = true
+pretty = true
+
+# ml is research code: type-checked, but not strictly.
+[[tool.mypy.overrides]]
+module = ["firstread_ml", "firstread_ml.*"]
+strict = false
+disallow_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["asyncpg", "asyncpg.*"]
+ignore_missing_imports = true
+
+# ---------- pytest ----------
+[tool.pytest.ini_options]
+testpaths = ["packages/core/tests", "services/api/tests", "services/ingest/tests", "ml/tests"]
+addopts = ["--import-mode=importlib", "-ra", "--strict-markers"]
+asyncio_mode = "auto"
+asyncio_default_fixture_loop_scope = "function"
+markers = ["integration: needs a running Postgres and Redis (make up)"]
