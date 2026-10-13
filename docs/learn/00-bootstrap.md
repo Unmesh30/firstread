@@ -485,7 +485,8 @@ Smaller decisions made in this phase:
 8. **Don't log exception messages from DB drivers in health checks.** They can include the DSN, password included. We log only the exception type. There's a test for this.
 9. **Supabase transaction pooler (port 6543) breaks prepared statements**, so `statement_cache_size=0` is set from day one.
 10. **Ports bound to `127.0.0.1`** so the local Postgres/Redis (with dev passwords) aren't reachable from the café Wi-Fi.
-11. **`check-json` vs `tsconfig.json`**: tsconfig files may contain comments (JSONC), which strict JSON parsers reject, so the pre-commit `check-json` hook excludes it.
+11. **Not every action has a floating major tag.** CI first failed in 3 s with `Unable to resolve action astral-sh/setup-uv@v10, unable to find version v10`: setup-uv publishes only full tags (`v10.3.0`). **Fix:** pin the release commit SHA with a version comment (`astral-sh/setup-uv@1c37ad0… # v10.3.0`); Dependabot updates SHA pins too. Check with `gh api repos/<owner>/<repo>/git/matching-refs/tags/v10`.
+12. **`check-json` vs `tsconfig.json`**: tsconfig files may contain comments (JSONC), which strict JSON parsers reject, so the pre-commit `check-json` hook excludes it.
 
 ---
 
