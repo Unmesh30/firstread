@@ -1,0 +1,471 @@
+{
+ "gate": {
+  "failures": [],
+  "max_macro_f1_gap": 0.1,
+  "min_topic_f1_title_only": 0.3,
+  "passed": true
+ },
+ "labels": [
+  "us",
+  "world",
+  "politics",
+  "business",
+  "tech_science",
+  "health",
+  "sports",
+  "entertainment",
+  "lifestyle",
+  "food_drink",
+  "travel",
+  "autos",
+  "weather"
+ ],
+ "n_excluded": 4043,
+ "n_test_dev_only": 2457,
+ "n_train_articles": 97651,
+ "n_train_rows": 195302,
+ "seconds": 49.8,
+ "selection": {
+  "best": {
+   "C": 1.0,
+   "class_weight": "none",
+   "val_accuracy_title_abstract": 0.7594716362891665,
+   "val_accuracy_title_only": 0.7437026418185542,
+   "val_macro_f1_mean": 0.6794460652174996,
+   "val_macro_f1_title_abstract": 0.6885339613258739,
+   "val_macro_f1_title_only": 0.6703581691091253
+  },
+  "grid": [
+   {
+    "C": 0.3,
+    "class_weight": "none",
+    "val_accuracy_title_abstract": 0.7585500716772476,
+    "val_accuracy_title_only": 0.7424738890026623,
+    "val_macro_f1_mean": 0.6766083079343232,
+    "val_macro_f1_title_abstract": 0.6850366449349544,
+    "val_macro_f1_title_only": 0.6681799709336921
+   },
+   {
+    "C": 0.3,
+    "class_weight": "balanced",
+    "val_accuracy_title_abstract": 0.726602498464059,
+    "val_accuracy_title_only": 0.7061232848658612,
+    "val_macro_f1_mean": 0.651216826177391,
+    "val_macro_f1_title_abstract": 0.662290866336767,
+    "val_macro_f1_title_only": 0.6401427860180149
+   },
+   {
+    "C": 1.0,
+    "class_weight": "none",
+    "val_accuracy_title_abstract": 0.7594716362891665,
+    "val_accuracy_title_only": 0.7437026418185542,
+    "val_macro_f1_mean": 0.6794460652174996,
+    "val_macro_f1_title_abstract": 0.6885339613258739,
+    "val_macro_f1_title_only": 0.6703581691091253
+   },
+   {
+    "C": 1.0,
+    "class_weight": "balanced",
+    "val_accuracy_title_abstract": 0.7270120827360229,
+    "val_accuracy_title_only": 0.7041777595740324,
+    "val_macro_f1_mean": 0.6497769342916679,
+    "val_macro_f1_title_abstract": 0.6617041556891701,
+    "val_macro_f1_title_only": 0.6378497128941659
+   },
+   {
+    "C": 3.0,
+    "class_weight": "none",
+    "val_accuracy_title_abstract": 0.755273397501536,
+    "val_accuracy_title_only": 0.7428834732746262,
+    "val_macro_f1_mean": 0.6764958846932458,
+    "val_macro_f1_title_abstract": 0.6830354156786306,
+    "val_macro_f1_title_only": 0.6699563537078611
+   },
+   {
+    "C": 3.0,
+    "class_weight": "balanced",
+    "val_accuracy_title_abstract": 0.7246569731722302,
+    "val_accuracy_title_only": 0.7038705713700594,
+    "val_macro_f1_mean": 0.6471476571160107,
+    "val_macro_f1_title_abstract": 0.6576587750409304,
+    "val_macro_f1_title_only": 0.6366365391910911
+   },
+   {
+    "C": 10.0,
+    "class_weight": "none",
+    "val_accuracy_title_abstract": 0.754454228957608,
+    "val_accuracy_title_only": 0.7411427401187795,
+    "val_macro_f1_mean": 0.673746753820293,
+    "val_macro_f1_title_abstract": 0.6803373143791214,
+    "val_macro_f1_title_only": 0.6671561932614647
+   },
+   {
+    "C": 10.0,
+    "class_weight": "balanced",
+    "val_accuracy_title_abstract": 0.7236330124923203,
+    "val_accuracy_title_only": 0.7021298382142126,
+    "val_macro_f1_mean": 0.6447138247366129,
+    "val_macro_f1_title_abstract": 0.6555933880999189,
+    "val_macro_f1_title_only": 0.6338342613733068
+   },
+   {
+    "C": 30.0,
+    "class_weight": "none",
+    "val_accuracy_title_abstract": 0.754863813229572,
+    "val_accuracy_title_only": 0.7411427401187795,
+    "val_macro_f1_mean": 0.6738535577258887,
+    "val_macro_f1_title_abstract": 0.680925066707434,
+    "val_macro_f1_title_only": 0.6667820487443434
+   },
+   {
+    "C": 30.0,
+    "class_weight": "balanced",
+    "val_accuracy_title_abstract": 0.7229162400163833,
+    "val_accuracy_title_only": 0.7018226500102396,
+    "val_macro_f1_mean": 0.6438820005113457,
+    "val_macro_f1_title_abstract": 0.654421125195163,
+    "val_macro_f1_title_only": 0.6333428758275284
+   }
+  ],
+  "threshold": 0.5,
+  "threshold_bins": [
+   {
+    "accuracy": null,
+    "hi": 0.05,
+    "lo": 0.0,
+    "n": 0
+   },
+   {
+    "accuracy": null,
+    "hi": 0.1,
+    "lo": 0.05,
+    "n": 0
+   },
+   {
+    "accuracy": null,
+    "hi": 0.15,
+    "lo": 0.1,
+    "n": 0
+   },
+   {
+    "accuracy": 0.1,
+    "hi": 0.2,
+    "lo": 0.15,
+    "n": 10
+   },
+   {
+    "accuracy": 0.3026315789473684,
+    "hi": 0.25,
+    "lo": 0.2,
+    "n": 76
+   },
+   {
+    "accuracy": 0.3048327137546468,
+    "hi": 0.3,
+    "lo": 0.25,
+    "n": 269
+   },
+   {
+    "accuracy": 0.3543859649122807,
+    "hi": 0.35,
+    "lo": 0.3,
+    "n": 570
+   },
+   {
+    "accuracy": 0.4211212516297262,
+    "hi": 0.4,
+    "lo": 0.35,
+    "n": 767
+   },
+   {
+    "accuracy": 0.4306569343065693,
+    "hi": 0.45,
+    "lo": 0.4,
+    "n": 959
+   },
+   {
+    "accuracy": 0.4865616311399444,
+    "hi": 0.5,
+    "lo": 0.45,
+    "n": 1079
+   },
+   {
+    "accuracy": 0.5045871559633027,
+    "hi": 0.55,
+    "lo": 0.5,
+    "n": 981
+   },
+   {
+    "accuracy": 0.5812431842966194,
+    "hi": 0.6,
+    "lo": 0.55,
+    "n": 917
+   },
+   {
+    "accuracy": 0.6019108280254777,
+    "hi": 0.65,
+    "lo": 0.6,
+    "n": 942
+   },
+   {
+    "accuracy": 0.6640883977900552,
+    "hi": 0.7,
+    "lo": 0.65,
+    "n": 905
+   },
+   {
+    "accuracy": 0.7206185567010309,
+    "hi": 0.75,
+    "lo": 0.7,
+    "n": 970
+   },
+   {
+    "accuracy": 0.7745604963805585,
+    "hi": 0.8,
+    "lo": 0.75,
+    "n": 967
+   },
+   {
+    "accuracy": 0.7970882620564149,
+    "hi": 0.85,
+    "lo": 0.8,
+    "n": 1099
+   },
+   {
+    "accuracy": 0.861198738170347,
+    "hi": 0.9,
+    "lo": 0.85,
+    "n": 1268
+   },
+   {
+    "accuracy": 0.9129937034917001,
+    "hi": 0.95,
+    "lo": 0.9,
+    "n": 1747
+   },
+   {
+    "accuracy": 0.983016983016983,
+    "hi": 1.0,
+    "lo": 0.95,
+    "n": 6006
+   }
+  ],
+  "val_fraction": 0.1
+ },
+ "test": {
+  "title_abstract": {
+   "accuracy": 0.7346357346357346,
+   "macro_f1": 0.6371489968601759,
+   "majority_class_accuracy": 0.3268213268213268,
+   "per_class": [
+    {
+     "f1": 0.6606170598911071,
+     "label": "us",
+     "precision": 0.6201022146507666,
+     "recall": 0.7067961165048544,
+     "support": 515
+    },
+    {
+     "f1": 0.45977011494252873,
+     "label": "world",
+     "precision": 0.6666666666666666,
+     "recall": 0.3508771929824561,
+     "support": 57
+    },
+    {
+     "f1": 0.815,
+     "label": "politics",
+     "precision": 0.7688679245283019,
+     "recall": 0.8670212765957447,
+     "support": 188
+    },
+    {
+     "f1": 0.5623003194888179,
+     "label": "business",
+     "precision": 0.5398773006134969,
+     "recall": 0.5866666666666667,
+     "support": 150
+    },
+    {
+     "f1": 0.6511627906976745,
+     "label": "tech_science",
+     "precision": 0.6829268292682927,
+     "recall": 0.6222222222222222,
+     "support": 90
+    },
+    {
+     "f1": 0.628099173553719,
+     "label": "health",
+     "precision": 0.6031746031746031,
+     "recall": 0.6551724137931034,
+     "support": 58
+    },
+    {
+     "f1": 0.9357682619647355,
+     "label": "sports",
+     "precision": 0.9464968152866242,
+     "recall": 0.925280199252802,
+     "support": 803
+    },
+    {
+     "f1": 0.6628571428571428,
+     "label": "entertainment",
+     "precision": 0.7160493827160493,
+     "recall": 0.6170212765957447,
+     "support": 94
+    },
+    {
+     "f1": 0.5610859728506787,
+     "label": "lifestyle",
+     "precision": 0.6262626262626263,
+     "recall": 0.5081967213114754,
+     "support": 122
+    },
+    {
+     "f1": 0.6605504587155964,
+     "label": "food_drink",
+     "precision": 0.6260869565217392,
+     "recall": 0.6990291262135923,
+     "support": 103
+    },
+    {
+     "f1": 0.4691358024691358,
+     "label": "travel",
+     "precision": 0.5229357798165137,
+     "recall": 0.4253731343283582,
+     "support": 134
+    },
+    {
+     "f1": 0.5714285714285714,
+     "label": "autos",
+     "precision": 0.5862068965517241,
+     "recall": 0.5573770491803278,
+     "support": 61
+    },
+    {
+     "f1": 0.6451612903225806,
+     "label": "weather",
+     "precision": 0.684931506849315,
+     "recall": 0.6097560975609756,
+     "support": 82
+    }
+   ]
+  },
+  "title_only": {
+   "accuracy": 0.7183557183557183,
+   "macro_f1": 0.624372144861339,
+   "majority_class_accuracy": 0.3268213268213268,
+   "per_class": [
+    {
+     "f1": 0.6268939393939394,
+     "label": "us",
+     "precision": 0.6118299445471349,
+     "recall": 0.6427184466019418,
+     "support": 515
+    },
+    {
+     "f1": 0.43956043956043955,
+     "label": "world",
+     "precision": 0.5882352941176471,
+     "recall": 0.3508771929824561,
+     "support": 57
+    },
+    {
+     "f1": 0.8136482939632546,
+     "label": "politics",
+     "precision": 0.8031088082901554,
+     "recall": 0.824468085106383,
+     "support": 188
+    },
+    {
+     "f1": 0.5625,
+     "label": "business",
+     "precision": 0.5294117647058824,
+     "recall": 0.6,
+     "support": 150
+    },
+    {
+     "f1": 0.6545454545454545,
+     "label": "tech_science",
+     "precision": 0.72,
+     "recall": 0.6,
+     "support": 90
+    },
+    {
+     "f1": 0.5833333333333334,
+     "label": "health",
+     "precision": 0.5645161290322581,
+     "recall": 0.603448275862069,
+     "support": 58
+    },
+    {
+     "f1": 0.9229805886036319,
+     "label": "sports",
+     "precision": 0.9282115869017632,
+     "recall": 0.9178082191780822,
+     "support": 803
+    },
+    {
+     "f1": 0.6413043478260869,
+     "label": "entertainment",
+     "precision": 0.6555555555555556,
+     "recall": 0.6276595744680851,
+     "support": 94
+    },
+    {
+     "f1": 0.575,
+     "label": "lifestyle",
+     "precision": 0.5847457627118644,
+     "recall": 0.5655737704918032,
+     "support": 122
+    },
+    {
+     "f1": 0.6278026905829597,
+     "label": "food_drink",
+     "precision": 0.5833333333333334,
+     "recall": 0.6796116504854369,
+     "support": 103
+    },
+    {
+     "f1": 0.44881889763779526,
+     "label": "travel",
+     "precision": 0.475,
+     "recall": 0.4253731343283582,
+     "support": 134
+    },
+    {
+     "f1": 0.5333333333333333,
+     "label": "autos",
+     "precision": 0.5423728813559322,
+     "recall": 0.5245901639344263,
+     "support": 61
+    },
+    {
+     "f1": 0.6871165644171779,
+     "label": "weather",
+     "precision": 0.691358024691358,
+     "recall": 0.6829268292682927,
+     "support": 82
+    }
+   ]
+  }
+ },
+ "threshold": 0.5,
+ "topic_map_sha256": "ed1b13889e9ed2f6964b98af94fa4b5c3a32cb224cbbadaa4c7be387e2f73220",
+ "train_per_topic": {
+  "autos": 3071,
+  "business": 6006,
+  "entertainment": 4382,
+  "food_drink": 4421,
+  "health": 2929,
+  "lifestyle": 5074,
+  "politics": 5697,
+  "sports": 32032,
+  "tech_science": 3026,
+  "travel": 4958,
+  "us": 19252,
+  "weather": 4272,
+  "world": 2531
+ },
+ "variant": "large"
+}
