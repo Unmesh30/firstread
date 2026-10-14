@@ -1,6 +1,14 @@
 # NRMS-lite training config (validated by firstread_ml.config.NRMSLiteConfig).
-# Hyperparameters are chosen on the time-based holdout (train's last day), never
-# on dev; see docs/learn/01-offline-ml.md for the tuning log.
+# Chosen on the MIND-small time-based holdout (train's last day), never on dev.
+# Full log: ml/reports/tuning-nrms-lite-small.md. Summary (final epoch, mean ± std
+# over seeds, holdout nDCG@10 overall / cold-start):
+#   constant lr 1e-3, epoch 3 (3 seeds): 0.3761 ± 0.0056 / 0.4519 ± 0.0045
+#   constant lr 3e-3, epoch 5 (3 seeds): 0.3740 ± 0.0129 / 0.4493 ± 0.0126
+#   cosine   lr 3e-3, 5 ep    (2 seeds): 0.3765 ± 0.0006 / 0.4533 ± 0.0008
+#   cosine   lr 1e-3, 5 ep    (2 seeds): 0.3770 ± 0.0008 / 0.4536 ± 0.0015  <- chosen
+# Configs are within noise of each other; cosine decay makes the final epoch
+# ~10x more stable across seeds, which matters because dev/large runs train a
+# fixed number of epochs with no early stopping.
 seed: 0
 model:
   heads: 8
@@ -9,10 +17,11 @@ model:
   attn_dropout: 0.1
   init_scale: 10.0
 train:
-  epochs: 3
+  epochs: 5
   batch_size: 256
   lr: 0.001
   weight_decay: 0.01
   negatives: 4
   grad_clip: 1.0
+  lr_schedule: cosine
   device: auto
