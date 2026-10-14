@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:media="http://search.yahoo.com/mrss/" version="2.0">
+    <channel>
+        <title>Synthetic title 1 for fixture rss2_enclosure_cdata.xml</title>
+        <link>https://example.com/newshour/</link>
+                <description>Synthetic description 7 for fixture rss2_enclosure_cdata.xml</description>
+                <language>en-US</language>
+        <copyright>Synthetic copyright 20 for fixture rss2_enclosure_cdata.xml</copyright>
+        <pubDate>Wed, 14 Oct 2026 16:05:09 -0400</pubDate>
+                        <item>
+            <title>Synthetic title 2 for fixture rss2_enclosure_cdata.xml</title>
+            <link>https://example.com/newshour/health/how-proposed-cuts-to-this-major-national-he</link>
+            <description>Synthetic description 8 for fixture rss2_enclosure_cdata.xml</description>
+            <pubDate>Wed, 14 Oct 2026 15:55:14 -0400</pubDate>
+            <guid isPermaLink="true">https://example.com/newshour/health/how-proposed-cuts-to-this-major-national-he</guid>
+                        <category domain="https://example.com/newshour/tag/people-with-disabilities"><![CDATA[People with disabilities]]></category>
+                        <category domain="https://example.com/newshour/tag/u-s-census-bureau"><![CDATA[U.S. Census Bureau]]></category>
+                                                        <dc:creator>Synthetic creator 13 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                                                <media:content url="https://img.example.com/image.jpg" medium="image" width="1024" height="751" />
+                    </item>
+                <item>
+            <title>Synthetic title 3 for fixture rss2_enclosure_cdata.xml</title>
+            <link>https://example.com/newshour/politics/justice-department-threatens-california-w</link>
+            <description>Synthetic description 9 for fixture rss2_enclosure_cdata.xml</description>
+            <pubDate>Wed, 14 Oct 2026 15:19:33 -0400</pubDate>
+            <guid isPermaLink="true">https://example.com/newshour/politics/justice-department-threatens-california-w</guid>
+                        <category domain="https://example.com/newshour/tag/california"><![CDATA[california]]></category>
+                        <category domain="https://example.com/newshour/tag/justice-department"><![CDATA[Department of Justice]]></category>
+                        <category domain="https://example.com/newshour/tag/elections"><![CDATA[elections]]></category>
+                        <category domain="https://example.com/newshour/tag/midterm-elections"><![CDATA[midterm elections]]></category>
+                        <category domain="https://example.com/newshour/tag/noncitizen-voting"><![CDATA[Noncitizen voting]]></category>
+                        <category domain="https://example.com/newshour/tag/vote-2026"><![CDATA[Vote 2026]]></category>
+                                                        <dc:creator>Synthetic creator 14 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                <dc:creator>Synthetic creator 15 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                                                <media:content url="https://img.example.com/image.jpg" medium="image" width="1024" height="634" />
+                    </item>
+                <item>
+            <title>Synthetic title 4 for fixture rss2_enclosure_cdata.xml</title>
+            <link>https://example.com/newshour/nation/ice-officer-appeared-to-intentionally-hit-a</link>
+            <description>Synthetic description 10 for fixture rss2_enclosure_cdata.xml</description>
+            <pubDate>Wed, 14 Oct 2026 15:04:01 -0400</pubDate>
+            <guid isPermaLink="true">https://example.com/newshour/nation/ice-officer-appeared-to-intentionally-hit-a</guid>
+                        <category domain="https://example.com/newshour/tag/houston"><![CDATA[Houston]]></category>
+                        <category domain="https://example.com/newshour/tag/immigration-enforcement"><![CDATA[immigration enforcement]]></category>
+                        <category domain="https://example.com/newshour/tag/texas"><![CDATA[texas]]></category>
+                        <category domain="https://example.com/newshour/tag/u-s-immigration-and-customs-enforcement"><![CDATA[u.s. immigration and customs enforcement]]></category>
+                                                        <dc:creator>Synthetic creator 16 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                <dc:creator>Synthetic creator 17 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                                                <media:content url="https://img.example.com/image.jpg" medium="image" width="1024" height="682" />
+                    </item>
+                <item>
+            <title>Synthetic title 5 for fixture rss2_enclosure_cdata.xml</title>
+            <link>https://example.com/newshour/world/imf-chief-urges-wealthy-nations-to-rein-in-d</link>
+            <description>Synthetic description 11 for fixture rss2_enclosure_cdata.xml</description>
+            <pubDate>Wed, 14 Oct 2026 14:59:04 -0400</pubDate>
+            <guid isPermaLink="true">https://example.com/newshour/world/imf-chief-urges-wealthy-nations-to-rein-in-d</guid>
+                        <category domain="https://example.com/newshour/tag/International-Monetary-Fund"><![CDATA[international monetary fund]]></category>
+                        <category domain="https://example.com/newshour/tag/kristalina-georgieva"><![CDATA[Kristalina Georgieva]]></category>
+                                                        <dc:creator>Synthetic creator 18 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                                                <media:content url="https://img.example.com/image.jpg" medium="image" width="1024" height="680" />
+                    </item>
+                <item>
+            <title>Synthetic title 6 for fixture rss2_enclosure_cdata.xml</title>
+            <link>https://example.com/newshour/nation/new-york-plans-to-ban-central-parks-horse-d</link>
+            <description>Synthetic description 12 for fixture rss2_enclosure_cdata.xml</description>
+            <pubDate>Wed, 14 Oct 2026 14:18:36 -0400</pubDate>
+            <guid isPermaLink="true">https://example.com/newshour/nation/new-york-plans-to-ban-central-parks-horse-d</guid>
+                        <category domain="https://example.com/newshour/tag/animals"><![CDATA[animals]]></category>
+                        <category domain="https://example.com/newshour/tag/central-park"><![CDATA[Central Park]]></category>
+                        <category domain="https://example.com/newshour/tag/horses"><![CDATA[horses]]></category>
+                        <category domain="https://example.com/newshour/tag/new-york"><![CDATA[New York]]></category>
+                        <category domain="https://example.com/newshour/tag/new-york-city"><![CDATA[New York City]]></category>
+                                                        <dc:creator>Synthetic creator 19 for fixture rss2_enclosure_cdata.xml</dc:creator>
+                                                                <media:content url="https://img.example.com/image.jpg" medium="image" width="1024" height="683" />
+                    </item>
+            </channel>
+</rss>

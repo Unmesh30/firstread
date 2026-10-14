@@ -1,0 +1,32 @@
+# Titles dropped by normalize.py (Phase 2 plan, owner review):
+# - `whole`: dropped only if the WHOLE normalized title (casefolded, punctuation
+#   stripped) equals one of these.
+# - `media_prefixes`: dropped if the title STARTS with one of these markers.
+# "Live updates: ..." and "Opinion: ..." are deliberately kept: live blogs carry
+# breaking news, and opinion maps to politics.
+version: 1
+whole:
+  - live updates
+  - live
+  - photos
+  - video
+  - videos
+  - watch
+  - podcast
+  - newsletter
+  - todays headlines
+  - the latest
+  - quiz
+  - crossword
+  - horoscope
+  - sponsored
+  - advertisement
+  - page not found
+  - access denied
+  - just a moment
+media_prefixes:
+  - "watch:"
+  - "video:"
+  - "photos:"
+  - "podcast:"
+  - "quiz:"

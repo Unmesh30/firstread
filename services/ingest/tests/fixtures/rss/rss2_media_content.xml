@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<rss xmlns:media="http://search.yahoo.com/mrss/" xmlns:dc="http://purl.org/dc/elements/1.1/" version="2.0">
+  <channel>
+    <title>Synthetic title 1 for fixture rss2_media_content.xml</title>
+    <link>https://example.com/world</link>
+    <description>Synthetic description 8 for fixture rss2_media_content.xml</description>
+    <language>en-gb</language>
+    <copyright>Synthetic copyright 34 for fixture rss2_media_content.xml</copyright>
+    <pubDate>Wed, 14 Oct 2026 19:54:29 GMT</pubDate>
+    <dc:date>2026-10-14T19:54:29Z</dc:date>
+    <dc:language>en-gb</dc:language>
+    <dc:rights>Synthetic rights 35 for fixture rss2_media_content.xml</dc:rights>
+    <image>
+      <title>Synthetic title 2 for fixture rss2_media_content.xml</title>
+      <url>https://img.example.com/image.jpg</url>
+      <link>https://example.com/</link>
+    </image>
+    <item>
+      <title>Synthetic title 3 for fixture rss2_media_content.xml</title>
+      <link>https://example.com/technology/2026/oct/14/zimbabwean-author-simbarashe-kundize</link>
+      <description>Synthetic description 9 for fixture rss2_media_content.xml</description>
+      <category domain="https://example.com/technology/artificialintelligenceai">AI (artificial intelligence)</category>
+      <category domain="https://example.com/books/caineprize">Caine prize</category>
+      <category domain="https://example.com/media/the-atlantic">The Atlantic</category>
+      <category domain="https://example.com/books/short-stories">Short stories</category>
+      <category domain="https://example.com/technology/technology">Technology</category>
+      <category domain="https://example.com/books/books">Books</category>
+      <category domain="https://example.com/culture/awards-and-prizes">Awards and prizes</category>
+      <category domain="https://example.com/culture/culture">Culture</category>
+      <category domain="https://example.com/books/fiction">Fiction</category>
+      <category domain="https://example.com/world/zimbabwe">Zimbabwe</category>
+      <category domain="https://example.com/world/africa">Africa</category>
+      <category domain="https://example.com/world/world">World news</category>
+      <pubDate>Wed, 14 Oct 2026 19:01:29 GMT</pubDate>
+      <guid>https://example.com/technology/2026/oct/14/zimbabwean-author-simbarashe-kundize</guid>
+      <media:content width="140" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 14 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="460" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 15 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="700" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 16 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <dc:creator>Synthetic creator 29 for fixture rss2_media_content.xml</dc:creator>
+      <dc:date>2026-10-14T19:01:29Z</dc:date>
+    </item>
+    <item>
+      <title>Synthetic title 4 for fixture rss2_media_content.xml</title>
+      <link>https://example.com/world/2026/oct/14/guinea-bissau-vaccine-hepatitis-b-trial-d</link>
+      <description>Synthetic description 10 for fixture rss2_media_content.xml</description>
+      <category domain="https://example.com/world/guinea-bissau">Guinea-Bissau</category>
+      <category domain="https://example.com/society/hepatitis-b">Hepatitis B</category>
+      <category domain="https://example.com/society/vaccines">Vaccines and immunisation</category>
+      <category domain="https://example.com/us-news/robert-f-kennedy-jr">Robert F Kennedy Jr</category>
+      <category domain="https://example.com/society/childrens-health">Children's health</category>
+      <category domain="https://example.com/world/africa">Africa</category>
+      <category domain="https://example.com/world/world">World news</category>
+      <pubDate>Wed, 14 Oct 2026 13:16:30 GMT</pubDate>
+      <guid>https://example.com/world/2026/oct/14/guinea-bissau-vaccine-hepatitis-b-trial-d</guid>
+      <media:content width="140" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 17 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="460" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 18 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="700" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 19 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <dc:creator>Synthetic creator 30 for fixture rss2_media_content.xml</dc:creator>
+      <dc:date>2026-10-14T13:16:30Z</dc:date>
+    </item>
+    <item>
+      <title>Synthetic title 5 for fixture rss2_media_content.xml</title>
+      <link>https://example.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr</link>
+      <description>Synthetic description 11 for fixture rss2_media_content.xml</description>
+      <category domain="https://example.com/society/vaccines">Vaccines and immunisation</category>
+      <category domain="https://example.com/world/guinea-bissau">Guinea-Bissau</category>
+      <category domain="https://example.com/world/africa">Africa</category>
+      <category domain="https://example.com/society/health">Health</category>
+      <category domain="https://example.com/us-news/robert-f-kennedy-jr">Robert F Kennedy Jr</category>
+      <category domain="https://example.com/world/denmark">Denmark</category>
+      <pubDate>Fri, 09 Oct 2026 21:36:18 GMT</pubDate>
+      <guid>https://example.com/society/2026/oct/09/vaccine-trial-guinea-bissau-rfk-jr</guid>
+      <media:content width="140" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 20 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="460" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 21 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="700" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 22 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <dc:creator>Synthetic creator 31 for fixture rss2_media_content.xml</dc:creator>
+      <dc:date>2026-10-09T21:36:18Z</dc:date>
+    </item>
+    <item>
+      <title>Synthetic title 6 for fixture rss2_media_content.xml</title>
+      <link>https://example.com/world/2026/oct/09/navanethem-navi-pillay-wins-nobel-peace-p</link>
+      <description>Synthetic description 12 for fixture rss2_media_content.xml</description>
+      <category domain="https://example.com/world/nobelpeaceprize">Nobel peace prize</category>
+      <category domain="https://example.com/world/norway">Norway</category>
+      <category domain="https://example.com/world/southafrica">South Africa</category>
+      <category domain="https://example.com/law/international-court-of-justice">International court of justice</category>
+      <category domain="https://example.com/world/world">World news</category>
+      <category domain="https://example.com/law/human-rights">Human rights</category>
+      <category domain="https://example.com/law/law">Law</category>
+      <category domain="https://example.com/world/africa">Africa</category>
+      <category domain="https://example.com/world/europe-news">Europe</category>
+      <pubDate>Fri, 09 Oct 2026 16:30:09 GMT</pubDate>
+      <guid>https://example.com/world/2026/oct/09/navanethem-navi-pillay-wins-nobel-peace-p</guid>
+      <media:content width="140" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 23 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="460" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 24 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="700" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 25 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <dc:creator>Synthetic creator 32 for fixture rss2_media_content.xml</dc:creator>
+      <dc:date>2026-10-09T16:30:09Z</dc:date>
+    </item>
+    <item>
+      <title>Synthetic title 7 for fixture rss2_media_content.xml</title>
+      <link>https://example.com/environment/2026/oct/09/isaias-strengthens-first-atlantic-h</link>
+      <description>Synthetic description 13 for fixture rss2_media_content.xml</description>
+      <category domain="https://example.com/world/hurricane-isaias">Hurricane Isaias</category>
+      <category domain="https://example.com/world/hurricanes">Hurricanes</category>
+      <category domain="https://example.com/environment/environment">Environment</category>
+      <category domain="https://example.com/us-news/us-weather">US weather</category>
+      <category domain="https://example.com/us-news/texas">Texas</category>
+      <category domain="https://example.com/us-news/louisiana">Louisiana</category>
+      <category domain="https://example.com/us-news/mississippi">Mississippi</category>
+      <category domain="https://example.com/us-news/alabama">Alabama</category>
+      <category domain="https://example.com/us-news/florida">Florida</category>
+      <category domain="https://example.com/world/zimbabwe">Zimbabwe</category>
+      <category domain="https://example.com/australia-news/australia-news">Australia news</category>
+      <category domain="https://example.com/australia-news/australia-weather">Australia weather</category>
+      <category domain="https://example.com/australia-news/new-south-wales">New South Wales</category>
+      <category domain="https://example.com/environment/flooding">Flooding</category>
+      <category domain="https://example.com/us-news/us-news">US news</category>
+      <category domain="https://example.com/world/world">World news</category>
+      <category domain="https://example.com/world/africa">Africa</category>
+      <category domain="https://example.com/world/extreme-weather">Extreme weather</category>
+      <pubDate>Fri, 09 Oct 2026 09:59:06 GMT</pubDate>
+      <guid>https://example.com/environment/2026/oct/09/isaias-strengthens-first-atlantic-h</guid>
+      <media:content width="140" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 26 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="460" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 27 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <media:content width="700" url="https://img.example.com/image.jpg">
+        <media:credit scheme="urn:ebu">Synthetic credit 28 for fixture rss2_media_content.xml</media:credit>
+      </media:content>
+      <dc:creator>Synthetic creator 33 for fixture rss2_media_content.xml</dc:creator>
+      <dc:date>2026-10-09T09:59:06Z</dc:date>
+    </item>
+  </channel>
+</rss>
