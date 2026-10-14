@@ -1,0 +1,24 @@
+{
+ "ndcg@10": {
+  "mean_history": {
+   "cold_candidates": 0.596026,
+   "cold_users": 0.423527,
+   "overall": 0.57607
+  },
+  "popularity": {
+   "cold_candidates": 0.42031,
+   "cold_users": 0.414946,
+   "overall": 0.43144
+  },
+  "random": {
+   "cold_candidates": 0.421585,
+   "cold_users": 0.396664,
+   "overall": 0.398116
+  },
+  "recency": {
+   "cold_candidates": 0.449027,
+   "cold_users": 0.415824,
+   "overall": 0.419295
+  }
+ }
+}

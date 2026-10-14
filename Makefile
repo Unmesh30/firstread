@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs mind-download
+.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate
 
 VARIANT ?= small
 
@@ -51,3 +51,13 @@ logs: ## Follow logs from the local stack
 # ---- Offline ML (Phase 1) ----
 mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
 	uv run firstread-ml download --variant $(VARIANT) $(if $(ACCEPT_LICENSE),--accept-license)
+
+eda: ## Aggregate EDA report for MIND (VARIANT=small|large) -> ml/reports/
+	uv run firstread-ml eda --variant $(VARIANT)
+
+eval: ## Reproduce the baseline eval: prepare, embed, holdout + dev reports (VARIANT=small|large)
+	uv run firstread-ml eval --variant $(VARIANT) --split holdout
+	uv run firstread-ml eval --variant $(VARIANT) --split dev
+
+eval-gate: ## Synthetic eval-regression gate (no MIND needed; also runs in CI via pytest)
+	uv run firstread-ml eval-gate
