@@ -31,4 +31,27 @@ What data FirstRead uses, where it comes from, and what we never publish.
 - US-centric 2019 news from one publisher platform. Models trained on it inherit its topical and editorial skew.
 
 ## Live news (Phase 2): GDELT and publisher RSS
-Documented in Phase 2. GDELT must be credited with a link to https://www.gdeltproject.org wherever its data appears.
+
+Credit: GDELT data comes from **the GDELT Project, https://www.gdeltproject.org**. Credit it, with that link, wherever GDELT-derived articles appear.
+
+| | GDELT GKG 2.0 files | Publisher RSS |
+|---|---|---|
+| What we read | One zip every 15 min of English-language web articles: URL, outlet domain, page title, sharing image, crawl and publication time | Each permitted feed's items: headline, link, time, thumbnail, description |
+| What we store | URL, headline, outlet domain (as source name), image URL, times, outlet country (ISO), topic, embedding | URL, headline, source name, image URL (unless the permission is text-only), times, topic, embedding. **Descriptions are never stored**; they only shape the embedding |
+| Never stored | Article text, GKG themes, people, quotations, tone | Full text, descriptions, author names |
+| Terms | Free for unlimited use with credit | Only feeds whose own terms explicitly allow website display with attribution (ADR 0007); each feed's verdict and terms URL are in `services/ingest/src/firstread_ingest/config/feeds.yaml` |
+| Placement | Outlet country from GDELT's 2015–2021 domain lookup (pinned by SHA256) plus reviewed overrides | Set per feed (`geo`) |
+| Filters | Blocklist (auto-generated stock tickers, syndicated radio copies), unplaceable domains, English-only, junk/short/stale titles, per-run cap of 50 ranked by story breadth | English-only (per item), junk/short/stale titles |
+
+**Known properties and biases**
+- **US coverage leans on GDELT.** The RSS feeds with explicit permission are mostly the BBC, plus tech, science, South America and climate outlets.
+- **GDELT skews towards outlets that publish a lot,** and towards US local news. The breadth ranking favours stories many outlets carry, and the per-outlet cap limits any one site.
+- **The domain lookup is 2015–2021** and estimates an outlet's country from what it mentions most. It misplaces international outlets (overrides fix the known ones) and doesn't know newer outlets.
+- **Titles only for GDELT.** Embeddings from titles cost the ranking model about 2% nDCG@10 relative (ADR 0007).
+
+**Retention**
+- Articles: 14 days.
+- `story_coverage`: 48 h (trending looks at 24 h).
+- `ingestion_runs`: 30 days.
+
+Retention runs in Phase 2b.
