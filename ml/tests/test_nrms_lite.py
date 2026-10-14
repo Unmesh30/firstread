@@ -144,3 +144,24 @@ def test_tuning_overrides_are_validated() -> None:
         apply_overrides(NRMSLiteConfig(), ["train.epochs=0"])
     with pytest.raises(ValueError, match="override"):
         apply_overrides(NRMSLiteConfig(), ["lr=0.1"])
+
+
+def test_cosine_schedule_decays_lr_to_zero() -> None:
+    from firstread_ml.models.train import train_nrms_lite
+
+    imps = make_impressions(
+        [[1, 2], [], [3]] * 4,
+        [[4, 5, 6], [7, 8], [9, 1, 2]] * 4,
+        [[1, 0, 0], [0, 1], [0, 0, 1]] * 4,
+    )
+    emb = F.normalize(torch.randn(10, EMBED_DIM), dim=-1).numpy()
+    cfg = NRMSLiteConfig.model_validate(
+        {
+            "model": {"heads": 4, "query_dim": 8},
+            "train": {"epochs": 2, "batch_size": 4, "device": "cpu", "lr_schedule": "cosine"},
+        }
+    )
+    _, history = train_nrms_lite(cfg, imps, emb, emb[0])
+    assert history[-1]["lr"] == pytest.approx(0.0, abs=1e-9)
+    assert history[0]["lr"] > 0
+    assert all(np.isfinite(h["loss"]) for h in history)
