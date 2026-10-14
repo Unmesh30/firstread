@@ -86,9 +86,34 @@ def _eda(args: argparse.Namespace) -> None:
 
 
 def _eval_gate(args: argparse.Namespace) -> None:
-    from firstread_ml.eval import gate
+    if not args.real:
+        from firstread_ml.eval import gate
 
-    raise SystemExit(gate.main(update=args.update))
+        raise SystemExit(gate.main(update=args.update))
+    from firstread_ml.eval import gate_real
+    from firstread_ml.paths import data_dir
+
+    out = data_dir() / "release" / "eval-gate-real-last.json"
+    code, _ = gate_real.main(args.release / "user_encoder.onnx", out, update=args.update)
+    raise SystemExit(code)
+
+
+def _release(args: argparse.Namespace) -> None:
+    from firstread_ml import release
+    from firstread_ml.paths import data_dir
+
+    try:
+        if args.action == "build":
+            release.build(args.version, release.default_sources(), dry_run=args.dry_run)
+        elif args.action == "upload":
+            release.upload(args.version, data_dir() / "release" / f"v{args.version}")
+        elif args.action == "verify":
+            release.verify_remote(args.version)
+        else:
+            release.verify_tag(args.version)
+    except release.ReleaseError as e:
+        print(f"RELEASE FAIL: {e}")
+        raise SystemExit(1) from e
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -139,9 +164,21 @@ def build_parser() -> argparse.ArgumentParser:
     variant_arg(p)
     p.set_defaults(func=_eda)
 
-    p = sub.add_parser("eval-gate", help="synthetic eval-regression gate (no MIND needed)")
+    p = sub.add_parser("eval-gate", help="eval-regression gate (synthetic; --real for MIND-small)")
     p.add_argument("--update", action="store_true", help="rewrite the expected values")
+    p.add_argument(
+        "--real", action="store_true", help="gate an exported ONNX user encoder on MIND-small dev"
+    )
+    p.add_argument(
+        "--release", type=Path, default=Path("data/release/dry-run"), help="release folder"
+    )
     p.set_defaults(func=_eval_gate)
+
+    p = sub.add_parser("release", help="build / upload / verify a model release (ADR 0005)")
+    p.add_argument("action", choices=["build", "upload", "verify", "verify-tag"])
+    p.add_argument("--version", required=True, help="e.g. 0.1.0 (tag v0.1.0)")
+    p.add_argument("--dry-run", action="store_true", help="build on any branch; never uploadable")
+    p.set_defaults(func=_release)
     return parser
 
 

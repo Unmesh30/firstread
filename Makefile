@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate reproduce mlflow-ui
+.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate eval-gate-real reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -70,6 +70,26 @@ reproduce: ## All Phase 1 numbers for VARIANT: EDA, holdout + dev eval incl. NRM
 
 eval-gate: ## Synthetic eval-regression gate (no MIND needed; also runs in CI via pytest)
 	uv run firstread-ml eval-gate
+
+RELEASE ?= data/release/dry-run
+eval-gate-real: ## Real-data gate: ONNX user encoder in RELEASE vs mean_history on MIND-small dev (local)
+	uv run firstread-ml eval-gate --real --release $(RELEASE)
+
+# ---- Model release (Phase 1c, ADR 0005) ----
+release-build: ## Build data/release/vVERSION (DRY_RUN=1 on a branch; real builds need a clean main)
+	@test -n "$(VERSION)" || (echo "usage: make release-build VERSION=0.1.0 [DRY_RUN=1]"; exit 2)
+	uv run firstread-ml release build --version $(VERSION) $(if $(DRY_RUN),--dry-run)
+
+# .env is sourced in a subshell; the token is never echoed.
+release-upload: ## Upload data/release/vVERSION to the HF Hub, tag it and verify hashes (needs HF_TOKEN)
+	@test -n "$(VERSION)" || (echo "usage: make release-upload VERSION=0.1.0"; exit 2)
+	@set -a && . ./.env && set +a && uv run firstread-ml release upload --version $(VERSION)
+
+release-verify: ## Re-download vVERSION from the HF Hub and check every SHA256
+	uv run firstread-ml release verify --version $(VERSION)
+
+release-verify-tag: ## Check that git tag vVERSION is the commit recorded in the HF manifest
+	uv run firstread-ml release verify-tag --version $(VERSION)
 
 mlflow-ui: ## Browse local MLflow runs (sqlite store in data/mlruns) at http://127.0.0.1:5000
 	uv run mlflow ui --backend-store-uri sqlite:///$(CURDIR)/data/mlruns/mlflow.db --host 127.0.0.1

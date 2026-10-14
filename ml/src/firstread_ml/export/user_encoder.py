@@ -10,6 +10,7 @@ needs the dot product, and the API reads ``score_scale`` from the metadata when
 it needs scores on the training logit scale.
 """
 
+import warnings
 from pathlib import Path
 
 import onnx
@@ -34,15 +35,18 @@ def export_user_encoder(
     mask = torch.zeros(2, HISTORY_LEN, dtype=torch.bool)
     mask[1, -3:] = True  # one empty and one partial row, so neither path is pruned
     batch = torch.export.Dim("batch", min=1, max=MAX_BATCH)
-    program = torch.onnx.export(
-        model,
-        (hist, mask),
-        dynamo=True,
-        opset_version=OPSET,
-        input_names=list(INPUTS),
-        output_names=[OUTPUT],
-        dynamic_shapes={"hist": {0: batch}, "mask": {0: batch}},
-    )
+    with warnings.catch_warnings():
+        # Both inputs share the one "batch" Dim on purpose; torch warns about the alias.
+        warnings.filterwarnings("ignore", message=".*shares the same shape constraints.*")
+        program = torch.onnx.export(
+            model,
+            (hist, mask),
+            dynamo=True,
+            opset_version=OPSET,
+            input_names=list(INPUTS),
+            output_names=[OUTPUT],
+            dynamic_shapes={"hist": {0: batch}, "mask": {0: batch}},
+        )
     if program is None:
         raise RuntimeError("torch.onnx.export returned no program")
     path.parent.mkdir(parents=True, exist_ok=True)
