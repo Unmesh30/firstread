@@ -61,8 +61,8 @@ Never clicked in training (not a train positive, not in any train history).
 | movies | 672 | 1.0% |
 | kids | 22 | 0.0% |
 | middleeast | 2 | 0.0% |
-| northamerica | 1 | 0.0% |
 | games | 1 | 0.0% |
+| northamerica | 1 | 0.0% |
 
 ![History length](figures/eda-small-history-length.svg)
 ![Candidates per impression](figures/eda-small-candidates.svg)

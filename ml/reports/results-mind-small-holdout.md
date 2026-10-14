@@ -9,8 +9,8 @@ Slice and metric definitions: [ADR 0003](../../docs/adr/0003-mind-data-and-eval-
 - Dataset revision: `2115068f457b577f93a268fffe22373e45727d89`; seed 0
 - Embedding cache id: `d84285fba6af8c71`
 
-> Bar to beat [overall]: mean_history nDCG@10 = 0.3662
-> Bar to beat [cold_candidates]: mean_history nDCG@10 = 0.4340
+> ACCEPT PASS [overall] every NRMS-lite seed must beat mean_history 0.3662: s0 0.3765, s1 0.3776, s2 0.3767
+> ACCEPT PASS [cold_candidates] every NRMS-lite seed must beat mean_history 0.4340: s0 0.4525, s1 0.4546, s2 0.4531
 
 ## Overall
 
@@ -21,7 +21,11 @@ Impressions: 30,270
 | random | 0.5006 | 0.2032 | 0.2037 | 0.2637 |
 | popularity | 0.5163 | 0.2160 | 0.2183 | 0.2783 |
 | recency | 0.5384 | 0.2282 | 0.2301 | 0.2884 |
-| mean_history | **0.6262** | **0.2888** | **0.3079** | **0.3662** |
+| mean_history | 0.6262 | 0.2888 | 0.3079 | 0.3662 |
+| nrms_lite_s0 | 0.6499 | 0.2932 | 0.3160 | 0.3765 |
+| nrms_lite_s1 | **0.6505** | **0.2945** | **0.3175** | **0.3776** |
+| nrms_lite_s2 | 0.6504 | 0.2937 | 0.3170 | 0.3767 |
+| **nrms_lite, mean ± std (3 seeds)** | 0.6503 ± 0.0003 | 0.2938 ± 0.0007 | 0.3168 ± 0.0007 | 0.3769 ± 0.0006 |
 
 ## Cold-start candidates (never clicked in training)
 
@@ -32,7 +36,11 @@ Impressions: 21,489
 | random | 0.4984 | 0.2491 | 0.2603 | 0.3349 |
 | popularity | 0.5000 | 0.2499 | 0.2604 | 0.3352 |
 | recency | 0.5322 | 0.2796 | 0.2915 | 0.3646 |
-| mean_history | **0.6147** | **0.3380** | **0.3676** | **0.4340** |
+| mean_history | 0.6147 | 0.3380 | 0.3676 | 0.4340 |
+| nrms_lite_s0 | 0.6536 | 0.3504 | 0.3868 | 0.4525 |
+| nrms_lite_s1 | **0.6542** | **0.3524** | **0.3888** | **0.4546** |
+| nrms_lite_s2 | 0.6540 | 0.3512 | 0.3876 | 0.4531 |
+| **nrms_lite, mean ± std (3 seeds)** | 0.6540 ± 0.0003 | 0.3513 ± 0.0010 | 0.3877 ± 0.0010 | 0.4534 ± 0.0011 |
 
 ## Cold users (history <= 2 clicks)
 
@@ -43,26 +51,48 @@ Impressions: 1,932, of which 772 with empty history
 | random | 0.4920 | 0.2089 | 0.2103 | 0.2727 |
 | popularity | 0.5285 | 0.2322 | 0.2419 | 0.3017 |
 | recency | 0.5250 | 0.2338 | 0.2325 | 0.2880 |
-| mean_history | **0.5628** | **0.2561** | **0.2618** | **0.3208** |
+| mean_history | 0.5628 | **0.2561** | 0.2618 | **0.3208** |
+| nrms_lite_s0 | **0.5708** | 0.2516 | 0.2620 | 0.3188 |
+| nrms_lite_s1 | 0.5694 | 0.2531 | 0.2638 | 0.3199 |
+| nrms_lite_s2 | 0.5688 | 0.2530 | **0.2642** | 0.3204 |
+| **nrms_lite, mean ± std (3 seeds)** | 0.5697 ± 0.0011 | 0.2526 ± 0.0008 | 0.2633 ± 0.0012 | 0.3197 ± 0.0008 |
+
+## nDCG@10 gain over mean_history (paired bootstrap)
+
+Per impression: mean nDCG@10 over NRMS-lite seeds minus mean_history's, on the same impression. 1,000 resamples of impressions with replacement (seed 12345); 95% CI = 2.5th to 97.5th percentile of the mean gain.
+
+| Slice | Impressions | Mean gain | 95% CI | Resamples with gain ≤ 0 | Gain per seed |
+|---|---:|---:|---|---:|---|
+| overall | 30,270 | +0.0108 | [+0.0078, +0.0140] | 0.0% | +0.0103, +0.0115, +0.0105 |
+| cold_candidates | 21,489 | +0.0194 | [+0.0155, +0.0232] | 0.0% | +0.0186, +0.0206, +0.0191 |
+
+## Reference: published NRMS (not directly comparable)
+
+Wu et al., ACL 2020 (MIND paper), Table 3, MIND-large test set, mean of 10 runs. Different split (test vs our dev), and NRMS learns its own news encoder, while NRMS-lite uses frozen bge-small embeddings (ADR 0004).
+
+| | AUC | MRR | NDCG@5 | NDCG@10 |
+|---|---:|---:|---:|---:|
+| NRMS, overall | 0.6776 | 0.3305 | 0.3594 | 0.4163 |
+| NRMS, unseen users | 0.6741 | 0.3305 | 0.3588 | 0.4155 |
 
 ## Per category (nDCG@10)
 
 Candidates restricted to one category. ⚠ = fewer than 100 impressions (low-n).
 No qualifying impressions (omitted): games, kids, middleeast, northamerica.
 
-| Category | Impressions | random | popularity | recency | mean_history |
-|---|---:|---:|---:|---:|---:|
-| autos | 1,070 | 0.5528 | 0.6010 | 0.5697 | 0.5832 |
-| entertainment | 1,219 | 0.6044 | 0.6022 | 0.6944 | 0.6686 |
-| finance | 2,894 | 0.5812 | 0.6073 | 0.5743 | 0.6362 |
-| foodanddrink | 2,030 | 0.5645 | 0.5625 | 0.5865 | 0.5869 |
-| health | 1,698 | 0.5744 | 0.6124 | 0.5570 | 0.6232 |
-| lifestyle | 5,848 | 0.5917 | 0.6041 | 0.6584 | 0.6831 |
-| movies | 327 | 0.6871 | 0.6640 | 0.7093 | 0.7509 |
-| music | 2,056 | 0.6523 | 0.6649 | 0.6801 | 0.6656 |
-| news | 9,318 | 0.4733 | 0.4985 | 0.4931 | 0.5472 |
-| sports | 2,891 | 0.5517 | 0.5533 | 0.5657 | 0.5834 |
-| travel | 1,526 | 0.5910 | 0.6300 | 0.5742 | 0.6261 |
-| tv | 1,814 | 0.7207 | 0.6843 | 0.7223 | 0.7942 |
-| video | 538 | 0.6388 | 0.6656 | 0.6451 | 0.7205 |
-| weather | 154 | 0.7267 | 0.6778 | 0.7365 | 0.7330 |
+| Category | Impressions | random | popularity | recency | mean_history | nrms_lite_s0 | nrms_lite_s1 | nrms_lite_s2 |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| autos | 1,070 | 0.5528 | 0.6010 | 0.5697 | 0.5832 | 0.6184 | 0.6188 | 0.6156 |
+| entertainment | 1,219 | 0.6044 | 0.6022 | 0.6944 | 0.6686 | 0.6477 | 0.6490 | 0.6500 |
+| finance | 2,894 | 0.5812 | 0.6073 | 0.5743 | 0.6362 | 0.6585 | 0.6592 | 0.6583 |
+| foodanddrink | 2,030 | 0.5645 | 0.5625 | 0.5865 | 0.5869 | 0.6076 | 0.6081 | 0.6067 |
+| health | 1,698 | 0.5744 | 0.6124 | 0.5570 | 0.6232 | 0.6439 | 0.6445 | 0.6447 |
+| lifestyle | 5,848 | 0.5917 | 0.6041 | 0.6584 | 0.6831 | 0.6877 | 0.6908 | 0.6877 |
+| movies | 327 | 0.6871 | 0.6640 | 0.7093 | 0.7509 | 0.7728 | 0.7786 | 0.7712 |
+| music | 2,056 | 0.6523 | 0.6649 | 0.6801 | 0.6656 | 0.6887 | 0.6909 | 0.6859 |
+| news | 9,318 | 0.4733 | 0.4985 | 0.4931 | 0.5472 | 0.5630 | 0.5644 | 0.5646 |
+| sports | 2,891 | 0.5517 | 0.5533 | 0.5657 | 0.5834 | 0.6010 | 0.6020 | 0.6002 |
+| travel | 1,526 | 0.5910 | 0.6300 | 0.5742 | 0.6261 | 0.6300 | 0.6272 | 0.6233 |
+| tv | 1,814 | 0.7207 | 0.6843 | 0.7223 | 0.7942 | 0.7470 | 0.7462 | 0.7457 |
+| video | 538 | 0.6388 | 0.6656 | 0.6451 | 0.7205 | 0.7129 | 0.7170 | 0.7152 |
+| weather | 154 | 0.7267 | 0.6778 | 0.7365 | 0.7330 | 0.7413 | 0.7354 | 0.7520 |
