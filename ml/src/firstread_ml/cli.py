@@ -79,6 +79,30 @@ def _classify(args: argparse.Namespace) -> None:
     )
 
 
+def _topics(args: argparse.Namespace) -> None:
+    from firstread_ml.models.topic_classifier import run
+
+    r = run(args.variant)
+    for mode, t in r["test"].items():
+        print(
+            f"topics ({mode}): accuracy {t['accuracy']:.4f}, macro-F1 {t['macro_f1']:.4f} "
+            f"on {r['n_test_dev_only']:,} dev-only articles"
+        )
+    verdict = "PASS" if r["gate"]["passed"] else "FAIL"
+    print(f"low-confidence threshold {r['threshold']:.2f}; gate {verdict}")
+    for f in r["gate"]["failures"]:
+        print(f"  GATE FAIL {f}")
+
+
+def _skew(args: argparse.Namespace) -> None:
+    from firstread_ml.eval import skew
+
+    r = skew.run(args.release / "user_encoder.onnx")
+    j, m = skew.write_report(r)
+    print(json.dumps(r["decision"], indent=1))
+    print(f"wrote {j} and {m}")
+
+
 def _eda(args: argparse.Namespace) -> None:
     from firstread_ml.eda import run
 
@@ -104,7 +128,8 @@ def _release(args: argparse.Namespace) -> None:
 
     try:
         if args.action == "build":
-            release.build(args.version, release.default_sources(), dry_run=args.dry_run)
+            sources = release.default_sources(inherit=args.inherit_user_encoder)
+            release.build(args.version, sources, dry_run=args.dry_run)
         elif args.action == "upload":
             release.upload(args.version, data_dir() / "release" / f"v{args.version}")
         elif args.action == "verify":
@@ -160,6 +185,16 @@ def build_parser() -> argparse.ArgumentParser:
     variant_arg(p)
     p.set_defaults(func=_classify)
 
+    p = sub.add_parser("topics", help="train + evaluate the topic classifier (ADR 0006)")
+    p.add_argument("--variant", choices=["small", "large"], default="large")
+    p.set_defaults(func=_topics)
+
+    p = sub.add_parser("skew", help="title-only vs title+abstract study on MIND-small dev")
+    p.add_argument(
+        "--release", type=Path, default=Path("data/release/v0.1.0"), help="release folder"
+    )
+    p.set_defaults(func=_skew)
+
     p = sub.add_parser("eda", help="aggregate EDA report -> ml/reports/eda-mind-<variant>.md")
     variant_arg(p)
     p.set_defaults(func=_eda)
@@ -178,6 +213,12 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("action", choices=["build", "upload", "verify", "verify-tag"])
     p.add_argument("--version", required=True, help="e.g. 0.1.0 (tag v0.1.0)")
     p.add_argument("--dry-run", action="store_true", help="build on any branch; never uploadable")
+    p.add_argument(
+        "--inherit-user-encoder",
+        metavar="VERSION",
+        default=None,
+        help="copy the user encoder from release VERSION (e.g. 0.1.0); ships the topic classifier",
+    )
     p.set_defaults(func=_release)
     return parser
 

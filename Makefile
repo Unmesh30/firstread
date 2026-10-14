@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate eval-gate-real reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -72,13 +72,19 @@ eval-gate: ## Synthetic eval-regression gate (no MIND needed; also runs in CI vi
 	uv run firstread-ml eval-gate
 
 RELEASE ?= data/release/dry-run
+topics: ## Train + evaluate the topic classifier on MIND-large (ADR 0006) -> ml/reports/
+	uv run firstread-ml topics --variant large
+
+skew: ## Title-only vs title+abstract ranking study on MIND-small dev (needs data/release/v0.1.0)
+	uv run firstread-ml skew --release data/release/v0.1.0
+
 eval-gate-real: ## Real-data gate: ONNX user encoder in RELEASE vs mean_history on MIND-small dev (local)
 	uv run firstread-ml eval-gate --real --release $(RELEASE)
 
 # ---- Model release (Phase 1c, ADR 0005) ----
-release-build: ## Build data/release/vVERSION (DRY_RUN=1 on a branch; real builds need a clean main)
+release-build: ## Build data/release/vVERSION (DRY_RUN=1 on a branch, INHERIT=0.1.0 to reuse that encoder)
 	@test -n "$(VERSION)" || (echo "usage: make release-build VERSION=0.1.0 [DRY_RUN=1]"; exit 2)
-	uv run firstread-ml release build --version $(VERSION) $(if $(DRY_RUN),--dry-run)
+	uv run firstread-ml release build --version $(VERSION) $(if $(DRY_RUN),--dry-run) $(if $(INHERIT),--inherit-user-encoder $(INHERIT))
 
 # .env is sourced in a subshell; the token is never echoed.
 release-upload: ## Upload data/release/vVERSION to the HF Hub, tag it and verify hashes (needs HF_TOKEN)
