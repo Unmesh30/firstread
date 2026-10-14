@@ -246,7 +246,7 @@ uv run firstread-ml tune --variant small --label cos-lr1e-3-s1 --set train.epoch
 # Final numbers: 3 seeds, all baselines, dev evaluated once, plus the classifier
 make reproduce VARIANT=small          # ~35 min on an M-series Mac
 make mind-download VARIANT=large ACCEPT_LICENSE=1
-make reproduce VARIANT=large          # overnight (see section 6 for timings)
+make reproduce VARIANT=large          # ~7 h 50 min after a 56 min one-time embed (section 6)
 make mlflow-ui                        # browse runs at http://127.0.0.1:5000
 ```
 ---
@@ -290,7 +290,7 @@ Measured runtimes on an M-series Mac (16 GB):
 | `embed` (65,238 articles) | 13 min 41 s (~79 texts/s); 96 MB cache |
 | `eval` holdout + dev (4 baselines, all slices) | 14 s once embeddings are cached |
 
-Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-small-dev.json`. MIND-large is used in 1b. Extrapolating, its ~130K articles take ~25–30 min to embed (one-time, cached).
+Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-small-dev.json`. MIND-large is used in 1b; its measured runtimes are below, after the NRMS-lite results.
 
 
 **MIND-small results with NRMS-lite** (dev, evaluated once, 3 seeds; `ml/reports/results-mind-small-dev.md`):
@@ -307,6 +307,34 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - The category classifier on 13,955 dev-only articles reaches **accuracy 0.749, macro-F1 0.549**, against a majority-class reference of 0.348 (`ml/reports/classifier-mind-small.md`).
 - Training cost on an M-series Mac: ~60 s/epoch on MPS for MIND-small (190K–236K samples/epoch). The whole `make reproduce VARIANT=small` (EDA, 6 trainings, 2 evals, classifier) took about 50 minutes.
 
+**MIND-large final results** (dev, 376,471 impressions, evaluated once, 3 seeds with the locked config; `ml/reports/results-mind-large-dev.md`):
+
+| Model | Overall nDCG@10 | Cold-start nDCG@10 (125,472 imps) | Cold users nDCG@10 (25,688 imps) | Overall AUC |
+|---|---:|---:|---:|---:|
+| random | 0.2864 | 0.4302 | 0.3119 | 0.5000 |
+| popularity | 0.3079 | 0.4303 | 0.3348 | 0.5385 |
+| recency | 0.2946 | 0.4830 | 0.3075 | 0.5117 |
+| mean_history (best baseline) | 0.3906 | 0.5332 | 0.3552 | 0.6247 |
+| NRMS-lite, seed 0 / 1 / 2 | 0.4149 / 0.4141 / 0.4145 | 0.5515 / 0.5501 / 0.5501 | 0.3625 / 0.3622 / 0.3622 | 0.6624 / 0.6618 / 0.6621 |
+| **NRMS-lite, mean ± std** | **0.4145 ± 0.0004** | **0.5506 ± 0.0008** | **0.3623 ± 0.0001** | **0.6621 ± 0.0003** |
+| **Paired gain over mean_history, 95% CI** | **+0.0239 [+0.0232, +0.0248]** | **+0.0174 [+0.0159, +0.0188]** | | |
+
+- `ACCEPT PASS` on overall and cold-start for every seed; no bootstrap resample showed a gain ≤ 0. This meets the P1 acceptance criterion.
+- Holdout (tuning split, 431,517 impressions): NRMS-lite 0.3882 ± 0.0003 overall and 0.4921 ± 0.0002 cold-start, against mean_history's 0.3668 / 0.4685. The paired gain is +0.0214 [+0.0206, +0.0223] overall.
+- More data helps the learned part. The gain over mean_history grew from +0.017 (MIND-small) to +0.024 (MIND-large) overall, with the same config and no retuning.
+- Against the published NRMS (MIND-large **test**, nDCG@10 0.4163, AUC 0.6776), NRMS-lite's dev 0.4145 / 0.6621 is in the same range. It is not directly comparable: a different split, and NRMS learns its own news encoder (ADR 0004).
+- Category classifier: **accuracy 0.721, macro-F1 0.598** on 2,624 dev-only articles (majority-class reference 0.326; `ml/reports/classifier-mind-large.md`). MIND-large's train news covers far more of dev, so this test set is 5× smaller than MIND-small's, with a different class mix. Don't compare the two accuracies directly.
+
+Measured runtimes for MIND-large on an M-series Mac (16 GB):
+
+| Step | MIND-large |
+|---|---|
+| Download (635 MB) + verify + extract | 2.6 GB raw on disk; 375 MB parquet |
+| `embed` (104,151 articles) | 55 min 42 s (~31 texts/s), peak RSS 4.6 GB; 153 MB cache |
+| Baselines, holdout + dev (all slices) | 15–40 s each |
+| NRMS-lite training on MPS | ~15 min/epoch (2.7M samples holdout-fit, 3.4M full train), ~1 GB RSS; 65–83 min per seed |
+| `make reproduce VARIANT=large` (EDA, 6 trainings, 2 evals, classifier) | 7 h 47 min, after the embed |
+
 **Reading the 1b results (`results-mind-<variant>-dev.md`):**
 - **Acceptance lines.** `ACCEPT PASS [overall]` and `[cold_candidates]` mean *every* NRMS-lite seed beat the best baseline. One seed below the bar is a FAIL, by design.
 - **Per-seed rows plus `mean ± std`.** If std is comparable to the gap over the baseline, the gain isn't solid.
@@ -319,7 +347,7 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - [ADR 0003](../adr/0003-mind-data-and-eval-protocol.md): HF mirror with SHA pins, license gate, time-based holdout, slice definitions, tie-breaking, eval-gate strategy.
 - **fastembed as an optional extra** rather than a hard dependency of core: the API image never embeds text, so it shouldn't carry ONNX Runtime and tokenizers (until P3, which needs ONNX Runtime for the user encoder only). CI checks that ML packages stay out of the image.
 - **Pinning the model revision ourselves** instead of trusting fastembed's "latest". It costs one `snapshot_download` call and buys reproducibility.
-- **Keep the pinned int8 model (`Qdrant/bge-small-en-v1.5-onnx-Q`) rather than switching to BAAI's fp32 ONNX export.** fp32 might embed faster on ARM, but embedding is a one-time, cached cost (MIND-small 14 min, MIND-large ~25–30 min), and switching would change every pin (source repo, revision, file SHA256), the cache key and the golden file. int8's small numeric effects (cross-platform ≤ 2.3e-4, padding ≤ 4.4e-4) are bounded by tests and far below anything that changes a ranking. Owner decision, 2026-10-14.
+- **Keep the pinned int8 model (`Qdrant/bge-small-en-v1.5-onnx-Q`) rather than switching to BAAI's fp32 ONNX export.** fp32 might embed faster on ARM, but embedding is a one-time, cached cost (MIND-small 14 min, MIND-large 56 min), and switching would change every pin (source repo, revision, file SHA256), the cache key and the golden file. int8's small numeric effects (cross-platform ≤ 2.3e-4, padding ≤ 4.4e-4) are bounded by tests and far below anything that changes a ranking. Owner decision, 2026-10-14.
 - **polars + numpy** instead of pandas: MIND-large has ~83M candidate rows in train, and polars parses it in seconds.
 - **SVG plots** so the existing `*.png` ignore rule stays, and diffs are text.
 
@@ -376,6 +404,8 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - **The pre-commit mypy hook sees untracked files.** pre-commit stashes unstaged changes to tracked files but leaves new untracked files in place. A partial commit can therefore fail type-checking against a half-old tree. Stash unrelated new files (`git stash push -u -- <paths>`) before committing in pieces.
 - **A partial `eval` once overwrote a committed report.** Running `eval --models mean_history,nrms_lite` rewrote `results-mind-small-holdout.md` without the other baselines. `report.write` now refuses to write a report missing any of the four baselines, and partial runs go to `data/reports-scratch/`.
 - **The classifier's best C was at the edge of the grid.** C = 10 was the largest value tried. Extending to 30 and 100 confirmed it as an interior optimum; otherwise "best" might just mean "biggest tried".
+- **The MIND-large embed estimate was off by 2×.** The plan extrapolated ~25–30 min from MIND-small's throughput. It took 56 min: ~31 texts/s against ~79/s on MIND-small, although text lengths are almost identical (abstract mean 36.4 vs 35.0 words, per the EDA reports). The cause wasn't isolated; it may be machine load or thermals during a long run, but that's unverified. Time a sample on the actual machine before promising a runtime, and budget for the long run being slower.
+- **The classifier test set shrinks with more training data.** "Articles that appear only in dev" is 13,955 for MIND-small but 2,624 for MIND-large, since the large train set already contains most dev articles. The large numbers are on a smaller, differently mixed test set.
 - **The published NRMS numbers had to be read, not recalled.** The paper's PDF text scrambles Table 3's layout. The columns were mapped by the repeating four-number groups and cross-checked against the paper's prose (NRMS best, DFM below DSSM). Our planning-stage recollection (nDCG@10 41.98) was wrong; the table says 41.63.
 ---
 

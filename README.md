@@ -44,9 +44,16 @@ MIND is license-gated: read the [terms](https://github.com/msnews/MIND/blob/mast
 
 ```bash
 make mind-download VARIANT=small ACCEPT_LICENSE=1   # verified download into data/ (gitignored)
-make eval VARIANT=small                              # baselines -> ml/reports/results-mind-small-*.md
-make eda VARIANT=small                               # aggregate dataset report
+make reproduce VARIANT=small                         # EDA, 4 baselines + NRMS-lite (3 seeds), classifier (~50 min)
+make reproduce VARIANT=large                         # final numbers (~9 h on an M-series Mac, overnight)
 ```
+
+MIND-large dev, nDCG@10 (NRMS-lite: mean ± std over 3 seeds; gain: paired bootstrap 95% CI):
+
+| | Best baseline (mean_history) | NRMS-lite | Gain |
+|---|---:|---:|---|
+| Overall | 0.3906 | **0.4145 ± 0.0004** | +0.0239 [+0.0232, +0.0248] |
+| Cold-start candidates | 0.5332 | **0.5506 ± 0.0008** | +0.0174 [+0.0159, +0.0188] |
 
 Results and the evaluation protocol: [ml/reports/](ml/reports/), [ADR 0003](docs/adr/0003-mind-data-and-eval-protocol.md), [docs/learn/01-offline-ml.md](docs/learn/01-offline-ml.md).
 
