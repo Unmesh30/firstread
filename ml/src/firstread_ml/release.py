@@ -85,6 +85,17 @@ FILES = (
     "user_encoder.onnx",
 )
 DRY_RUN_DIR = "dry-run"
+# Releases a build may inherit from, pinned in code because Hub tags can move.
+# A tag must still resolve to `hub_commit`; files are downloaded at that commit,
+# and the manifest must hash to `manifest_sha256` (same rule as ingest's models.py).
+PINNED_RELEASES: dict[str, dict[str, str]] = {
+    "0.1.0": {
+        "hub_commit": "f29ec56afbb760c04db94e638d9b60c3039658bd",
+        "manifest_sha256": "cf094e8e88fc4aa5a57676fc02717c75efaa0fba887044c4a7acdd6fb1477584",
+    },
+}
+# From this version on, every release ships the topic classifier (ADR 0006).
+TOPICS_SINCE = (0, 2, 0)
 REPORT_SLICES = ("overall", "cold_candidates", "cold_users")
 
 
@@ -140,6 +151,7 @@ class Sources:
     histories: list[NDArray[np.int32]]  # real click histories (article indices)
     gate: Callable[[Path, Path], tuple[int, dict[str, Any]]]  # (onnx, out) -> (code, result)
     inherit: Path | None = None  # verified folder of an earlier release to take the encoder from
+    inherit_manifest_sha256: str | None = None  # the pinned hash of that folder's manifest.json
     topic_map: Path | None = None  # required when the classifier is the topic classifier
 
 
@@ -157,8 +169,11 @@ def find_checkpoint(model_dir: Path, cfg: NRMSLiteConfig, embedding_id: str) -> 
 
 
 def default_sources(data_root: Path | None = None, inherit: str | None = None) -> Sources:
-    """The real inputs: MIND-large classifier, MIND-small gate, and either the seed-0
-    MIND-large dev checkpoint or (``inherit="0.1.0"``) the encoder of that release."""
+    """The real inputs: the MIND-large topic classifier, the MIND-small gate, and either
+    the seed-0 MIND-large dev checkpoint or (``inherit="0.1.0"``) that release's encoder.
+
+    v0.1.0 (the 15-category classifier) is released and immutable, so new builds
+    always ship the topic classifier, whichever way the encoder is produced."""
     from firstread_ml.embed_cache import load_or_build
     from firstread_ml.eval import gate_real
     from firstread_ml.eval.harness import load_eval_data
@@ -169,9 +184,11 @@ def default_sources(data_root: Path | None = None, inherit: str | None = None) -
     root = data_root or data_dir()
     ckpt: Path | None = None
     inherit_dir: Path | None = None
+    inherit_sha: str | None = None
     if inherit:
         inherit_dir = root / "release" / f"inherit-v{inherit}"
         fetch_release(inherit, inherit_dir)
+        inherit_sha = PINNED_RELEASES[inherit]["manifest_sha256"]
     else:
         cfg = load_config(DEFAULT_CONFIG).model_copy(update={"seed": SHIPPED_SEED})
         ckpt = find_checkpoint(
@@ -181,34 +198,51 @@ def default_sources(data_root: Path | None = None, inherit: str | None = None) -
     proc = prepare(v, raw_dir=mind_raw_dir(data_root), out_dir=processed_dir(v, data_root))
     test = load_eval_data(v, "dev", data_root).test
     test = test.take(gate_real.subset_rows(test.n))
-    topics = inherit is not None  # releases from v0.2.0 ship the topic classifier
     return Sources(
         checkpoint=ckpt,
-        classifier_dir=root / "models" / "large" / ("topic_classifier" if topics else "classifier"),
+        classifier_dir=root / "models" / "large" / "topic_classifier",
         results=reports_dir() / "results-mind-large-dev.json",
-        classifier_report=reports_dir()
-        / ("topic-classifier-mind-large.json" if topics else "classifier-mind-large.json"),
+        classifier_report=reports_dir() / "topic-classifier-mind-large.json",
         model_card=REPO_ROOT / "docs" / "model-card.md",
         emb=load_or_build(v, load_news(v, proc), None, data_root),
         histories=test.histories(slice(0, 512)),
         gate=lambda onnx_path, out: gate_real.main(onnx_path, out, data_root=data_root),
         inherit=inherit_dir,
-        topic_map=TOPIC_MAP if topics else None,
+        inherit_manifest_sha256=inherit_sha,
+        topic_map=TOPIC_MAP,
     )
 
 
 def fetch_release(version: str, dest: Path, api: Any = None) -> dict[str, Any]:
-    """Download every file of release ``version`` into ``dest`` and verify its manifest."""
+    """Download pinned release ``version`` into ``dest`` and verify it against the pin.
+
+    Refuses if the version isn't pinned in ``PINNED_RELEASES``, if its tag no longer
+    resolves to the pinned Hub commit, or if the manifest's SHA256 differs. Files
+    are downloaded at the pinned commit, not the (movable) tag.
+    """
+    pin = PINNED_RELEASES.get(version)
+    if pin is None:
+        raise ReleaseError(f"v{version} is not pinned in PINNED_RELEASES; refusing to inherit")
     hub = api or _public_hub()
-    dest.mkdir(parents=True, exist_ok=True)
     tag = f"v{version}"
-    get = lambda n: hub.hf_hub_download(HF_REPO, n, revision=tag, local_dir=dest)  # noqa: E731
+    resolved = hub.model_info(HF_REPO, revision=tag).sha
+    if resolved != pin["hub_commit"]:
+        raise ReleaseError(
+            f"{HF_REPO}@{tag} resolves to {resolved}, but {pin['hub_commit']} is pinned; "
+            "the tag moved"
+        )
+    dest.mkdir(parents=True, exist_ok=True)
+    get = lambda n: hub.hf_hub_download(  # noqa: E731
+        HF_REPO, n, revision=pin["hub_commit"], local_dir=dest
+    )
     get("manifest.json")
+    if sha256(dest / "manifest.json") != pin["manifest_sha256"]:
+        raise ReleaseError(f"{tag} manifest.json SHA256 differs from the pinned value")
     manifest: dict[str, Any] = json.loads((dest / "manifest.json").read_text())
     for name in manifest["files"]:
         get(name)
     verify_files(dest, manifest)
-    print(f"fetched {HF_REPO}@{tag} -> {dest} (hashes verified)")
+    print(f"fetched {HF_REPO}@{tag} = {pin['hub_commit'][:12]} -> {dest} (pinned, hashes verified)")
     return manifest
 
 
@@ -360,8 +394,23 @@ def verify_files(folder: Path, manifest: dict[str, Any]) -> dict[str, Any]:
 INHERITED_FILES = ("user_encoder.onnx", "population.npy", "config.yaml")
 
 
-def inherit_user_encoder(prev_dir: Path, out: Path) -> dict[str, Any]:
-    """Copy the encoder files of an earlier release byte for byte; return its manifest."""
+def _version_tuple(version: str) -> tuple[int, ...]:
+    try:
+        return tuple(int(x) for x in version.split("."))
+    except ValueError as e:
+        raise ReleaseError(f"version {version!r} is not X.Y.Z") from e
+
+
+def inherit_user_encoder(prev_dir: Path, out: Path, manifest_sha256: str | None) -> dict[str, Any]:
+    """Copy the encoder files of an earlier release byte for byte; return its manifest.
+
+    ``manifest_sha256`` is the pinned hash of that release's manifest; a folder whose
+    manifest doesn't match it is refused.
+    """
+    if manifest_sha256 is None:
+        raise ReleaseError("inheriting needs the pinned manifest SHA256 of the earlier release")
+    if sha256(prev_dir / "manifest.json") != manifest_sha256:
+        raise ReleaseError(f"{prev_dir}/manifest.json doesn't match the pinned SHA256")
     prev: dict[str, Any] = json.loads((prev_dir / "manifest.json").read_text())
     verify_files(prev_dir, {"files": {n: prev["files"][n] for n in INHERITED_FILES}})
     for name in INHERITED_FILES:
@@ -441,10 +490,13 @@ def build(
 
     clf = joblib.load(sources.classifier_dir / "model.joblib")
     labels = json.loads((sources.classifier_dir / "labels.json").read_text())
+    is_topic = (sources.classifier_dir / "policy.json").is_file()
+    if not is_topic and _version_tuple(version) >= TOPICS_SINCE:
+        raise ReleaseError(
+            f"releases from v{'.'.join(map(str, TOPICS_SINCE))} must ship the topic classifier"
+        )
     topic_fields = (
-        check_topic_classifier(sources, labels)
-        if (sources.classifier_dir / "policy.json").is_file()
-        else {"kind": "mind_categories"}
+        check_topic_classifier(sources, labels) if is_topic else {"kind": "mind_categories"}
     )
     meta = {"firstread_release": version, "hf_repo": HF_REPO}
     cls = export_classifier(clf, out / "category_classifier.onnx", meta | {"labels": "labels.json"})
@@ -452,7 +504,7 @@ def build(
     print("parity (PyTorch/sklearn vs ONNX Runtime, max abs diff):")
     parity_metrics: dict[str, Any] = {}
     if sources.inherit is not None:
-        prev = inherit_user_encoder(sources.inherit, out)
+        prev = inherit_user_encoder(sources.inherit, out, sources.inherit_manifest_sha256)
         enc = out / "user_encoder.onnx"
         encoder_block = {**prev["user_encoder"], "inherited_from": prev["tag"]}
         parity_metrics["user_encoder"] = {
