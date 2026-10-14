@@ -1,0 +1,16 @@
+# Tiny, CPU-only config for tests and the synthetic CI eval gate.
+seed: 0
+model:
+  heads: 4
+  query_dim: 32
+  dropout: 0.1
+  attn_dropout: 0.0
+  init_scale: 10.0
+train:
+  epochs: 2
+  batch_size: 64
+  lr: 0.003
+  weight_decay: 0.0
+  negatives: 4
+  grad_clip: 1.0
+  device: cpu

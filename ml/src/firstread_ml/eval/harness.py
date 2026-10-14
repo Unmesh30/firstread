@@ -21,9 +21,22 @@ from firstread_ml.mind.data import Impressions
 from firstread_ml.mind.load import load_impressions, load_news, prepare
 from firstread_ml.mind.manifest import HF_REVISION
 from firstread_ml.mind.splits import clicked_articles, first_seen, holdout_split
-from firstread_ml.paths import mind_raw_dir, processed_dir
+from firstread_ml.paths import data_dir, mind_raw_dir, processed_dir
 
 SPLITS = ("holdout", "dev")
+TRAINABLE = ("nrms_lite",)
+MODELS = (*BASELINES, *TRAINABLE)
+
+
+def make_scorer(name: str, nrms_config: Path | None = None) -> Scorer:
+    if name in BASELINES:
+        scorer: Scorer = BASELINES[name]()
+        return scorer
+    if name == "nrms_lite":
+        from firstread_ml.models.scorer import DEFAULT_CONFIG, NRMSLiteScorer
+
+        return NRMSLiteScorer(nrms_config or DEFAULT_CONFIG)
+    raise ValueError(f"unknown model {name!r}; available: {list(MODELS)}")
 
 
 @dataclass
@@ -98,18 +111,19 @@ def run(
     embedder: Embedder | None = None,
     data_root: Path | None = None,
     raw_dir: Path | None = None,
+    nrms_config: Path | None = None,
 ) -> dict[str, Any]:
     """Prepare (cached), embed (cached) and evaluate ``models`` on ``split``."""
-    unknown = set(models) - set(BASELINES)
+    unknown = set(models) - set(MODELS)
     if unknown:
-        raise ValueError(f"unknown models {sorted(unknown)}; available: {sorted(BASELINES)}")
+        raise ValueError(f"unknown models {sorted(unknown)}; available: {list(MODELS)}")
     proc = prepare(
         variant,
         raw_dir=raw_dir or mind_raw_dir(data_root),
         out_dir=processed_dir(variant, data_root),
     )
     data = load_eval_data(variant, split, data_root)
-    scorers: list[Scorer] = [BASELINES[m]() for m in models]
+    scorers = [make_scorer(m, nrms_config) for m in models]
     emb = None
     meta: dict[str, Any] = {
         "variant": variant,
@@ -127,7 +141,14 @@ def run(
         # flag hex strings next to the word "key".
         meta["embedding_cache_id"] = embedding_cache_key()[0][:16]
     ctx = FitContext(
-        train=data.fit, n_news=data.n_news, first_seen=data.first_seen, emb=emb, seed=seed
+        train=data.fit,
+        n_news=data.n_news,
+        first_seen=data.first_seen,
+        emb=emb,
+        seed=seed,
+        embedding_id=meta.get("embedding_cache_id", ""),
+        model_dir=(data_root or data_dir()) / "models" / variant / split,
+        tag=f"{variant}-{split}",
     )
     print(f"evaluating {models} on MIND-{variant} {split} ({data.test.n} impressions)")
     out = evaluate(scorers, ctx, data, seed)

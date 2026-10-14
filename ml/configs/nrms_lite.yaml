@@ -1,0 +1,18 @@
+# NRMS-lite training config (validated by firstread_ml.config.NRMSLiteConfig).
+# Hyperparameters are chosen on the time-based holdout (train's last day), never
+# on dev; see docs/learn/01-offline-ml.md for the tuning log.
+seed: 0
+model:
+  heads: 8
+  query_dim: 200
+  dropout: 0.2
+  attn_dropout: 0.1
+  init_scale: 10.0
+train:
+  epochs: 3
+  batch_size: 256
+  lr: 0.001
+  weight_decay: 0.01
+  negatives: 4
+  grad_clip: 1.0
+  device: auto

@@ -5,7 +5,8 @@ CI cannot hold MIND (no redistribution), so the gate runs the full pipeline
 dataset with a hash embedder and fails if any model's nDCG@10 drops by more
 than 1% (relative) versus the committed expected values. It catches
 regressions in code (metrics, slices, features, training), not in MIND quality;
-the real-data gate is ``make eval-gate`` locally (added with the model in 1b/1c).
+NRMS-lite trains with the tiny CPU config. The real-data gate runs locally
+before a release (1c).
 """
 
 import json
@@ -20,7 +21,8 @@ from firstread_ml.testing import synthetic
 
 EXPECTED = REPO_ROOT / "ml" / "tests" / "data" / "eval_gate_expected.json"
 MAX_RELATIVE_DROP = 0.01
-GATE_MODELS = ["random", "popularity", "recency", "mean_history"]
+GATE_MODELS = ["random", "popularity", "recency", "mean_history", "nrms_lite"]
+CI_CONFIG = REPO_ROOT / "ml" / "configs" / "nrms_lite_ci.yaml"  # tiny, CPU, deterministic
 GATED_SLICES = ("overall", "cold_candidates", "cold_users")
 
 
@@ -34,6 +36,7 @@ def run_synthetic(root: Path, models: list[str] | None = None) -> dict[str, Any]
         embedder=Embedder(backend=synthetic.hash_backend),
         data_root=root,
         raw_dir=raw,
+        nrms_config=CI_CONFIG,
     )
 
 

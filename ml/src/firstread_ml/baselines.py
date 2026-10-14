@@ -5,6 +5,7 @@ of every test impression independently.
 """
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Protocol
 
 import numpy as np
@@ -29,6 +30,9 @@ class FitContext:
     first_seen: NDArray[np.int64]
     emb: NDArray[np.float32] | None = None
     seed: int = 0
+    embedding_id: str = ""  # embedding cache id, part of model checkpoint keys
+    model_dir: Path | None = None  # where trainable scorers cache checkpoints
+    tag: str = ""  # e.g. "small-holdout", for run names
     _population: NDArray[np.float32] | None = field(default=None, repr=False)
 
     @property
