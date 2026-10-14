@@ -63,3 +63,14 @@ Each slice keeps a subset of every impression's candidates. An impression stays 
 - Our dev numbers are **not directly comparable** to MIND leaderboard numbers (those are on the test set). Reports say so.
 - Anyone can reproduce the numbers with `make mind-download … ACCEPT_LICENSE=1` followed by `make eval`, because the data is pinned by hash.
 - The CI gate protects the code, not data-dependent quality. Quality regressions on real data are caught locally before a release.
+
+## Amendment (2026-10-14, PR 1c): the real-data gate as built
+
+- `firstread-ml eval-gate --real` (`make eval-gate-real`) scores the **exported ONNX user encoder** through ONNX Runtime, not the PyTorch weights. It runs on a fixed sample of **5,000 MIND-small dev impressions**, drawn with `numpy.random.default_rng(0)` and sorted. "Cold" is relative to MIND-small train.
+- **It passes only if both hold:**
+  1. The released model beats `mean_history` on nDCG@10, overall and on cold candidates.
+  2. No model's nDCG@10 (overall, cold candidates, cold users) drops more than 1% (relative) versus the committed reference `ml/reports/eval-gate-real.json`, which holds aggregates only.
+- `release build` requires the gate to pass.
+- **The reference changes only through `--update`,** deliberately, in a PR. A normal run writes its result under gitignored `data/`, so a release build never modifies a tracked file.
+- **v0.1.0 reference:** nDCG@10 0.4217 vs mean_history 0.3946 overall, and 0.4600 vs 0.4329 on cold candidates.
+- The MIND-large-trained model is evaluated on MIND-small **dev**. It was never trained on that split, so there is no leakage.

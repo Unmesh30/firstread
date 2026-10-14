@@ -57,6 +57,20 @@ MIND-large dev, nDCG@10 (NRMS-lite: mean ± std over 3 seeds; gain: paired boots
 
 Results and the evaluation protocol: [ml/reports/](ml/reports/), [ADR 0003](docs/adr/0003-mind-data-and-eval-protocol.md), [docs/learn/01-offline-ml.md](docs/learn/01-offline-ml.md).
 
+### Models on the Hugging Face Hub
+
+The trained models are released as ONNX at **[Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models)**. Current release: [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
+
+- **What's in it:** the NRMS-lite user encoder and the category classifier, plus a SHA256 `manifest.json` and a [model card](docs/model-card.md).
+- **License:** the weights are MIND-derived and **non-commercial**, under the [MSR License Terms](https://github.com/msnews/MIND/blob/master/MSR%20License_Data.pdf), not MIT.
+- **Latency:** ONNX Runtime on one CPU thread (Apple M4) encodes a 50-click history in 0.17 ms p50.
+
+```bash
+make release-verify VERSION=0.1.0     # re-download from the Hub and check every SHA256
+```
+
+How releases are built, gated and tagged: [ADR 0005](docs/adr/0005-model-artifacts-on-hf-hub.md).
+
 ## Repository layout
 
 ```
@@ -72,8 +86,8 @@ docs/              architecture, ADRs, learn chapters
 ## Data and credits
 
 - News metadata from the [GDELT Project](https://www.gdeltproject.org/).
-- Models are trained and evaluated on [MIND](https://msnews.github.io/) under the Microsoft Research License (research use only; not redistributed here). See [docs/data-card.md](docs/data-card.md).
+- Models are trained and evaluated on [MIND](https://msnews.github.io/) under the Microsoft Research License (research use only; not redistributed here). See [docs/data-card.md](docs/data-card.md). The released weights are MIND-derived and non-commercial; see the [model card](docs/model-card.md).
 
 ## License
 
-[MIT](LICENSE)
+Code: [MIT](LICENSE). Model weights on the Hugging Face Hub: non-commercial, MIND-derived (see the [model card](docs/model-card.md)).
