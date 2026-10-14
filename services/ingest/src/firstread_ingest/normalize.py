@@ -21,10 +21,32 @@ from firstread_ingest.items import Candidate, RawItem
 _WORDS = re.compile(r"[0-9a-z]+")
 MAX_AGE = timedelta(hours=72)
 MAX_FUTURE = timedelta(hours=6)
+# Function words that are common in headlines of a language and rare in English ones.
+# Feeds declare a language per channel, but some (e.g. Yale Climate Connections) mix
+# in Spanish items, so each item is checked too.
+_EN = frozenset(re.findall(r"\S+", (
+    "the a an of to in on for and is are was with as at by from that this it how why what "
+    "after over says new"
+)))  # fmt: skip
+_FOREIGN = frozenset(re.findall(r"\S+", (
+    "que cómo como del los las una por para con sobre más hay el la de y en es "  # es
+    "les des une pour avec dans sur est qui du au aux "  # fr
+    "der die das und ist nicht mit für auf dem den ein eine "  # de
+    "não uma com pelo pela dos são "  # pt
+    "di che per non della sono gli"  # it
+)))  # fmt: skip
 
 
 def _squash(text: str) -> str:
     return " ".join(_WORDS.findall(unicodedata.normalize("NFKC", text).casefold()))
+
+
+def looks_english(text: str) -> bool:
+    """False when foreign function words clearly outnumber English ones (>= 2 and more)."""
+    words = re.findall(r"[^\W\d_]+", text.casefold())
+    en = sum(w in _EN for w in words)
+    foreign = sum(w in _FOREIGN and w not in _EN for w in words)
+    return not (foreign >= 2 and foreign > en)
 
 
 def is_junk(title: str, junk: JunkTitles) -> bool:
@@ -51,6 +73,8 @@ def normalize(
     if not item.language.lower().startswith("en"):
         return "non_english"
     title = strip_source_suffix(clean_text(item.title), item.source_name, item.source_domain)
+    if not looks_english(f"{title} {clean_text(item.description or '')}"):
+        return "non_english"
     if len(title.split()) < min_words:
         return "short_title"
     if is_junk(title, junk):

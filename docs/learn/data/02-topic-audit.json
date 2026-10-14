@@ -1,0 +1,220 @@
+{
+ "n": 100,
+ "halves": {
+  "us": {
+   "n": 50,
+   "population": 78,
+   "reweighted_accuracy": 0.835,
+   "ci95": [
+    0.725,
+    0.945
+   ],
+   "unweighted_accuracy": 0.82,
+   "strata": {
+    "tech_science": {
+     "n": 19,
+     "correct": 19,
+     "population": 33
+    },
+    "business": {
+     "n": 6,
+     "correct": 5,
+     "population": 10
+    },
+    "us": {
+     "n": 5,
+     "correct": 1,
+     "population": 8
+    },
+    "health": {
+     "n": 5,
+     "correct": 4,
+     "population": 9
+    },
+    "weather": {
+     "n": 2,
+     "correct": 2,
+     "population": 3
+    },
+    "travel": {
+     "n": 1,
+     "correct": 0,
+     "population": 1
+    },
+    "entertainment": {
+     "n": 3,
+     "correct": 3,
+     "population": 4
+    },
+    "food_drink": {
+     "n": 2,
+     "correct": 2,
+     "population": 2
+    },
+    "politics": {
+     "n": 2,
+     "correct": 2,
+     "population": 2
+    },
+    "world": {
+     "n": 3,
+     "correct": 3,
+     "population": 4
+    },
+    "autos": {
+     "n": 2,
+     "correct": 0,
+     "population": 2
+    }
+   },
+   "confusions": [
+    {
+     "predicted": "us",
+     "true": "politics",
+     "n": 2
+    },
+    {
+     "predicted": "autos",
+     "true": "us",
+     "n": 2
+    },
+    {
+     "predicted": "business",
+     "true": "tech_science",
+     "n": 1
+    },
+    {
+     "predicted": "us",
+     "true": "world",
+     "n": 1
+    },
+    {
+     "predicted": "us",
+     "true": "tech_science",
+     "n": 1
+    },
+    {
+     "predicted": "health",
+     "true": "tech_science",
+     "n": 1
+    },
+    {
+     "predicted": "travel",
+     "true": "weather",
+     "n": 1
+    }
+   ],
+   "geo_rule": {
+    "fired": 0,
+    "correct": 0
+   }
+  },
+  "intl": {
+   "n": 50,
+   "population": 141,
+   "reweighted_accuracy": 0.843,
+   "ci95": [
+    0.73,
+    0.957
+   ],
+   "unweighted_accuracy": 0.84,
+   "strata": {
+    "tech_science": {
+     "n": 4,
+     "correct": 3,
+     "population": 10
+    },
+    "world": {
+     "n": 12,
+     "correct": 10,
+     "population": 36
+    },
+    "business": {
+     "n": 3,
+     "correct": 2,
+     "population": 9
+    },
+    "food_drink": {
+     "n": 1,
+     "correct": 1,
+     "population": 1
+    },
+    "sports": {
+     "n": 16,
+     "correct": 16,
+     "population": 51
+    },
+    "lifestyle": {
+     "n": 2,
+     "correct": 0,
+     "population": 5
+    },
+    "health": {
+     "n": 5,
+     "correct": 5,
+     "population": 13
+    },
+    "entertainment": {
+     "n": 5,
+     "correct": 3,
+     "population": 14
+    },
+    "weather": {
+     "n": 1,
+     "correct": 1,
+     "population": 1
+    },
+    "travel": {
+     "n": 1,
+     "correct": 1,
+     "population": 1
+    }
+   },
+   "confusions": [
+    {
+     "predicted": "lifestyle",
+     "true": "world",
+     "n": 2
+    },
+    {
+     "predicted": "tech_science",
+     "true": "business",
+     "n": 1
+    },
+    {
+     "predicted": "world",
+     "true": "sports",
+     "n": 1
+    },
+    {
+     "predicted": "world",
+     "true": "tech_science",
+     "n": 1
+    },
+    {
+     "predicted": "business",
+     "true": "world",
+     "n": 1
+    },
+    {
+     "predicted": "entertainment",
+     "true": "lifestyle",
+     "n": 1
+    },
+    {
+     "predicted": "entertainment",
+     "true": "world",
+     "n": 1
+    }
+   ],
+   "geo_rule": {
+    "fired": 1,
+    "correct": 1
+   }
+  }
+ },
+ "notes": [
+  "Labels by Claude; owner spot-check pending (20 items).",
+  "One non-English (Spanish) item reached the sample (#35, yaleclimateconnections.org); fixed by a per-item English check."
+ ]
+}
