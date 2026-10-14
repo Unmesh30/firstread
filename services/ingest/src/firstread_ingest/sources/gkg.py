@@ -41,6 +41,7 @@ from typing import Any
 import httpx
 
 from firstread_core.countries import US, fips_to_iso
+from firstread_core.urls import canonical_host
 from firstread_ingest.http import fetch_with_retry
 from firstread_ingest.items import RawItem
 from firstread_ingest.sources.gdelt_domains import DomainCountries
@@ -128,7 +129,7 @@ def parse_gkg(blob: bytes) -> list[GkgRecord]:
         if len(row) != N_COLUMNS:
             continue
         m = _TITLE.search(row[COL_EXTRAS])
-        url, domain = row[COL_URL].strip(), row[COL_SOURCE].strip().lower()
+        url, domain = row[COL_URL].strip(), canonical_host(row[COL_SOURCE].strip())
         seen = _ts(row[COL_DATE].strip())
         if not (m and url.startswith("http") and domain and seen):
             continue

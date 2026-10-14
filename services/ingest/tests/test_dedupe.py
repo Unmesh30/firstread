@@ -35,11 +35,11 @@ def recent_with(vec: np.ndarray, src: str = "title_summary") -> tuple[Recent, uu
 @pytest.mark.parametrize(
     ("cos", "action", "reason"),
     [
-        (0.96, "near_duplicate", "cosine"),
-        (0.9501, "near_duplicate", "cosine"),  # float32: exactly 0.95 can round below
-        (0.9499, "insert", "same_story"),
-        (0.85, "insert", "same_story"),
-        (0.8499, "insert", "new_story"),
+        (0.98, "near_duplicate", "cosine"),
+        (0.9751, "near_duplicate", "cosine"),  # float32: exactly 0.975 can round below
+        (0.9749, "insert", "same_story"),
+        (0.8751, "insert", "same_story"),
+        (0.8749, "insert", "new_story"),
     ],
 )
 def test_threshold_boundaries(cos: float, action: str, reason: str) -> None:
@@ -64,7 +64,7 @@ def test_exact_duplicates_by_url_and_fingerprint() -> None:
 
 def test_duplicates_inside_one_batch() -> None:
     items = [item(1), item(1), Item("https://example.com/2", "fp1", "title", NOW), item(3)]
-    vecs = np.stack([unit(0), unit(0), unit(1), at_cos(unit(0), 2, 0.97)])
+    vecs = np.stack([unit(0), unit(0), unit(1), at_cos(unit(0), 2, 0.98)])
     d = decide(items, vecs, Recent.empty(), Thresholds())
     assert [x.action for x in d] == ["insert", "duplicate", "duplicate", "near_duplicate"]
     assert len({x.cluster_id for x in d}) == 1  # all the same story, for coverage
@@ -76,7 +76,7 @@ def test_cluster_continues_across_runs() -> None:
     recent = Recent(
         [first.article_id], [first.cluster_id], ["title_summary"], unit(0)[None, :], {}, {}
     )
-    second = decide([item(2)], at_cos(unit(0), 3, 0.9)[None, :], recent, Thresholds())[0]
+    second = decide([item(2)], at_cos(unit(0), 3, 0.92)[None, :], recent, Thresholds())[0]
     assert second.action == "insert"
     assert second.cluster_id == first.cluster_id
 
@@ -89,3 +89,14 @@ def test_per_pair_type_thresholds() -> None:
     assert decide([item(1, "title")], vec, recent, t)[0].reason == "same_story"
     assert decide([item(1, "title_summary")], vec, recent, t)[0].reason == "new_story"
     assert pair_type("title_summary", "title") == pair_type("title", "title_summary")
+
+
+def test_validated_thresholds_are_stricter_where_the_sample_was_thin() -> None:
+    from firstread_ingest.dedupe import VALIDATED_BY_PAIR
+
+    gdelt = VALIDATED_BY_PAIR[("title", "title")]
+    cross = VALIDATED_BY_PAIR[("title", "title_summary")]
+    rss = VALIDATED_BY_PAIR[("title_summary", "title_summary")]
+    assert gdelt == (0.975, 0.875)
+    assert cross[1] < gdelt[1]  # title-only vs title+summary vectors sit further apart
+    assert all(dup > story for dup, story in (gdelt, cross, rss))

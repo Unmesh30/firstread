@@ -25,7 +25,7 @@ from firstread_core.embedding import EMBED_MODEL, Embedder, embedding_cache_key
 from firstread_core.topics import TopicDecision, resolve_topic
 from firstread_ingest import store
 from firstread_ingest.config import Feed, Settings, load_feeds
-from firstread_ingest.dedupe import Decision, Item, Recent, Thresholds, decide
+from firstread_ingest.dedupe import VALIDATED_BY_PAIR, Decision, Item, Recent, Thresholds, decide
 from firstread_ingest.http import make_client
 from firstread_ingest.items import Candidate, RawItem
 from firstread_ingest.models import TopicClassifier
@@ -325,7 +325,11 @@ async def _run(
     items = [
         Item(c.url_canonical, c.title_fingerprint, c.text_source, c.raw.seen_at) for c in cands
     ]
-    thresholds = Thresholds(settings.ingest_tau_dup, settings.ingest_tau_story)
+    thresholds = Thresholds(
+        settings.ingest_tau_dup,
+        settings.ingest_tau_story,
+        VALIDATED_BY_PAIR if settings.ingest_per_pair_thresholds else {},
+    )
     decisions = decide(items, vectors, recent, thresholds)
     topics = classify(cands, decisions, vectors, classifier)
 
