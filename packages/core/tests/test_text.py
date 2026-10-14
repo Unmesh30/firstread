@@ -1,7 +1,14 @@
 import pytest
 
 from firstread_core import TEXT_PREP_VERSION, __version__, normalize_whitespace
-from firstread_core.text import MAX_CHARS, article_text, clean_text, truncate
+from firstread_core.text import (
+    MAX_CHARS,
+    article_text,
+    clean_text,
+    strip_source_suffix,
+    title_fingerprint,
+    truncate,
+)
 
 
 @pytest.mark.parametrize(
@@ -63,3 +70,34 @@ def test_article_text_is_capped() -> None:
 
 def test_version_is_set() -> None:
     assert __version__
+
+
+@pytest.mark.parametrize(
+    ("title", "name", "domain", "want"),
+    [
+        ("Storm hits coast - CNN", "CNN", "cnn.com", "Storm hits coast"),
+        ("Storm hits coast | Reuters", "", "reuters.com", "Storm hits coast"),
+        ("Storm hits coast — The Guardian", "The Guardian", "theguardian.com", "Storm hits coast"),
+        (
+            "Storm hits coast - The New York Times",
+            "",
+            "nytimes.com",
+            "Storm hits coast - The New York Times",
+        ),
+        ("Storm hits coast - The New York Times", "The New York Times", "", "Storm hits coast"),
+        ("Biden - Harris debate recap", "CNN", "cnn.com", "Biden - Harris debate recap"),
+        ("No suffix here", "BBC", "bbc.co.uk", "No suffix here"),
+        ("Markets rally - Yahoo Finance", "", "finance.yahoo.com", "Markets rally"),
+        ("  Spaces   - NPR ", "NPR", "npr.org", "Spaces"),
+    ],
+)
+def test_strip_source_suffix(title: str, name: str, domain: str, want: str) -> None:
+    assert strip_source_suffix(title, name, domain) == want
+
+
+def test_title_fingerprint_ignores_case_punctuation_and_spacing() -> None:
+    a = title_fingerprint("Diddy hospitalized after prison fight")
+    assert a == title_fingerprint("  DIDDY hospitalized — after prison-fight! ")
+    assert a == title_fingerprint("Diddy hospitalized after <b>prison</b> fight")
+    assert a != title_fingerprint("Diddy hospitalized after prison fights")
+    assert len(a) == 40
