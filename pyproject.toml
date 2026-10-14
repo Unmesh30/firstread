@@ -76,4 +76,7 @@ testpaths = ["packages/core/tests", "services/api/tests", "services/ingest/tests
 addopts = ["--import-mode=importlib", "-ra", "--strict-markers"]
 asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
-markers = ["integration: needs a running Postgres and Redis (make up)"]
+markers = [
+  "integration: needs a running Postgres and Redis (make up)",
+  "model: downloads the pinned embedding model (~67 MB, cached)",
+]
