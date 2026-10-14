@@ -1,7 +1,7 @@
 # 01: Offline ML on MIND
 
 > Phase 1 of [SPEC.md §16](../../SPEC.md). This chapter grows with each PR:
-> **1a: data, shared embedder, eval harness, baselines** (this PR) · 1b: NRMS-lite and the category classifier · 1c: ONNX export and the Hugging Face release.
+> **1a: data, shared embedder, eval harness, baselines** · **1b: NRMS-lite and the category classifier** · 1c: ONNX export and the Hugging Face release.
 
 ---
 
@@ -16,6 +16,12 @@ Before training any model we need three things we can trust:
 **Analogy.** Before a coaching program you buy a calibrated stopwatch, agree exactly how the race is timed, and time a few ordinary runners. Only then can you say the coached runner is faster. In 1a, the stopwatch is the metrics and slices, the timing rules are the splits and tie handling (ADR 0003), and the ordinary runners are the baselines.
 
 **Why first?** If the measuring stick is wrong, every later number is wrong. If the embedding differs between training and serving, offline wins don't survive production (train/serve skew).
+
+**1b adds two models:**
+- **NRMS-lite** reads a reader's last 50 clicked articles and outputs a vector in the same space as article embeddings. Scoring any article, even one published a minute ago, is then just a dot product.
+- **A category classifier** lets ingestion label live articles ("sports", "finance", ...) from their embedding alone.
+
+**Analogy, continued.** If 1a timed ordinary runners, 1b is the coached runner. The coach (NRMS-lite) doesn't change the shoes (frozen article embeddings), only the running style (how the reader's history is summarized). We start the coached runner from the best ordinary runner's style (mean-of-history), so coaching can only add.
 
 ---
 
@@ -77,6 +83,32 @@ The split is *by time*, because news is time-sensitive: a random split would let
 ### 2.8 CSR layout
 Impressions have different numbers of candidates. Instead of a Python list per impression, we store all candidates in one flat array plus an **offsets** array: impression *i* owns `cand[offsets[i]:offsets[i+1]]`. This is how sparse CSR matrices work. Metrics then run over all impressions with a few vectorized numpy calls (`lexsort`, `bincount`) instead of a 73K-iteration Python loop.
 
+### 2.9 Two towers and why ours has one learned tower
+A two-tower recommender scores `user_vec · item_vec`. Usually both towers are learned. FirstRead keeps the **item tower frozen**: the item vector is exactly the bge-small embedding stored at ingestion. Retraining the user model then never invalidates stored article vectors or the ANN index, and brand-new articles are scorable the moment they're embedded ([ADR 0004](../adr/0004-identity-item-tower.md)).
+
+### 2.10 Multi-head self-attention over a click history
+Self-attention lets each clicked article "look at" the others and update its representation from the ones related to it. For example, a click on a trade-war story is read differently next to finance clicks than next to politics clicks.
+- **Multi-head** means doing this in several smaller subspaces at once (8 heads × 48 dims = 384).
+- A **key padding mask** stops real items from attending to padding.
+
+### 2.11 Additive attention pooling
+After self-attention we still have 50 vectors. They're pooled into one using weights `softmax(q · tanh(W h_i))`, where `q` is a learned "what matters" query. Recent or more informative clicks can then get more weight than a plain average gives them.
+
+### 2.12 Residual on the baseline (alpha = 0 at init)
+`user = normalize(mean(history)) + α · proj(pool(MHSA(history)))`. With `α = 0` the untrained model *equals* mean-of-history, and a unit test checks this exactly. Training moves `α` only if the attention branch actually helps. That's a cheap way to make "at least as good as the baseline" the starting point instead of a hope.
+
+### 2.13 Negative sampling and softmax cross-entropy
+For each click we take K=4 non-clicked articles **from the same impression** (same moment, same feed). We score all 5 and apply softmax cross-entropy with the click as the correct class. "Same impression" matters: those negatives were shown alongside the click, so they're hard and realistic. Random articles from the whole catalogue would be too easy.
+
+### 2.14 The temperature and keeping it sane
+Scores are `s · dot(user, article)`. Because vectors are normalized, the dot lies in [−1, 1], and softmax over such small numbers is nearly uniform. `s` (initialized to 10) sharpens it. We learn `log s` and clamp it to [log 1, log 100], so `s` can't go negative or explode. A test pushes it with a huge learning rate in both directions and checks the bounds hold.
+
+### 2.15 Why empty histories need special care
+Softmax over a row where *every* position is masked divides 0 by 0, which gives **NaN**. `torch.where(empty, population, model_output)` doesn't save you: autograd still computes the gradient of the unused branch, and `0 × NaN = NaN` poisons the weights. So for empty rows we unmask one zero-vector slot, which keeps every computation finite, and replace the output with the population vector afterwards. Tests check finite loss and gradients on a batch mixing empty, length-1, partial and full histories, and that an empty history returns the population vector exactly.
+
+### 2.16 Tuning without fooling yourself
+On the holdout we look at the whole epoch curve, not just the final number, and repeat promising configs with different **seeds**. If two configs differ by less than seed-to-seed variation, the difference isn't real. The full log is committed: `ml/reports/tuning-nrms-lite-small.md`.
+
 ---
 
 ## 3. Architecture of this phase (1a)
@@ -95,6 +127,24 @@ flowchart LR
 ```
 
 Everything left of `ml/reports` lives in gitignored `data/`. Only aggregate reports are committed.
+
+### 1b: NRMS-lite and the classifier
+
+```mermaid
+flowchart LR
+  EMB[(frozen article embeddings<br/>data/cache/emb)] --> H[last 50 clicks<br/>history_index_matrix]
+  H --> MH[mean + normalize]
+  H --> AT[MHSA, 8 heads] --> AP[additive pooling] --> PR[linear 384→384]
+  MH --> SUM((+))
+  PR -->|× α, init 0| SUM
+  SUM --> EW{empty history?}
+  EW -->|yes| POP[population vector]
+  EW -->|no| U[user vector, 384-d]
+  U --> SC[score = s · dot&#40;user, article&#41;]
+  EMB --> SC
+  SC --> CE[softmax CE over click + 4 same-impression negatives]
+  EMB --> LR[logistic regression] --> CAT[MIND category]
+```
 
 ---
 
@@ -122,6 +172,20 @@ Everything left of `ml/reports` lives in gitignored `data/`. Only aggregate repo
 | `ml/src/firstread_ml/eda.py` | Aggregate EDA → `ml/reports/eda-mind-<variant>.md` + SVG plots. |
 | `ml/src/firstread_ml/cli.py` | `firstread-ml download / prepare / embed / eda / eval / eval-gate`. |
 
+
+**1b files**
+
+| File | What it does / why it exists |
+|---|---|
+| `ml/src/firstread_ml/models/nrms_lite.py` | The user encoder: `AdditiveAttention`, `NRMSLite` (residual on mean-of-history, empty-history guard, clamped temperature, population buffer). |
+| `ml/src/firstread_ml/models/train.py` | `build_samples` (one sample per click), `sample_negatives` (K from the same impression, with replacement if needed), training loop (AdamW, grad clipping, seeds), `user_vectors` for inference. |
+| `ml/src/firstread_ml/models/scorer.py` | NRMS-lite as an eval-harness `Scorer`: `fit` trains, or reuses a checkpoint whose `key.json` (config + embedding id + training-data fingerprint + code version) matches. |
+| `ml/src/firstread_ml/models/tune.py` | `firstread-ml tune`: trains on the fit days, evaluates the holdout every epoch, and appends to the tuning log. `--set train.lr=…`, `--set seed=…`. |
+| `ml/src/firstread_ml/models/classifier.py` | Logistic regression on embeddings. C and class weighting are chosen by validation macro-F1 on train articles; the test set is articles that appear only in dev. |
+| `ml/src/firstread_ml/config.py` | Pydantic schema for the YAML configs (`extra="forbid"`, so a typo is an error, not a silent default). |
+| `ml/configs/nrms_lite.yaml`, `nrms_lite_ci.yaml` | The committed training config (chosen on the holdout), and a tiny CPU config for tests and the CI gate. |
+| `ml/src/firstread_ml/tracking.py` | MLflow (skinny) file store in `data/mlruns`. Best-effort; `FIRSTREAD_TRACKING=0` disables it. |
+| `docs/adr/0004-identity-item-tower.md` | Why the article tower is the frozen embedding. |
 ---
 
 ## 5. Rebuild from scratch
@@ -158,6 +222,33 @@ make eda VARIANT=small
 uv run firstread-ml eval-gate --update
 ```
 
+
+**1b, in order:**
+
+```bash
+git checkout -b phase-1b-models
+# ml/pyproject.toml adds: "torch>=2.14.1", "pyyaml>=6.0.3", "pydantic>=2.14.1", "mlflow>=3.17.1"
+# Root pyproject.toml routes torch to the CPU index on Linux (CI/Docker), PyPI elsewhere:
+#   [tool.uv.sources] torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
+#   [[tool.uv.index]] name = "pytorch-cpu", url = "https://download.pytorch.org/whl/cpu", explicit = true
+uv lock && uv sync --all-packages
+grep -A3 'version = "2.14.1+cpu"' uv.lock      # Linux wheel comes from download.pytorch.org/whl/cpu
+
+# Write: config.py, models/{nrms_lite,train,scorer,tune,classifier}.py, tracking.py,
+#        eval/stats.py, ml/configs/nrms_lite{,_ci}.yaml (see section 4)
+
+# Tune on the MIND-small holdout (never dev). Each run appends to ml/reports/tuning-nrms-lite-small.md
+uv run firstread-ml tune --variant small --label lr1e-3 --set train.epochs=5
+uv run firstread-ml tune --variant small --label cos-lr1e-3-s1 --set train.epochs=5 \
+    --set train.lr_schedule=cosine --set seed=1
+# ...then commit the chosen values in ml/configs/nrms_lite.yaml
+
+# Final numbers: 3 seeds, all baselines, dev evaluated once, plus the classifier
+make reproduce VARIANT=small          # ~35 min on an M-series Mac
+make mind-download VARIANT=large ACCEPT_LICENSE=1
+make reproduce VARIANT=large          # overnight (see section 6 for timings)
+make mlflow-ui                        # browse runs at http://127.0.0.1:5000
+```
 ---
 
 ## 6. How to test and verify it, and how to read the results
@@ -201,6 +292,26 @@ Measured runtimes on an M-series Mac (16 GB):
 
 Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-small-dev.json`. MIND-large is used in 1b. Extrapolating, its ~130K articles take ~25–30 min to embed (one-time, cached).
 
+
+**MIND-small results with NRMS-lite** (dev, evaluated once, 3 seeds; `ml/reports/results-mind-small-dev.md`):
+
+| Model | Overall nDCG@10 | Cold-start nDCG@10 | Overall AUC |
+|---|---:|---:|---:|
+| mean_history (best baseline) | 0.3904 | 0.4383 | 0.6247 |
+| NRMS-lite, seed 0 / 1 / 2 | 0.4077 / 0.4065 / 0.4077 | 0.4540 / 0.4523 / 0.4542 | 0.6527 / 0.6516 / 0.6527 |
+| **NRMS-lite, mean ± std** | **0.4073 ± 0.0007** | **0.4535 ± 0.0010** | **0.6523 ± 0.0006** |
+| **Paired gain over mean_history, 95% CI** | **+0.0168 [+0.0149, +0.0186]** | **+0.0152 [+0.0126, +0.0177]** | |
+
+- `ACCEPT PASS` on both slices for every seed, and no bootstrap resample showed a gain ≤ 0.
+- On the holdout (tuning split) the same config gives 0.3769 ± 0.0006 overall and 0.4534 ± 0.0011 cold-start, against mean_history's 0.3662 / 0.4340.
+- The category classifier on 13,955 dev-only articles reaches **accuracy 0.749, macro-F1 0.549**, against a majority-class reference of 0.348 (`ml/reports/classifier-mind-small.md`).
+- Training cost on an M-series Mac: ~60 s/epoch on MPS for MIND-small (190K–236K samples/epoch). The whole `make reproduce VARIANT=small` (EDA, 6 trainings, 2 evals, classifier) took about 50 minutes.
+
+**Reading the 1b results (`results-mind-<variant>-dev.md`):**
+- **Acceptance lines.** `ACCEPT PASS [overall]` and `[cold_candidates]` mean *every* NRMS-lite seed beat the best baseline. One seed below the bar is a FAIL, by design.
+- **Per-seed rows plus `mean ± std`.** If std is comparable to the gap over the baseline, the gain isn't solid.
+- **Paired bootstrap table.** The 95% CI of the nDCG@10 gain over mean_history. A CI entirely above 0, with "resamples with gain ≤ 0" at 0.0%, is the evidence that the gain is real, not noise. Pairing (comparing both models on the *same* impressions) removes impression-difficulty variance, which is why the CI is much tighter than the per-model metric spread.
+- **Classifier (`classifier-mind-<variant>.md`).** Compare accuracy with the majority-class reference. Macro-F1 is pulled down by tiny or ambiguous classes (kids, video, tv); per-class F1 shows which ones.
 ---
 
 ## 7. Decisions and alternatives considered
@@ -212,6 +323,12 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - **polars + numpy** instead of pandas: MIND-large has ~83M candidate rows in train, and polars parses it in seconds.
 - **SVG plots** so the existing `*.png` ignore rule stays, and diffs are text.
 
+- [ADR 0004](../adr/0004-identity-item-tower.md): **identity item tower.** Only the user encoder is learned, so stored article vectors and the ANN index survive model releases.
+- **Residual on mean-of-history (α = 0 at init)** rather than learning a user vector from scratch: the baseline is the floor at step 0, and a test checks the equality.
+- **Locked config: cosine LR decay, lr 1e-3, 5 epochs.** Every config in the sweep landed within seed noise (0.374–0.378 holdout nDCG@10). Cosine cut the across-seed std at the final epoch from 0.006–0.013 to under 0.001. That matters because dev and MIND-large runs train a fixed number of epochs with no early stopping (there's nothing to stop on without peeking at dev).
+- **3 seeds, PASS only if every seed beats the bar, plus a paired bootstrap CI.** The first holdout margin (+0.016 from one lucky seed) was close to the ±0.01 epoch-to-epoch swing, so a single number wasn't evidence. Owner decision.
+- **MLflow: full `mlflow` with a sqlite store** (`data/mlruns/mlflow.db`) instead of mlflow-skinny's file store, which MLflow 3 has in maintenance mode and only allows behind `MLFLOW_ALLOW_FILE_STORE=true`. ml-only dependency; the API image check stays green. Owner decision.
+- **Classifier: logistic regression with C and class_weight chosen by validation macro-F1.** Macro-F1 because ingestion labels every topic, not just the big two. Categories with fewer than 10 training articles are dropped instead of being guessed. The test set is articles that appear only in dev, so it's honest for new articles.
 ---
 
 ## 8. What went wrong and the gotchas
@@ -252,6 +369,14 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 
   Lesson: golden tests for quantized models need a cross-platform tolerance, measured rather than guessed.
 
+- **A lucky seed looked like a result.** The first NRMS-lite holdout run gave 0.3822 against mean_history's 0.3662. Two more seeds of the same config gave 0.3712 and 0.3750. Constant-LR curves also swung by about ±0.01 between epochs. Always repeat a promising config with other seeds before believing it.
+- **Masked softmax NaN.** Covered in §2.15. It only shows up when a batch contains a user with *no* history, which is rare in a random batch, so a test builds such a batch deliberately.
+- **`float(exp(log(100)))` is 100.0000076 in float32.** The bound test compares with a relative tolerance.
+- **mlflow-skinny can't use sqlite** (its model-registry store rejects the URI), and its file store raises unless `MLFLOW_ALLOW_FILE_STORE=true`. We switched to full mlflow with sqlite.
+- **The pre-commit mypy hook sees untracked files.** pre-commit stashes unstaged changes to tracked files but leaves new untracked files in place. A partial commit can therefore fail type-checking against a half-old tree. Stash unrelated new files (`git stash push -u -- <paths>`) before committing in pieces.
+- **A partial `eval` once overwrote a committed report.** Running `eval --models mean_history,nrms_lite` rewrote `results-mind-small-holdout.md` without the other baselines. `report.write` now refuses to write a report missing any of the four baselines, and partial runs go to `data/reports-scratch/`.
+- **The classifier's best C was at the edge of the grid.** C = 10 was the largest value tried. Extending to 30 and 100 confirmed it as an interior optimum; otherwise "best" might just mean "biggest tried".
+- **The published NRMS numbers had to be read, not recalled.** The paper's PDF text scrambles Table 3's layout. The columns were mapped by the repeating four-number groups and cross-checked against the paper's prose (NRMS best, DFM below DSSM). Our planning-stage recollection (nDCG@10 41.98) was wrong; the table says 41.63.
 ---
 
 ## 9. Ten interview questions (with strong answers)
@@ -286,6 +411,23 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 10. **Your embedding job was 10× slower than estimated. How did you approach it?**
     Benchmark on a fixed sample, change one variable at a time, and diff the outputs for *every* variable. I initially only diffed thread counts, and a later test showed padding shifts vectors by up to 4.4e-4, so the "identical" claim had to be corrected and locked in with a test. Length-sorting removed padding waste (2×), smaller batches and 4 threads gave another ~1.5×, and multi-process parallelism didn't help. The remaining lever, an fp32 model, changes a pinned dependency, so it's a deliberate decision rather than a quick fix.
 
+**1b questions** (the list is trimmed to the best ten for the whole phase in 1c):
+
+11. **Why not learn the article tower too?**
+    Every model release would invalidate every stored article vector and the ANN index, and new articles would need a text model at request time. With the frozen embedding as the item tower, a release changes only the user encoder. The cost is a lower ceiling, which we accept and report (ADR 0004).
+
+12. **How do you guarantee the learned model is no worse than the baseline at the start?**
+    The user vector is `normalize(mean(history)) + α · f(history)` with α initialized to 0, so the untrained model *is* mean-of-history (a unit test checks equality). Training moves α only if f helps on the loss.
+
+13. **What breaks with an all-masked attention row, and how did you fix it?**
+    softmax over all −inf is 0/0 = NaN. `torch.where` still backpropagates through the unused branch, and 0 × NaN = NaN poisons every weight. We unmask one zero slot for empty rows so the forward pass is finite, then substitute the population vector. Tests assert finite gradients for a batch mixing empty and non-empty histories.
+
+14. **Your first result beat the baseline by 0.016. Why didn't you ship that number?**
+    The same config with two other seeds gave much less, and constant-LR curves swung by ±0.01 between epochs. So we added LR decay, chose the config by its mean across seeds, trained the final model with 3 seeds, required every seed to pass, and reported a paired bootstrap CI for the gain.
+
+15. **Why a *paired* bootstrap?**
+    Impressions vary hugely in difficulty, and both models see the same ones. Resampling per-impression *differences* cancels that shared variance, so the CI reflects the model difference, not which impressions happened to be drawn. Unpaired CIs on each model's mean would overlap even for a real gain.
+
 ---
 
 ## 10. Glossary of new terms
@@ -307,3 +449,13 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 | **CSR** | Compressed Sparse Row: a flat values array plus offsets. |
 | **Cache key / sidecar** | A hash of everything that determines cached data, stored in a small file next to it. |
 | **int8 quantization** | Storing model weights as 8-bit integers: smaller, sometimes faster, slightly different outputs. |
+| **Two-tower model** | Scores `user_vec · item_vec`, with one network ("tower") per side. |
+| **Identity item tower** | The item vector is the frozen embedding itself; nothing is learned on the item side. |
+| **Multi-head self-attention (MHSA)** | Each element of a sequence updates itself from a weighted mix of the others, in several subspaces ("heads") at once. |
+| **Additive attention pooling** | Weighted average of a sequence with weights `softmax(q · tanh(W x))`. |
+| **Negative sampling** | Training on a click plus a few non-clicked examples instead of the whole catalogue. |
+| **Temperature (scale)** | Multiplier on scores before softmax; higher means sharper probabilities. |
+| **Cosine LR decay** | The learning rate follows a half cosine from its initial value down to 0 over training. |
+| **Seed variance** | How much a result changes when only the random seed changes; the noise floor for comparisons. |
+| **Paired bootstrap** | Resample test units (impressions) with replacement, recomputing the mean *difference* between two models on the same units, to get a confidence interval. |
+| **Macro-F1** | The F1 score averaged over classes with equal weight, so small classes count as much as big ones. |
