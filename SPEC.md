@@ -1,6 +1,6 @@
 # FirstRead — Product & Technical Spec (v1)
 
-Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-14 (ADR 0006: topic taxonomy)
+Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-14 (ADRs 0006–0009: topics, live sources, schema, dedupe)
 
 > This document is the single source of truth for what we are building. Claude Code reads it before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
@@ -65,7 +65,7 @@ FirstRead is a personalized "For You" news feed that recommends **breaking stori
 ```mermaid
 flowchart LR
   subgraph Sources
-    G[GDELT DOC 2.0 API]
+    G[GDELT GKG 15-min files]
     R[Curated publisher RSS]
   end
   subgraph Ingest["Ingest job (GitHub Actions cron, every 15 min)"]
@@ -118,8 +118,8 @@ flowchart LR
 | Source | Use | Notes |
 |---|---|---|
 | **MIND** (Microsoft News Dataset): ~160K English articles, 15M+ impression logs from 1M users. `news.tsv` has ID, category, subcategory, title, abstract, URL, entities. `behaviors.tsv` has impression ID, user ID, time, click history, impressions (`N123-1 N456-0`). | Training and offline evaluation | Research license. Start with MIND-small, then MIND-large for final numbers. Download script prints the license notice; data lives in `data/` (gitignored). |
-| **GDELT DOC 2.0 API** | Live headlines | Article list mode returns url, title, seendate, socialimage, domain, language, sourcecountry (no summary); up to 250 records per query. Checked 2026-10-14: a 15-minute timespan is rejected as "too short" (plain text, HTTP 200), and the API throttles far harder than its "one request every 5 seconds" message suggests. Phase 2 measures the limits and evaluates the static 15-minute GKG files as a fallback before building the adapter. Scope: English sources from the US, UK, Canada, Australia, Ireland and New Zealand. Credit and link GDELT. |
-| **Curated RSS feeds** | Live source | Config file of syndicated feeds from major US outlets, reputable English-language outlets from every region (Europe, Middle East, Asia, Africa, Latin America, Oceania), and topical feeds for thin topics. Each feed has a topic hint and a geo (`us`/`intl`). We store headline, link, time and thumbnail only; descriptions are used in memory for the embedding and never stored. Can be disabled per outlet. |
+| **GDELT GKG 2.0 files** (ADR 0007) | Live headlines | One zip of English-language web articles every 15 minutes: URL, outlet domain, page title, sharing image, crawl time (no summary). Processed with a catch-up cursor (≤ 2 h per run), outlets placed by GDELT's domain→country lookup plus reviewed overrides, a spam/syndication blocklist, and a per-run cap of 50 ranked by story breadth with a topic floor. The DOC 2.0 API was evaluated and rejected: every probe call was throttled (HTTP 429) and 15-minute windows are refused. Credit and link GDELT. |
+| **Curated RSS feeds** (ADR 0007) | Live source | Config file of publisher feeds with a topic hint, a geo (`us`/`intl`) and each publisher's terms verdict. **Only feeds whose own terms explicitly allow showing headlines on a website (with attribution) are enabled**; "personal, non-commercial" terms don't cover a public app. We store headline, link, time and thumbnail (unless the permission is text-only); descriptions are used in memory for the embedding and never stored. |
 | **Embedding model** `BAAI/bge-small-en-v1.5` via `fastembed` (ONNX, CPU) | Article and persona embeddings | 384 dimensions, max 512 tokens, MIT license. Passages need no instruction prefix. |
 
 ---
@@ -185,12 +185,14 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 
 ### Postgres (migrations in `infra/db/`)
 
-- **`articles`**: `id uuid pk`, `url`, `url_canonical unique`, `title`, `summary`, `source_name`, `source_domain`, `image_url`, `language`, `source_country` (ISO 3166-1 alpha-2), `category` (an app topic id, ADR 0006), `category_confidence`, `category_source ('model'|'feed_hint'|'geo_rule')`, `geo ('us'|'intl')`, `published_at`, `first_seen_at`, `embedding halfvec(384)`, `embedding_model`, `story_cluster_id`, `origin ('gdelt'|'rss')`, `created_at`. Indexes: HNSW on `embedding` (inner product on normalized vectors), btree on `first_seen_at desc`, on `category`.
+- **`articles`**: `id uuid pk`, `url`, `url_canonical unique`, `title`, `summary` (always NULL in v1), `source_name`, `source_domain`, `image_url`, `language`, `source_country` (ISO 3166-1 alpha-2), `category` (an app topic id, ADR 0006), `category_confidence`, `category_source ('model'|'feed_hint'|'geo_rule')`, `geo ('us'|'intl')`, `published_at`, `first_seen_at`, `embedding extensions.halfvec(384)`, `embedding_model`, `text_source ('title'|'title_summary')`, `title_fingerprint`, `story_cluster_id`, `origin ('gdelt'|'rss')`, `created_at`. Indexes: HNSW on `embedding` (`halfvec_ip_ops`: inner product on normalized vectors), btree on `first_seen_at desc`, `(category, first_seen_at desc)`, `(title_fingerprint, first_seen_at)`, `story_cluster_id`. pgvector lives in the `extensions` schema (ADR 0008).
 - **`profiles`**: `user_id` (FK `auth.users`, cascade delete), `topics text[]`, `active_persona`, timestamps.
 - **`events`**: `id uuid pk` (client-generated, for idempotency), `user_id`, `article_id`, `type`, `position`, `dwell_ms`, `request_id`, `model_version`, `created_at`. Index `(user_id, created_at desc)`.
-- **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `fetched`, `inserted`, `duplicates`, `errors`, `status`.
+- **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `window_start`, `window_end`, `fetched`, `inserted`, `duplicates`, `near_duplicates`, `clustered`, `errors`, `gdelt_calls`, `redis_commands`, `status ('running'|'ok'|'partial'|'failed')`, `details jsonb`.
+- **`story_coverage`**: `(story_cluster_id, source_domain)` pk, `first_seen_at`: every outlet that carried a story, including dropped duplicates (trending, ADR 0010).
+- **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor.
 - **`demo_personas`**, **`persona_articles`**: persona definitions built from live articles.
-- **RLS:** articles are public-read; profiles and events are owner-only. Services use a dedicated DB role.
+- **RLS on every table** (ADR 0008): articles are public-read; profiles and events are owner-only; all service tables have no policy. Services use a dedicated DB role (P5).
 - **Retention:** articles 14 days, events 30 days. Target DB size < 400 MB.
 
 ### Redis keys

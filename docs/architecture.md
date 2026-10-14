@@ -7,7 +7,7 @@
 ```mermaid
 flowchart LR
   subgraph Sources
-    G[GDELT DOC 2.0 API]
+    G[GDELT GKG 15-min files]
     R[Curated publisher RSS]
   end
   subgraph Ingest["Ingest job (GitHub Actions cron, every 15 min)"]
@@ -104,13 +104,32 @@ flowchart LR
 - The release ships only weights and aggregates: no MIND rows, text or embedding caches.
 - Services pin a tag and verify `manifest.json`. Article embeddings stay valid across releases (identity item tower, ADR 0004).
 
+## Live ingestion (Phase 2a)
+
+```mermaid
+flowchart LR
+  subgraph Sources
+    RSS[9 RSS feeds<br/>explicit permission only<br/>conditional GET]
+    GKG[GDELT GKG 15-min files<br/>catch-up cursor ≤ 2 h]
+  end
+  GKG --> PL[place outlet: GDELT domain lookup<br/>+ overrides, blocklist]
+  RSS --> N[normalize: clean title, canonical URL,<br/>English, junk/short/stale filters]
+  PL --> N
+  N --> X[exact dedupe: URL, title fingerprint 72 h]
+  X --> E[embed new items<br/>packages/core Embedder]
+  E --> D[near-dup + story cluster<br/>per-pair-type cosine thresholds, 48 h]
+  D --> C[topic: v0.2.0 ONNX classifier<br/>+ feed hint + geo rule]
+  C --> S[select GDELT: breadth, ≤ 3/outlet,<br/>topic floor, 50/run]
+  S --> PG[(Postgres: articles, story_coverage,<br/>feed_state, source_cursor, ingestion_runs)]
+```
+
 ## Status by phase
 
 | Phase | What exists |
 |---|---|
 | **P0 Bootstrap** ✅ | uv workspace (4 members), FastAPI `/healthz` + `/readyz`, structlog JSON logs, Expo app placeholder with web export under `/firstread`, Docker Compose stack, Makefile, pre-commit, CI (`python`, `mobile`, `docker`, `secrets`), Dependabot, docs |
 | **P1 Offline ML** ✅ | **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. **1b:** NRMS-lite user encoder (identity item tower, ADR 0004), 3-seed results with paired bootstrap CIs, category classifier, MLflow (sqlite) tracking, `make reproduce`; beats every baseline on MIND-large dev overall and on cold-start. **1c:** ONNX export (user encoder, classifier) with parity tests, ONNX-based real-data eval gate, release builder with SHA256 manifest, model card, HF Hub release `v0.1.0`. |
-| P2 Ingestion | **2a-ml:** title-only skew study (titles alone cost the user encoder 2.1% relative nDCG@10), 13 app topics in `packages/core` with the shared `resolve_topic` rule, reviewed MIND subcategory → topic map, topic classifier trained on title+abstract and title-only embeddings, release builder that inherits the v0.1.0 user encoder byte for byte (release `v0.2.0`, ADR 0006). |
+| P2 Ingestion | **2a-ml:** title-only skew study (titles alone cost the user encoder 2.1% relative nDCG@10), 13 app topics in `packages/core` with the shared `resolve_topic` rule, reviewed MIND subcategory → topic map, topic classifier trained on title+abstract and title-only embeddings, release builder that inherits the v0.1.0 user encoder byte for byte (release `v0.2.0`, ADR 0006). **2a:** Postgres schema as SQL migrations with RLS on every table, checked on the Supabase image in CI (ADR 0008); RSS adapter (conditional GET, per-host serial, only feeds with explicit website permission) and GDELT GKG adapter (catch-up cursor, domain placement, blocklist, breadth-ranked topic-aware cap) (ADR 0007); URL canonicalization, title fingerprints, validated per-pair-type near-duplicate and story-clustering thresholds (ADR 0009); topic classification with the v0.2.0 classifier; idempotent upsert. A run inserts about 220 articles from a cold start (169 RSS + 50 GDELT) and 0 when repeated. |
 | P3 API | — |
 | P4 App | — |
 | P5 Cloud | — |
@@ -120,6 +139,6 @@ flowchart LR
 
 ## Related
 
-- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md), [0006 topic taxonomy and classifier](adr/0006-topic-taxonomy-and-classifier.md)
+- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md), [0006 topic taxonomy and classifier](adr/0006-topic-taxonomy-and-classifier.md), [0007 live sources](adr/0007-live-sources-gdelt-gkg-and-rss.md), [0008 Postgres schema](adr/0008-postgres-schema-and-migrations.md), [0009 dedupe and clustering](adr/0009-dedupe-and-story-clustering.md)
 - Learn chapters: [00 bootstrap](learn/00-bootstrap.md), [01 offline ML](learn/01-offline-ml.md)
 - [Model card](model-card.md), [data card](data-card.md)
