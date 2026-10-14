@@ -25,6 +25,7 @@ FEEDS = [
         region="US",
         geo="us" if i % 2 else "intl",
         topic_hint="world",
+        terms="website_with_attribution",
     )
     for i, p in enumerate(sorted(FIX.glob("*.xml")))
 ]

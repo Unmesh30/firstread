@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 import yaml
-from pydantic import BaseModel, SecretStr, field_validator
+from pydantic import BaseModel, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from firstread_core.topics import TOPIC_IDS
@@ -58,10 +58,20 @@ class Feed(BaseModel):
     enabled: bool = True
     terms_checked: bool = False
     terms: Literal[
-        "website_with_attribution", "personal_noncommercial", "forbidden", "unverified"
-    ] = "unverified"
+        "website_with_attribution", "personal_noncommercial", "forbidden", "no_explicit_permission"
+    ] = "no_explicit_permission"
     rss_page_url: str | None = None
     terms_url: str | None = None
+    # False when the publisher's permission covers text but not images.
+    allow_images: bool = True
+
+    @model_validator(mode="after")
+    def _enabled_needs_explicit_permission(self) -> Feed:
+        if self.enabled and self.terms != "website_with_attribution":
+            raise ValueError(
+                f"{self.id}: only feeds with explicit website permission may be enabled"
+            )
+        return self
 
     @field_validator("topic_hint")
     @classmethod

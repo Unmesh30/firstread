@@ -93,7 +93,7 @@ def parse_feed(feed: Feed, body: bytes, fetched_at: datetime) -> list[RawItem]:
                 seen_at=fetched_at,
                 published_at=_when(e),
                 description=e.get("summary") or e.get("description"),
-                image_url=_image(e),
+                image_url=_image(e) if feed.allow_images else None,
                 language=language,
                 source_country=None,
                 topic_hint=feed.topic_hint,

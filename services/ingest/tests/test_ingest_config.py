@@ -1,4 +1,5 @@
 from collections import Counter
+from typing import Any
 
 import pytest
 
@@ -43,6 +44,31 @@ def test_feeds_whose_terms_forbid_website_use_are_disabled() -> None:
     for f in load_feeds(enabled_only=False):
         if f.terms == "forbidden":
             assert not f.enabled, f.id
-        if f.terms != "unverified":
-            assert f.terms_checked
+        if f.enabled:
+            assert f.terms == "website_with_attribution"
             assert f.terms_url
+        assert f.terms_checked, f.id
+
+
+def test_a_feed_without_explicit_permission_cannot_be_enabled() -> None:
+    from pydantic import ValidationError
+
+    from firstread_ingest.config import Feed
+
+    base: dict[str, Any] = {
+        "id": "x",
+        "url": "https://x.example/f",
+        "source_name": "X",
+        "domain": "x.example",
+        "region": "US",
+        "geo": "us",
+    }
+    with pytest.raises(ValidationError, match="explicit website permission"):
+        Feed(**base, enabled=True, terms="personal_noncommercial")
+    assert not Feed(**base, enabled=False, terms="personal_noncommercial").enabled
+    assert Feed(**base, enabled=True, terms="website_with_attribution").enabled
+
+
+def test_text_only_permission_drops_images() -> None:
+    ycc = next(f for f in load_feeds() if f.id == "yale-climate-connections")
+    assert not ycc.allow_images
