@@ -26,6 +26,9 @@ class TrainConfig(_Strict):
     weight_decay: float = Field(default=0.01, ge=0)
     negatives: int = Field(default=4, ge=1)  # K negatives per positive, same impression
     grad_clip: float = Field(default=1.0, gt=0)
+    # "cosine" decays the LR to 0 over all steps, so the last epochs are stable
+    # (we train for a fixed number of epochs on dev/large, with no early stopping).
+    lr_schedule: Literal["constant", "cosine"] = "constant"
     device: Literal["auto", "cpu", "mps"] = "auto"
 
 

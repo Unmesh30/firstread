@@ -80,10 +80,10 @@ def sample_negatives(
 
 
 def gather(
-    table: torch.Tensor, idx: NDArray[np.int64], mask: NDArray[np.bool_], device: torch.device
+    table: torch.Tensor, idx: NDArray[np.integer], mask: NDArray[np.bool_], device: torch.device
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Look up padded history indices on ``device``; padded slots become zeros."""
-    i = torch.from_numpy(np.where(mask, idx, 0)).to(device)
+    i = torch.from_numpy(np.where(mask, idx, 0).astype(np.int64)).to(device)
     m = torch.from_numpy(mask).to(device)
     return table[i] * m.unsqueeze(-1), m
 
@@ -101,12 +101,19 @@ def train_nrms_lite(
     rng = np.random.default_rng(cfg.seed)
     samples = build_samples(train)
     hist_idx, hist_mask = history_index_matrix(train.histories(), HISTORY_LEN)
+    hist_idx = hist_idx.astype(np.int32)  # MIND-large: 2.2M x 50 -> ~440 MB instead of ~880 MB
     table = torch.from_numpy(emb).to(device)
     model = NRMSLite(cfg.model, torch.from_numpy(population)).to(device)
     opt = torch.optim.AdamW(
         model.parameters(), lr=cfg.train.lr, weight_decay=cfg.train.weight_decay
     )
     bs, k = cfg.train.batch_size, cfg.train.negatives
+    total_steps = cfg.train.epochs * -(-samples.n // bs)
+    sched = (
+        torch.optim.lr_scheduler.CosineAnnealingLR(opt, T_max=total_steps)
+        if cfg.train.lr_schedule == "cosine"
+        else None
+    )
     print(f"training NRMS-lite on {device}: {samples.n:,} samples/epoch, batch {bs}, K={k}")
     history: list[dict[str, Any]] = []
     for epoch in range(1, cfg.train.epochs + 1):
@@ -128,6 +135,8 @@ def train_nrms_lite(
             loss.backward()
             torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.train.grad_clip)
             opt.step()
+            if sched is not None:
+                sched.step()
             total += float(loss.detach())
             steps += 1
         stats: dict[str, Any] = {
@@ -135,6 +144,7 @@ def train_nrms_lite(
             "loss": total / max(steps, 1),
             "alpha": float(model.alpha.detach()),
             "scale": float(model.scale.detach()),
+            "lr": float(opt.param_groups[0]["lr"]),
             "seconds": time.perf_counter() - t0,
         }
         if on_epoch is not None:
