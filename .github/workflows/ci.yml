@@ -50,6 +50,12 @@ jobs:
           enable-cache: true
       - name: Install dependencies
         run: uv sync --all-packages --frozen
+      # The pinned embedding model (~67 MB) for the golden-vector test.
+      - name: Cache embedding model
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firstread/models
+          key: embed-model-${{ hashFiles('packages/core/src/firstread_core/embedding.py') }}
       - name: Ruff lint
         run: uv run --frozen ruff check --output-format=github .
       - name: Ruff format
@@ -104,6 +110,16 @@ jobs:
           docker run -d --name api -p 8000:8000 firstread-api:ci
           for i in $(seq 1 20); do curl -fsS localhost:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
+      # The API never trains or embeds text: ML deps must stay out of the image.
+      - name: No ML dependencies in the image
+        run: |
+          docker image inspect firstread-api:ci --format 'image size: {{.Size}} bytes'
+          docker run --rm --entrypoint python firstread-api:ci -c "
+          import importlib.util, sys
+          bad = [m for m in ('torch', 'fastembed', 'sklearn', 'polars', 'onnx', 'matplotlib')
+                 if importlib.util.find_spec(m)]
+          print('ML packages in image:', bad or 'none')
+          sys.exit(1 if bad else 0)"
 
   secrets:
     name: secrets
