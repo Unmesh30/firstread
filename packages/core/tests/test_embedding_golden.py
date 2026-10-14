@@ -95,3 +95,19 @@ def test_negative_control_is_far_outside_tolerance(embedder: Embedder) -> None:
     one_minus_cos = 1.0 - (actual * expected).sum(axis=1)
     assert (max_abs >= NEGATIVE_CONTROL_MARGIN * MAX_ABS_DIFF).all()
     assert (one_minus_cos >= NEGATIVE_CONTROL_MARGIN * (1.0 - MIN_COSINE)).all()
+
+
+def test_vectors_do_not_depend_on_batch_composition(embedder: Embedder) -> None:
+    """Ingestion embeds different batches than training did, so a text's vector
+    must not depend on what it is batched with (padding length, batch size)."""
+    texts, _ = _golden()
+    alone = np.stack([embedder.embed([t])[0] for t in texts])
+    long_text = article_text("Long report", " ".join(["markets rallied after the data"] * 60))
+    fillers = ["a", "Hi", long_text, "Rates", long_text[:400], "x y", long_text[:700]] * 3
+    mixed = embedder.embed(fillers[:9] + texts + fillers[9:])
+    together = mixed[9 : 9 + len(texts)]
+    max_abs = float(np.abs(together - alone).max())
+    min_cos = float((together * alone).sum(axis=1).min())
+    print(f"batch invariance: max_abs_diff={max_abs:.3e} min_cosine={min_cos:.8f}")
+    assert max_abs <= MAX_ABS_DIFF, f"max_abs_diff={max_abs:.3e}"
+    assert min_cos >= MIN_COSINE, f"min_cosine={min_cos:.8f}"

@@ -229,7 +229,13 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
   | length-sorted, batch 16, 10 threads | 86 |
   | data-parallel 8 processes × 1 thread | 64 |
 
-  Vectors were bit-identical across all settings. `Embedder` now length-sorts and defaults to batch 16 with 4 threads. A faster option is BAAI's fp32 ONNX export: int8 kernels are often slow on ARM. That would be a different, new model source, so it's deferred and needs approval.
+  `Embedder` now length-sorts and defaults to batch 16 with 4 threads. We considered BAAI's fp32 ONNX export (int8 kernels are often slow on ARM) and **decided to keep the pinned int8 model**: embedding is a one-time, cached cost, and switching would change every pin and the golden file.
+
+  **Correction (found in review).** I first wrote that vectors were "bit-identical across all settings". The benchmark only diffed outputs across *thread counts*, which really are identical. A batch-invariance test then showed that **padding changes vectors slightly**. Measured on a 600-article MIND sample, embedding inside batches of 16, 64 or 256 vs. one at a time gave max abs diff **4.4e-4** (median 1.1e-4) and min cosine **0.99999952**. A text batched with identical copies, so no padding, matches its solo vector exactly (0.0). Adding one long text forces padding and moves it by ~1.9e-4.
+  - Most likely cause: the int8 model quantizes activations dynamically, with a scale computed over the whole padded tensor. That's an inference, not confirmed in ONNX Runtime's source.
+  - Why it matters: ingestion (P2) embeds different batches than training did.
+  - Now locked in by `test_vectors_do_not_depend_on_batch_composition`. It embeds the golden texts alone and inside a batch mixed with very short and very long texts, then asserts the golden tolerance (abs ≤ 7e-4, 1 − cos ≤ 1.1e-6); locally it measures 2.07e-4.
+  - At this size the effect can't change a ranking: score gaps between candidates are orders of magnitude larger.
 - **polars `replace_strict` inside `list.eval` was slow** (79 s on MIND-small). Exploding, joining against the id table and re-aggregating gives identical output in 1.2 s.
 - **A long pipeline hid progress.** Piping a long job through `grep` buffered its progress lines, so a run looked hung. Write logs to a file and tail it.
 - **gitleaks flagged a SHA256 as an API key.** A field named `embedding_cache_key` holding a hex string matches the `generic-api-key` rule. It's a hash of public config, not a secret, so we renamed it to `embedding_cache_id` instead of allowlisting a pattern that could hide real leaks later.
@@ -277,7 +283,7 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
    Input-order tie-breaking makes results depend on how candidates were logged. In MIND that could systematically favour or punish tie-heavy scorers like popularity on new items. A seeded random tie-break is neutral and reproducible. AUC already handles ties with average ranks.
 
 10. **Your embedding job was 10× slower than estimated. How did you approach it?**
-    Benchmark on a fixed sample, change one variable at a time, and check outputs stay identical. Length-sorting removed padding waste (2×), smaller batches and 4 threads gave another ~1.5×, and multi-process parallelism didn't help. The remaining lever, an fp32 model, changes a pinned dependency, so it's a deliberate decision rather than a quick fix.
+    Benchmark on a fixed sample, change one variable at a time, and diff the outputs for *every* variable. I initially only diffed thread counts, and a later test showed padding shifts vectors by up to 4.4e-4, so the "identical" claim had to be corrected and locked in with a test. Length-sorting removed padding waste (2×), smaller batches and 4 threads gave another ~1.5×, and multi-process parallelism didn't help. The remaining lever, an fp32 model, changes a pinned dependency, so it's a deliberate decision rather than a quick fix.
 
 ---
 
