@@ -100,4 +100,5 @@ asyncio_default_fixture_loop_scope = "function"
 markers = [
   "integration: needs a running Postgres and Redis (make up)",
   "model: downloads the pinned embedding model (~67 MB, cached)",
+  "supabase: needs a supabase/postgres container (SUPABASE_TEST_URL, CI job `supabase`)",
 ]
