@@ -1,5 +1,6 @@
 """Release build, allowlist, manifest, clean tree, upload and tag checks (synthetic; no network)."""
 
+import dataclasses
 import json
 import shutil
 import subprocess
@@ -356,6 +357,7 @@ def topic_sources(built: dict[str, Any], **overrides: Any) -> release.Sources:
         "classifier_dir": cls_dir,
         "classifier_report": report,
         "inherit": built["out"],
+        "inherit_manifest_sha256": release.sha256(built["out"] / "manifest.json"),
         "topic_map": topic_map,
     }
     return release.Sources(**(fields | overrides))
@@ -414,3 +416,83 @@ def test_failed_topic_gate_blocks_the_release(built: dict[str, Any]) -> None:
     sources.classifier_report.write_text(json.dumps(report))
     with pytest.raises(release.ReleaseError, match="topic gate failed"):
         build_from(built, sources)
+
+
+def test_inherit_refuses_a_manifest_that_is_not_the_pinned_one(built: dict[str, Any]) -> None:
+    sources = topic_sources(built)
+    with pytest.raises(release.ReleaseError, match="pinned SHA256"):
+        build_from(built, dataclasses.replace(sources, inherit_manifest_sha256="0" * 64))
+    with pytest.raises(release.ReleaseError, match="needs the pinned"):
+        build_from(built, dataclasses.replace(sources, inherit_manifest_sha256=None))
+
+
+def test_releases_from_0_2_0_must_ship_the_topic_classifier(built: dict[str, Any]) -> None:
+    repo = built["repo"]
+    with pytest.raises(release.ReleaseError, match="must ship the topic classifier"):
+        release.build(
+            "0.2.0", built["sources"], dry_run=True, repo=repo,
+            out_root=repo / "data" / "release3", bench=fast_bench,
+        )  # fmt: skip
+
+
+class PinnedHub:
+    """Serves a local release folder as if it were the Hub at one commit."""
+
+    def __init__(self, folder: Path, commit: str) -> None:
+        self.folder, self.commit = folder, commit
+        self.revisions: set[str] = set()
+
+    def model_info(self, repo: str, revision: str) -> SimpleNamespace:
+        return SimpleNamespace(sha=self.commit)
+
+    def hf_hub_download(self, repo: str, name: str, revision: str, local_dir: Path) -> str:
+        self.revisions.add(revision)
+        Path(local_dir).mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(self.folder / name, Path(local_dir) / name)
+        return str(Path(local_dir) / name)
+
+
+@pytest.fixture
+def pinned(built: dict[str, Any], monkeypatch: pytest.MonkeyPatch) -> dict[str, str]:
+    pin = {
+        "hub_commit": "c" * 40,
+        "manifest_sha256": release.sha256(built["out"] / "manifest.json"),
+    }
+    monkeypatch.setitem(release.PINNED_RELEASES, VERSION, pin)
+    return pin
+
+
+def test_fetch_release_downloads_the_pinned_commit(
+    built: dict[str, Any], pinned: dict[str, str], tmp_path: Path
+) -> None:
+    hub = PinnedHub(built["out"], pinned["hub_commit"])
+    manifest = release.fetch_release(VERSION, tmp_path / "prev", api=hub)
+    assert hub.revisions == {pinned["hub_commit"]}  # never the movable tag
+    assert set(manifest["files"]) <= {p.name for p in (tmp_path / "prev").iterdir()}
+
+
+def test_fetch_release_refuses_a_moved_tag(
+    built: dict[str, Any], pinned: dict[str, str], tmp_path: Path
+) -> None:
+    with pytest.raises(release.ReleaseError, match="tag moved"):
+        release.fetch_release(VERSION, tmp_path / "prev", api=PinnedHub(built["out"], "d" * 40))
+
+
+def test_fetch_release_refuses_a_tampered_manifest(
+    built: dict[str, Any], pinned: dict[str, str], tmp_path: Path
+) -> None:
+    with (built["out"] / "manifest.json").open("a") as f:
+        f.write(" ")
+    with pytest.raises(release.ReleaseError, match="differs from the pinned"):
+        release.fetch_release(VERSION, tmp_path / "prev", api=PinnedHub(built["out"], "c" * 40))
+
+
+def test_fetch_release_refuses_unpinned_versions(tmp_path: Path) -> None:
+    with pytest.raises(release.ReleaseError, match="not pinned"):
+        release.fetch_release("9.9.9", tmp_path, api=object())
+
+
+def test_v0_1_0_pin_is_the_published_release() -> None:
+    pin = release.PINNED_RELEASES["0.1.0"]
+    assert pin["hub_commit"] == "f29ec56afbb760c04db94e638d9b60c3039658bd"
+    assert len(pin["manifest_sha256"]) == 64

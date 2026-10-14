@@ -50,6 +50,10 @@ Live sources add two more facts:
 
 **Release v0.2.0** ships the topic classifier with the **v0.1.0 user encoder**, inherited byte for byte: `release build --inherit-user-encoder 0.1.0` downloads v0.1.0, verifies every hash against its manifest and copies the files. `manifest.json` records `user_encoder.inherited_from: v0.1.0`. The real-data eval gate still runs on the inherited encoder.
 
+**Inheriting trusts a pin, not a tag.** Hub tags can move, so `release.PINNED_RELEASES` pins each inheritable release in code: v0.1.0 = Hub commit `f29ec56afbb760c04db94e638d9b60c3039658bd`, manifest SHA256 `cf094e8e…1477584`. `fetch_release` refuses if the tag no longer resolves to that commit, downloads at the commit (never the tag) and checks the manifest hash; `build` re-checks the manifest hash before copying. This is the same rule ingestion uses for the model it loads.
+
+**Every release from v0.2.0 ships the topic classifier,** whether the encoder is inherited or retrained: `default_sources` always picks it, and `build` refuses a non-topic classifier for versions ≥ 0.2.0.
+
 ## Results (MIND-large, 2,457 dev-only articles)
 
 | | Title + abstract | Title only |
