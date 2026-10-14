@@ -22,28 +22,21 @@ updates:
       dev-tools:
         dependency-type: development
     ignore:
-      # Expo group: only patch updates. A partial SDK bump (some packages on the
-      # next SDK) breaks the app; CI's `npx expo install --check` catches drift.
+      # Expo group: no Dependabot updates at all. react must exactly match the
+      # renderer bundled with React Native, and every SDK package is pinned by
+      # the Expo SDK, so these move only with `npx expo install --fix` (CI's
+      # `npx expo install --check` catches drift). Omitting update-types
+      # ignores every update for the dependency.
       - dependency-name: "expo"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "expo-*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@expo/*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-dom"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-native"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "react-native-*"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "jest-expo"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "eslint-config-expo"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       - dependency-name: "@types/react"
-        update-types: ["version-update:semver-major", "version-update:semver-minor"]
       # Dev-tools group: no majors (e.g. jest-expo 57 needs jest 29). Keep this
       # list in sync with the non-Expo devDependencies in apps/mobile/package.json.
       - dependency-name: "@testing-library/react-native"
