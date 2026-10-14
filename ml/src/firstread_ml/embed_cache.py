@@ -5,6 +5,10 @@ sidecar. The key (``firstread_core.embedding.embedding_cache_key``) covers the
 model, its revision, the fastembed version and the text-prep settings, and the
 sidecar also records a hash of the article ids. If anything differs, the cache
 is rebuilt; stale vectors are never reused (that would be train/serve skew).
+
+``text_mode="title_only"`` embeds titles without abstracts (the live GDELT case,
+which has no summary). It is cached separately under ``<variant>-title_only/``
+and records the mode in its sidecar; the default cache key is unchanged.
 """
 
 import hashlib
@@ -22,17 +26,21 @@ from firstread_core.text import article_text
 from firstread_ml.paths import emb_cache_dir
 
 CHUNK = 4096
+TEXT_MODES = ("title_abstract", "title_only")
 
 
-def _expected_sidecar(news: pl.DataFrame) -> dict[str, Any]:
+def _expected_sidecar(news: pl.DataFrame, text_mode: str) -> dict[str, Any]:
     key, components = embedding_cache_key()
     ids = "\n".join(news["nid"].to_list()).encode()
-    return {
+    sidecar: dict[str, Any] = {
         "key": key,
         "components": components,
         "n_articles": news.height,
         "article_ids_sha256": hashlib.sha256(ids).hexdigest(),
     }
+    if text_mode != "title_abstract":  # keep the default sidecar (and existing caches) as-is
+        sidecar["text_mode"] = text_mode
+    return sidecar
 
 
 def _explain_miss(variant_dir: Path, expected: dict[str, Any]) -> str:
@@ -59,10 +67,14 @@ def load_or_build(
     news: pl.DataFrame,
     embedder: Embedder | None = None,
     root: Path | None = None,
+    text_mode: str = "title_abstract",
 ) -> NDArray[np.float32]:
     """Return ``float32[n_articles, EMBED_DIM]`` aligned with ``news['nidx']``."""
-    variant_dir = emb_cache_dir(variant, root)
-    expected = _expected_sidecar(news)
+    if text_mode not in TEXT_MODES:
+        raise ValueError(f"text_mode must be one of {TEXT_MODES}")
+    suffix = "" if text_mode == "title_abstract" else f"-{text_mode}"
+    variant_dir = emb_cache_dir(f"{variant}{suffix}", root)
+    expected = _expected_sidecar(news, text_mode)
     cache = variant_dir / expected["key"][:16]
     sidecar, vectors = cache / "key.json", cache / "emb.npy"
     if sidecar.is_file() and vectors.is_file():
@@ -79,10 +91,9 @@ def load_or_build(
         print(f"embedding cache miss: {_explain_miss(variant_dir, expected)}")
 
     embedder = embedder or Embedder()
-    texts = [
-        article_text(t, a)
-        for t, a in zip(news["title"].to_list(), news["abstract"].to_list(), strict=True)
-    ]
+    abstracts = news["abstract"].to_list() if text_mode == "title_abstract" else None
+    titles = news["title"].to_list()
+    texts = [article_text(t, abstracts[i] if abstracts else None) for i, t in enumerate(titles)]
     parts = []
     for i in range(0, len(texts), CHUNK):
         parts.append(embedder.embed(texts[i : i + CHUNK]))

@@ -96,3 +96,36 @@ def test_tampered_sidecar_rebuilds(news: pl.DataFrame, tmp_path: Path, tamper: s
     build(news, tmp_path, b)
     assert b.calls == 2
     assert json.loads(sidecar.read_text())["key"] == embedding.embedding_cache_key()[0]
+
+
+class RecordingBackend(CountingBackend):
+    def __init__(self) -> None:
+        super().__init__()
+        self.texts: list[str] = []
+
+    def __call__(self, texts: list[str]):  # type: ignore[no-untyped-def]
+        self.texts += texts
+        return super().__call__(texts)
+
+
+def test_title_only_mode_embeds_titles_in_a_separate_cache(
+    news: pl.DataFrame, tmp_path: Path
+) -> None:
+    full, titles = RecordingBackend(), RecordingBackend()
+    a = embed_cache.load_or_build("t", news, Embedder(backend=full), tmp_path)
+    b = embed_cache.load_or_build(
+        "t", news, Embedder(backend=titles), tmp_path, text_mode="title_only"
+    )
+    assert sorted(titles.texts) == sorted(news["title"].to_list())
+    assert "topic1 a b. x" in full.texts
+    assert not np.array_equal(a, b)  # N1 and N3 have abstracts
+    (sidecar,) = tmp_path.glob("cache/emb/t-title_only/*/key.json")
+    assert json.loads(sidecar.read_text())["text_mode"] == "title_only"
+    # The default cache is untouched and still reused.
+    embed_cache.load_or_build("t", news, Embedder(backend=full), tmp_path)
+    assert full.calls == 1
+
+
+def test_unknown_text_mode_is_rejected(news: pl.DataFrame, tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="text_mode"):
+        embed_cache.load_or_build("t", news, None, tmp_path, text_mode="abstract_only")
