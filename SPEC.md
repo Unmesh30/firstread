@@ -1,6 +1,6 @@
 # FirstRead — Product & Technical Spec (v1)
 
-Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-13
+Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-14 (ADR 0006: topic taxonomy)
 
 > This document is the single source of truth for what we are building. Claude Code reads it before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
@@ -118,8 +118,8 @@ flowchart LR
 | Source | Use | Notes |
 |---|---|---|
 | **MIND** (Microsoft News Dataset): ~160K English articles, 15M+ impression logs from 1M users. `news.tsv` has ID, category, subcategory, title, abstract, URL, entities. `behaviors.tsv` has impression ID, user ID, time, click history, impressions (`N123-1 N456-0`). | Training and offline evaluation | Research license. Start with MIND-small, then MIND-large for final numbers. Download script prints the license notice; data lives in `data/` (gitignored). |
-| **GDELT DOC 2.0 API** | Live headlines | Article list mode returns url, title, seendate, socialimage, domain, language, sourcecountry; up to 250 records per query; updated every 15 minutes. Verify current behavior and rate limits in Phase 2 before relying on it. Credit and link GDELT. |
-| **Curated RSS feeds** | Secondary live source | Config file of major US/world outlets with category hints. Headline + link only. Can be disabled per outlet. |
+| **GDELT DOC 2.0 API** | Live headlines | Article list mode returns url, title, seendate, socialimage, domain, language, sourcecountry (no summary); up to 250 records per query. Checked 2026-10-14: a 15-minute timespan is rejected as "too short" (plain text, HTTP 200), and the API throttles far harder than its "one request every 5 seconds" message suggests. Phase 2 measures the limits and evaluates the static 15-minute GKG files as a fallback before building the adapter. Scope: English sources from the US, UK, Canada, Australia, Ireland and New Zealand. Credit and link GDELT. |
+| **Curated RSS feeds** | Live source | Config file of syndicated feeds from major US outlets, reputable English-language outlets from every region (Europe, Middle East, Asia, Africa, Latin America, Oceania), and topical feeds for thin topics. Each feed has a topic hint and a geo (`us`/`intl`). We store headline, link, time and thumbnail only; descriptions are used in memory for the embedding and never stored. Can be disabled per outlet. |
 | **Embedding model** `BAAI/bge-small-en-v1.5` via `fastembed` (ONNX, CPU) | Article and persona embeddings | 384 dimensions, max 512 tokens, MIT license. Passages need no instruction prefix. |
 
 ---
@@ -127,7 +127,7 @@ flowchart LR
 ## 7. ML design
 
 1. **Article encoder (frozen):** text = `title + ". " + summary` (cleaned, truncated) → bge-small → 384-d, L2-normalized. Lives in `packages/core`. Embeddings for MIND are computed once and cached in `data/`.
-2. **Category classifier:** logistic regression on embeddings, trained on MIND categories; exported to ONNX (skl2onnx). Used by ingestion to label live articles. Report accuracy and macro-F1.
+2. **Topic classifier** (ADR 0006): logistic regression on embeddings predicting **13 app topics** (us, world, politics, business, tech_science, health, sports, entertainment, lifestyle, food_drink, travel, autos, weather), with labels mapped from MIND (category, subcategory) pairs by the reviewed table `ml/configs/topic_map.yaml`. Trained on title+abstract **and** title-only embeddings (live GDELT articles have no summary); exported to ONNX (skl2onnx). Report accuracy and macro-F1 in both text modes; release gate: every topic's title-only F1 ≥ 0.30. Ingestion resolves the final topic with `firstread_core.topics.resolve_topic`: the model's top-1, a feed's topic hint as tie-breaker below the shipped confidence threshold, then the geo rule (non-US source + us/politics → world).
 3. **User encoder ("NRMS-lite"):** input = up to N=50 most recent clicked-article embeddings (masked) → multi-head self-attention → additive-attention pooling → user vector **in the same 384-d space** as article embeddings. Score = dot(user_vec, article_emb).
    - v1 decision: the **item tower is the frozen embedding (identity)**, so model updates never require re-embedding stored articles, and retrieval can run ANN directly on stored embeddings. Record in an ADR; a learned item tower is a v2 option.
    - Training: MIND impressions, negative sampling from the same impression (K=4), softmax cross-entropy; PyTorch with MPS; seeds fixed; config in YAML.
@@ -185,7 +185,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 
 ### Postgres (migrations in `infra/db/`)
 
-- **`articles`**: `id uuid pk`, `url`, `url_canonical unique`, `title`, `summary`, `source_name`, `source_domain`, `image_url`, `language`, `source_country`, `category`, `category_confidence`, `published_at`, `first_seen_at`, `embedding halfvec(384)`, `embedding_model`, `story_cluster_id`, `origin ('gdelt'|'rss')`, `created_at`. Indexes: HNSW on `embedding` (inner product on normalized vectors), btree on `first_seen_at desc`, on `category`.
+- **`articles`**: `id uuid pk`, `url`, `url_canonical unique`, `title`, `summary`, `source_name`, `source_domain`, `image_url`, `language`, `source_country` (ISO 3166-1 alpha-2), `category` (an app topic id, ADR 0006), `category_confidence`, `category_source ('model'|'feed_hint'|'geo_rule')`, `geo ('us'|'intl')`, `published_at`, `first_seen_at`, `embedding halfvec(384)`, `embedding_model`, `story_cluster_id`, `origin ('gdelt'|'rss')`, `created_at`. Indexes: HNSW on `embedding` (inner product on normalized vectors), btree on `first_seen_at desc`, on `category`.
 - **`profiles`**: `user_id` (FK `auth.users`, cascade delete), `topics text[]`, `active_persona`, timestamps.
 - **`events`**: `id uuid pk` (client-generated, for idempotency), `user_id`, `article_id`, `type`, `position`, `dwell_ms`, `request_id`, `model_version`, `created_at`. Index `(user_id, created_at desc)`.
 - **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `fetched`, `inserted`, `duplicates`, `errors`, `status`.

@@ -94,11 +94,11 @@ flowchart LR
   LAT --> DIR[data/release/vX.Y.Z<br/>allowlisted files + manifest.json SHA256]
   DIR -->|make release-upload<br/>clean main == origin/main| HUB[(HF Hub Unmesh30/firstread-models<br/>tag vX.Y.Z)]
   HUB -->|re-download + verify hashes| OK[git tag vX.Y.Z = manifest git_commit<br/>+ GitHub release linking the Hub]
-  HUB -.->|P2 pins tag| ING[ingest: classifier]
+  HUB -.->|P2 pins v0.2.0| ING[ingest: topic classifier]
   HUB -.->|P3 pins tag| API2[API: user encoder]
 ```
 
-- Hub repo: [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models), release [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
+- Hub repo: [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models), releases [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0) and [`v0.2.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.2.0) (topic classifier; user encoder inherited from v0.1.0 by hash, ADR 0006).
 - Model card: [docs/model-card.md](model-card.md). Decision record: [ADR 0005](adr/0005-model-artifacts-on-hf-hub.md).
 - The weights are MIND-derived and **non-commercial** (MSR License Terms). The code is MIT.
 - The release ships only weights and aggregates: no MIND rows, text or embedding caches.
@@ -110,7 +110,7 @@ flowchart LR
 |---|---|
 | **P0 Bootstrap** ✅ | uv workspace (4 members), FastAPI `/healthz` + `/readyz`, structlog JSON logs, Expo app placeholder with web export under `/firstread`, Docker Compose stack, Makefile, pre-commit, CI (`python`, `mobile`, `docker`, `secrets`), Dependabot, docs |
 | **P1 Offline ML** ✅ | **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. **1b:** NRMS-lite user encoder (identity item tower, ADR 0004), 3-seed results with paired bootstrap CIs, category classifier, MLflow (sqlite) tracking, `make reproduce`; beats every baseline on MIND-large dev overall and on cold-start. **1c:** ONNX export (user encoder, classifier) with parity tests, ONNX-based real-data eval gate, release builder with SHA256 manifest, model card, HF Hub release `v0.1.0`. |
-| P2 Ingestion | — |
+| P2 Ingestion | **2a-ml:** title-only skew study (titles alone cost the user encoder 2.1% relative nDCG@10), 13 app topics in `packages/core` with the shared `resolve_topic` rule, reviewed MIND subcategory → topic map, topic classifier trained on title+abstract and title-only embeddings, release builder that inherits the v0.1.0 user encoder byte for byte (release `v0.2.0`, ADR 0006). |
 | P3 API | — |
 | P4 App | — |
 | P5 Cloud | — |
@@ -120,6 +120,6 @@ flowchart LR
 
 ## Related
 
-- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md)
+- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md), [0006 topic taxonomy and classifier](adr/0006-topic-taxonomy-and-classifier.md)
 - Learn chapters: [00 bootstrap](learn/00-bootstrap.md), [01 offline ML](learn/01-offline-ml.md)
 - [Model card](model-card.md), [data card](data-card.md)

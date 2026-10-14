@@ -46,6 +46,8 @@ MIND is license-gated: read the [terms](https://github.com/msnews/MIND/blob/mast
 make mind-download VARIANT=small ACCEPT_LICENSE=1   # verified download into data/ (gitignored)
 make reproduce VARIANT=small                         # EDA, 4 baselines + NRMS-lite (3 seeds), classifier (~50 min)
 make reproduce VARIANT=large                         # final numbers (~9 h on an M-series Mac, overnight)
+make topics                                          # 13-topic classifier on MIND-large (ADR 0006)
+make skew                                            # title-only vs title+abstract ranking study
 ```
 
 MIND-large dev, nDCG@10 (NRMS-lite: mean ± std over 3 seeds; gain: paired bootstrap 95% CI):
@@ -59,14 +61,15 @@ Results and the evaluation protocol: [ml/reports/](ml/reports/), [ADR 0003](docs
 
 ### Models on the Hugging Face Hub
 
-The trained models are released as ONNX at **[Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models)**. Current release: [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
+The trained models are released as ONNX at **[Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models)**. Current release: [`v0.2.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.2.0) (adds the 13-topic classifier; the user encoder is byte-identical to [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0)).
 
-- **What's in it:** the NRMS-lite user encoder and the category classifier, plus a SHA256 `manifest.json` and a [model card](docs/model-card.md).
+- **What's in it:** the NRMS-lite user encoder and the topic classifier ([ADR 0006](docs/adr/0006-topic-taxonomy-and-classifier.md)), plus a SHA256 `manifest.json` and a [model card](docs/model-card.md).
+- **Headlines without summaries:** the topic classifier scores accuracy 0.7184 from titles alone (0.7346 with abstracts), and title-only ranking costs the user encoder 2.1% relative nDCG@10.
 - **License:** the weights are MIND-derived and **non-commercial**, under the [MSR License Terms](https://github.com/msnews/MIND/blob/master/MSR%20License_Data.pdf), not MIT.
 - **Latency:** ONNX Runtime on one CPU thread (Apple M4) encodes a 50-click history in 0.17 ms p50.
 
 ```bash
-make release-verify VERSION=0.1.0     # re-download from the Hub and check every SHA256
+make release-verify VERSION=0.2.0     # re-download from the Hub and check every SHA256
 ```
 
 How releases are built, gated and tagged: [ADR 0005](docs/adr/0005-model-artifacts-on-hf-hub.md).
