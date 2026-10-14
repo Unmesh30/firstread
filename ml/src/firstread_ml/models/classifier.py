@@ -41,7 +41,7 @@ from firstread_ml.paths import data_dir, mind_raw_dir, processed_dir, reports_di
 matplotlib.rcParams["svg.hashsalt"] = "firstread"
 
 MIN_TRAIN_PER_CLASS = 10
-GRID_C = (0.1, 0.3, 1.0, 3.0, 10.0)
+GRID_C = (0.1, 0.3, 1.0, 3.0, 10.0, 30.0, 100.0)
 GRID_CLASS_WEIGHT = (None, "balanced")
 VAL_FRACTION = 0.1
 
