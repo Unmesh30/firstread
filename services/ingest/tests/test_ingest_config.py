@@ -1,5 +1,7 @@
 from collections import Counter
 
+import pytest
+
 from firstread_core.topics import TOPIC_IDS
 from firstread_ingest.config import Settings, load_feeds, load_junk_titles
 
@@ -30,3 +32,8 @@ def test_default_settings_pin_the_topic_release() -> None:
     s = Settings(_env_file=None)  # type: ignore[call-arg]
     assert s.ingest_model_tag == "v0.2.0"
     assert s.ingest_min_title_words == 3
+
+
+def test_empty_model_dir_means_download_from_the_hub(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("INGEST_MODEL_DIR", "")
+    assert Settings(_env_file=None).ingest_model_dir is None  # type: ignore[call-arg]

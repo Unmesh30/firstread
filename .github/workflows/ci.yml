@@ -64,6 +64,42 @@ jobs:
         run: uv run --frozen mypy
       - name: Pytest
         run: uv run --frozen pytest
+      # Ingestion runs ONNX Runtime only (ADR 0005/0006): ML training libraries must
+      # never be in its dependency tree.
+      - name: No ML training dependencies in ingest
+        run: |
+          bad=$(uv export --package firstread-ingest --no-dev --frozen --no-hashes \
+            | grep -iE '^(torch|scikit-learn|onnx|skl2onnx|onnxscript|polars|mlflow)==' || true)
+          echo "ML packages in ingest: ${bad:-none}"
+          test -z "$bad"
+
+  supabase:
+    name: supabase
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # The real Supabase Postgres image: `postgres` is not a superuser and the anon /
+    # authenticated roles exist, as on hosted Supabase (P5). Pin the tag deliberately.
+    services:
+      supabase:
+        image: supabase/postgres:17.11.0.004
+        env:
+          POSTGRES_PASSWORD: postgres
+        ports: ["54329:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres -h localhost"
+          --health-interval 5s --health-timeout 3s --health-retries 30
+    env:
+      SUPABASE_TEST_URL: postgresql://postgres:postgres@localhost:54329/postgres
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+      - name: Install dependencies
+        run: uv sync --all-packages --frozen
+      - name: Migrations on the Supabase image (RLS, non-superuser)
+        run: uv run --frozen pytest -m supabase packages/core/tests/test_supabase_compat.py -v
 
   mobile:
     name: mobile

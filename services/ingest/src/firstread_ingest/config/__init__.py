@@ -41,6 +41,11 @@ class Settings(BaseSettings):
     # Titles with fewer words are dropped.
     ingest_min_title_words: int = 3
 
+    @field_validator("ingest_model_dir", mode="before")
+    @classmethod
+    def _empty_is_unset(cls, v: object) -> object:
+        return None if v in ("", None) else v
+
 
 class Feed(BaseModel):
     id: str

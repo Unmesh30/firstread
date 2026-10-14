@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -47,6 +47,13 @@ down: ## Stop the local stack (keeps the database volume)
 
 logs: ## Follow logs from the local stack
 	$(COMPOSE) logs -f --tail=100
+
+# ---- Ingestion (Phase 2) ----
+db-migrate: ## Apply infra/db/migrations to DATABASE_URL (local stack by default)
+	uv run firstread-ingest migrate
+
+ingest: ## One ingestion run against the local stack (DRY_RUN=1 writes nothing)
+	uv run firstread-ingest run $(if $(DRY_RUN),--dry-run)
 
 # ---- Offline ML (Phase 1) ----
 mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
