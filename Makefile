@@ -5,7 +5,9 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs
+.PHONY: help setup fmt lint typecheck test up down logs mind-download
+
+VARIANT ?= small
 
 help: ## Show this help
 	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
@@ -45,3 +47,7 @@ down: ## Stop the local stack (keeps the database volume)
 
 logs: ## Follow logs from the local stack
 	$(COMPOSE) logs -f --tail=100
+
+# ---- Offline ML (Phase 1) ----
+mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
+	uv run firstread-ml download --variant $(VARIANT) $(if $(ACCEPT_LICENSE),--accept-license)
