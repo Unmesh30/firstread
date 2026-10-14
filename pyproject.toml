@@ -67,7 +67,7 @@ strict = false
 disallow_untyped_defs = false
 
 [[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*"]
+module = ["asyncpg", "asyncpg.*", "sklearn", "sklearn.*"]
 ignore_missing_imports = true
 
 # ---------- pytest ----------

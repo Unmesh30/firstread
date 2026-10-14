@@ -6,6 +6,7 @@ the tolerance relates to cross-platform differences.
 """
 
 import json
+import platform
 from pathlib import Path
 from typing import Any
 
@@ -61,9 +62,14 @@ def test_golden_vectors(embedder: Embedder) -> None:
     actual = embedder.embed(texts)
     max_abs = float(np.abs(actual - expected).max())
     min_cos = float((actual * expected).sum(axis=1).min())
-    print(f"golden: max_abs_diff={max_abs:.3e} min_cosine={min_cos:.8f} on {GOLDEN['platform']}")
-    assert max_abs <= MAX_ABS_DIFF
-    assert min_cos >= MIN_COSINE
+    # The measurement is in the message so a CI-only failure reports the
+    # cross-platform difference (see the learn chapter before changing tolerances).
+    measured = (
+        f"max_abs_diff={max_abs:.3e} min_cosine={min_cos:.8f} "
+        f"(golden from {GOLDEN['platform']}, running on {platform.system()} {platform.machine()})"
+    )
+    assert max_abs <= MAX_ABS_DIFF, measured
+    assert min_cos >= MIN_COSINE, measured
 
 
 def test_negative_control_is_far_outside_tolerance(embedder: Embedder) -> None:

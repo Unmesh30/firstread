@@ -100,3 +100,10 @@ def test_fastembed_version_guard(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(embedding, "FASTEMBED_VERSION", "0.0.1")
     with pytest.raises(EmbeddingModelError, match="pinned"):
         embedding.check_fastembed_version()
+
+
+def test_embedder_preserves_input_order_when_sorting_by_length() -> None:
+    texts = ["a much longer text here", "b", "medium text"]
+    together = Embedder(backend=fake_backend).embed(texts)
+    one_by_one = [Embedder(backend=fake_backend).embed([t])[0] for t in texts]
+    np.testing.assert_allclose(together, np.stack(one_by_one), atol=1e-6)

@@ -18,7 +18,7 @@ PAD_INDEX = -1
 
 
 def history_index_matrix(
-    histories: Sequence[Sequence[int]], history_len: int = HISTORY_LEN
+    histories: Sequence[Sequence[int] | NDArray[np.integer[Any]]], history_len: int = HISTORY_LEN
 ) -> tuple[NDArray[np.int64], NDArray[np.bool_]]:
     """Turn per-user lists of article indices into a padded batch.
 
