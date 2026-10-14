@@ -30,10 +30,13 @@ TRACKED_SLICES = ("overall", "cold_candidates", "cold_users")
 
 
 def apply_overrides(cfg: NRMSLiteConfig, overrides: list[str]) -> NRMSLiteConfig:
-    """``["train.lr=0.0003", "model.heads=4"]`` -> a new validated config."""
+    """``["train.lr=0.0003", "model.heads=4", "seed=1"]`` -> a new validated config."""
     data: dict[str, Any] = cfg.model_dump()
     for item in overrides:
         key, _, value = item.partition("=")
+        if key == "seed":
+            data["seed"] = yaml.safe_load(value)
+            continue
         section, _, field = key.partition(".")
         if not field or section not in ("model", "train"):
             raise ValueError(f"override must look like model.x=1 or train.y=2, got {item!r}")

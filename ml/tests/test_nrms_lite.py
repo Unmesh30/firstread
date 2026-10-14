@@ -134,8 +134,11 @@ def test_configs_load_and_reject_unknown_keys(tmp_path: Path) -> None:
 def test_tuning_overrides_are_validated() -> None:
     from firstread_ml.models.tune import apply_overrides
 
-    cfg = apply_overrides(NRMSLiteConfig(), ["train.lr=1e-3", "model.heads=4", "train.epochs=5"])
+    cfg = apply_overrides(
+        NRMSLiteConfig(), ["train.lr=1e-3", "model.heads=4", "train.epochs=5", "seed=1"]
+    )
     assert cfg.train.lr == pytest.approx(0.001)
+    assert cfg.seed == 1
     assert (cfg.model.heads, cfg.train.epochs) == (4, 5)
     with pytest.raises(pydantic.ValidationError):
         apply_overrides(NRMSLiteConfig(), ["train.epochs=0"])
