@@ -1,0 +1,32 @@
+# GDELT GKG source filtering (ADR 0007). Reviewed by the owner.
+#
+# overrides: the 2015-2021 lookup places an outlet in the country it MENTIONS most,
+# which is wrong for international outlets that cover the US heavily. FIPS 10-4
+# codes, like the lookup. Evidence: probe of 2026-10-14 (lookup value, top share).
+#
+# blocklist: domains whose GKG records are auto-generated or syndicated copies, not
+# original reporting. A blocked domain's records are dropped before ranking.
+version: 1
+overrides:
+  aljazeera.com: QA        # lookup US (0.36)
+  reuters.com: UK          # lookup US (0.36)
+  economist.com: UK        # lookup US (0.43)
+  euronews.com: FR         # lookup US (0.27)
+  politico.eu: BE          # lookup US (0.26)
+  trtworld.com: TU         # lookup IR (0.27)
+  thenationalnews.com: AE  # lookup UK (0.31)
+  africanews.com: CF       # lookup NI (0.33)
+blocklist:
+  # Auto-generated stock-ticker articles (one network, many domains).
+  - themarketsdaily.com
+  - tickerreport.com
+  - dailypolitical.com
+  - theenterpriseleader.com
+  - modernreaders.com
+  - etfdailynews.com
+  - wkrb13.com
+  - zolmax.com
+  - americanbankingnews.com
+  - marketbeat.com
+  # Syndicated copies of wire and local stories across radio-station sites (9% of a file).
+  - iheart.com

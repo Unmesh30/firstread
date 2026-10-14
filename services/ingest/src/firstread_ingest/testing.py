@@ -19,6 +19,7 @@ import respx
 from firstread_core.embedding import EMBED_DIM, l2_normalize
 from firstread_core.topics import TOPIC_IDS
 from firstread_ingest.models import TopicClassifier, expected_blocks
+from firstread_ingest.sources.gdelt_domains import DomainCountries, load_config, parse_lookup
 
 
 @pytest.fixture
@@ -111,3 +112,27 @@ def release_dir(tmp_path: Path) -> tuple[Path, str]:
 @pytest.fixture
 def classifier(release_dir: tuple[Path, str]) -> TopicClassifier:
     return TopicClassifier.load(release_dir[0])
+
+
+# GDELT outlet placement for the GKG fixture (FIPS codes, like the real lookup).
+LOOKUP = """domain,countrycode,cnt
+wisn.com,US,900
+wisn.com,UK,10
+fox4news.com,US,500
+mashable.com,US,300
+gazetteseries.co.uk,UK,400
+dunmowbroadcast.co.uk,UK,90
+nzherald.co.nz,NZ,800
+thehindu.com,IN,700
+jpost.com,IS,600
+jpost.com,US,200
+iheart.com,US,999
+themarketsdaily.com,US,999
+"""
+
+
+@pytest.fixture
+def places() -> DomainCountries:
+    """GDELT placement from a tiny lookup plus the real overrides/blocklist."""
+    overrides, blocklist = load_config()
+    return DomainCountries(parse_lookup(LOOKUP), overrides, blocklist)
