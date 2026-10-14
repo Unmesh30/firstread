@@ -79,7 +79,7 @@ def run(variant: str, data_root: Path | None = None, out_dir: Path | None = None
     cats = (
         news.group_by("category")
         .len()
-        .sort("len", descending=True)
+        .sort(["len", "category"], descending=[True, False])  # name breaks ties: stable output
         .with_columns((pl.col("len") / news.height * 100).alias("pct"))
     )
 
