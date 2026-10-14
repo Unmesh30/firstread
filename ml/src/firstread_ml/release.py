@@ -14,6 +14,13 @@ SHA256 ``manifest.json``. Two modes:
 A build never modifies a tracked file: everything it writes is under
 gitignored ``data/release/``, and it fails if ``git status`` changed.
 
+From v0.2.0 a build can **inherit** the user encoder from an earlier release
+(``--inherit-user-encoder v0.1.0``): its ``user_encoder.onnx``,
+``population.npy`` and ``config.yaml`` are downloaded at that tag, verified
+against that release's manifest and copied byte for byte, so only the
+classifier changes (ADR 0006). The topic classifier must pass its own gate and
+must have been trained with the committed ``ml/configs/topic_map.yaml``.
+
 ``upload``: push the folder to the Hugging Face Hub, tag it, and re-download
 every file at the tag to check its SHA256. Only MIND-derived *weights and
 aggregates* are released, never MIND rows, text or embedding caches (allowlist).
@@ -56,6 +63,7 @@ from firstread_core.embedding import (
 )
 from firstread_core.features import HISTORY_LEN, gather_history, history_index_matrix
 from firstread_core.text import TEXT_PREP_VERSION
+from firstread_core.topics import TOPIC_IDS
 from firstread_ml.config import NRMSLiteConfig, load_config
 from firstread_ml.export import parity
 from firstread_ml.export.classifier import export_classifier
@@ -123,14 +131,16 @@ def require_releasable_main(repo: Path) -> str:
 class Sources:
     """Everything a build reads. Tests point these at synthetic fixtures."""
 
-    checkpoint: Path  # NRMS-lite checkpoint dir (model.pt, config.yaml, key.json)
-    classifier_dir: Path  # model.joblib + labels.json
+    checkpoint: Path | None  # NRMS-lite checkpoint dir; None when inheriting the encoder
+    classifier_dir: Path  # model.joblib + labels.json (+ policy.json for the topic classifier)
     results: Path  # committed dev results (aggregates)
     classifier_report: Path  # committed classifier report (aggregates)
     model_card: Path  # docs/model-card.md, shipped as README.md
     emb: NDArray[np.float32]  # embedding table for real-history parity
     histories: list[NDArray[np.int32]]  # real click histories (article indices)
     gate: Callable[[Path, Path], tuple[int, dict[str, Any]]]  # (onnx, out) -> (code, result)
+    inherit: Path | None = None  # verified folder of an earlier release to take the encoder from
+    topic_map: Path | None = None  # required when the classifier is the topic classifier
 
 
 def find_checkpoint(model_dir: Path, cfg: NRMSLiteConfig, embedding_id: str) -> Path:
@@ -146,33 +156,60 @@ def find_checkpoint(model_dir: Path, cfg: NRMSLiteConfig, embedding_id: str) -> 
     return hits[0]
 
 
-def default_sources(data_root: Path | None = None) -> Sources:
-    """The real inputs: seed-0 MIND-large dev checkpoint, large classifier, MIND-small gate."""
+def default_sources(data_root: Path | None = None, inherit: str | None = None) -> Sources:
+    """The real inputs: MIND-large classifier, MIND-small gate, and either the seed-0
+    MIND-large dev checkpoint or (``inherit="0.1.0"``) the encoder of that release."""
     from firstread_ml.embed_cache import load_or_build
     from firstread_ml.eval import gate_real
     from firstread_ml.eval.harness import load_eval_data
     from firstread_ml.mind.load import load_news, prepare
+    from firstread_ml.models.topic_classifier import TOPIC_MAP
     from firstread_ml.paths import mind_raw_dir, processed_dir
 
     root = data_root or data_dir()
-    cfg = load_config(DEFAULT_CONFIG).model_copy(update={"seed": SHIPPED_SEED})
-    ckpt = find_checkpoint(
-        root / "models" / "large" / "dev" / "nrms_lite", cfg, embedding_cache_key()[0][:16]
-    )
+    ckpt: Path | None = None
+    inherit_dir: Path | None = None
+    if inherit:
+        inherit_dir = root / "release" / f"inherit-v{inherit}"
+        fetch_release(inherit, inherit_dir)
+    else:
+        cfg = load_config(DEFAULT_CONFIG).model_copy(update={"seed": SHIPPED_SEED})
+        ckpt = find_checkpoint(
+            root / "models" / "large" / "dev" / "nrms_lite", cfg, embedding_cache_key()[0][:16]
+        )
     v = gate_real.VARIANT
     proc = prepare(v, raw_dir=mind_raw_dir(data_root), out_dir=processed_dir(v, data_root))
     test = load_eval_data(v, "dev", data_root).test
     test = test.take(gate_real.subset_rows(test.n))
+    topics = inherit is not None  # releases from v0.2.0 ship the topic classifier
     return Sources(
         checkpoint=ckpt,
-        classifier_dir=root / "models" / "large" / "classifier",
+        classifier_dir=root / "models" / "large" / ("topic_classifier" if topics else "classifier"),
         results=reports_dir() / "results-mind-large-dev.json",
-        classifier_report=reports_dir() / "classifier-mind-large.json",
+        classifier_report=reports_dir()
+        / ("topic-classifier-mind-large.json" if topics else "classifier-mind-large.json"),
         model_card=REPO_ROOT / "docs" / "model-card.md",
         emb=load_or_build(v, load_news(v, proc), None, data_root),
         histories=test.histories(slice(0, 512)),
         gate=lambda onnx_path, out: gate_real.main(onnx_path, out, data_root=data_root),
+        inherit=inherit_dir,
+        topic_map=TOPIC_MAP if topics else None,
     )
+
+
+def fetch_release(version: str, dest: Path, api: Any = None) -> dict[str, Any]:
+    """Download every file of release ``version`` into ``dest`` and verify its manifest."""
+    hub = api or _public_hub()
+    dest.mkdir(parents=True, exist_ok=True)
+    tag = f"v{version}"
+    get = lambda n: hub.hf_hub_download(HF_REPO, n, revision=tag, local_dir=dest)  # noqa: E731
+    get("manifest.json")
+    manifest: dict[str, Any] = json.loads((dest / "manifest.json").read_text())
+    for name in manifest["files"]:
+        get(name)
+    verify_files(dest, manifest)
+    print(f"fetched {HF_REPO}@{tag} -> {dest} (hashes verified)")
+    return manifest
 
 
 # ---------------------------------------------------------------- pieces
@@ -262,14 +299,34 @@ def dev_metrics(results: dict[str, Any], classifier: dict[str, Any]) -> dict[str
         "results": {m: {sl: res[m][sl] for sl in REPORT_SLICES} for m in keep},
         "seed_summary": {sl: results["nrms_lite"]["summary"][sl] for sl in REPORT_SLICES},
         "bootstrap": results.get("bootstrap"),
-        "classifier": {
-            "dataset": "MIND-large, articles only in dev news.tsv",
-            "accuracy": classifier["test"]["accuracy"],
-            "macro_f1": classifier["test"]["macro_f1"],
-            "majority_class_accuracy": classifier["test"]["majority_class_accuracy"],
-            "n_test": classifier["n_test_dev_only"],
-            "labels": classifier["labels"],
-            "dropped_labels": classifier["dropped_labels"],
+        "classifier": _classifier_metrics(classifier),
+    }
+
+
+def _classifier_metrics(c: dict[str, Any]) -> dict[str, Any]:
+    common = {
+        "dataset": "MIND-large, articles only in dev news.tsv",
+        "n_test": c["n_test_dev_only"],
+        "labels": c["labels"],
+    }
+    if "title_only" not in c["test"]:  # v0.1.0: 15 MIND categories
+        t = c["test"]
+        return common | {
+            "accuracy": t["accuracy"],
+            "macro_f1": t["macro_f1"],
+            "majority_class_accuracy": t["majority_class_accuracy"],
+            "dropped_labels": c["dropped_labels"],
+        }
+    return common | {
+        "kind": "topics",
+        "threshold": c["threshold"],
+        "topic_map_sha256": c["topic_map_sha256"],
+        "gate": c["gate"],
+        **{
+            mode: {
+                k: t[k] for k in ("accuracy", "macro_f1", "majority_class_accuracy", "per_class")
+            }
+            for mode, t in c["test"].items()
         },
     }
 
@@ -300,6 +357,66 @@ def verify_files(folder: Path, manifest: dict[str, Any]) -> dict[str, Any]:
 # ---------------------------------------------------------------- build
 
 
+INHERITED_FILES = ("user_encoder.onnx", "population.npy", "config.yaml")
+
+
+def inherit_user_encoder(prev_dir: Path, out: Path) -> dict[str, Any]:
+    """Copy the encoder files of an earlier release byte for byte; return its manifest."""
+    prev: dict[str, Any] = json.loads((prev_dir / "manifest.json").read_text())
+    verify_files(prev_dir, {"files": {n: prev["files"][n] for n in INHERITED_FILES}})
+    for name in INHERITED_FILES:
+        shutil.copyfile(prev_dir / name, out / name)
+        if sha256(out / name) != prev["files"][name]["sha256"]:
+            raise ReleaseError(f"{name}: copy differs from {prev['tag']}")
+    for key in ("embedding", "features"):
+        if prev.get(key) != _current_block(key):
+            raise ReleaseError(
+                f"{prev['tag']} {key} block differs from packages/core; can't inherit"
+            )
+    digest = prev["files"]["user_encoder.onnx"]["sha256"]
+    print(f"user encoder inherited from {prev['tag']} (SHA256 {digest[:12]})")
+    return prev
+
+
+def _current_block(key: str) -> dict[str, Any]:
+    if key == "features":
+        return {"history_len": HISTORY_LEN, "embed_dim": EMBED_DIM, "right_aligned": True}
+    return {
+        "model": EMBED_MODEL,
+        "source": EMBED_MODEL_SOURCE,
+        "revision": EMBED_MODEL_REVISION,
+        "file": EMBED_MODEL_FILE,
+        "fastembed": FASTEMBED_VERSION,
+        "text_prep_version": TEXT_PREP_VERSION,
+        "l2_normalized": True,
+    }
+
+
+def check_topic_classifier(sources: Sources, labels: list[str]) -> dict[str, Any]:
+    """The topic classifier must cover every app topic, match the committed topic map,
+    and have passed its gate. Returns the manifest fields it adds."""
+    from firstread_ml.models.topic_classifier import load_topic_map
+
+    if sources.topic_map is None:
+        raise ReleaseError("a topic classifier needs Sources.topic_map")
+    if labels != list(TOPIC_IDS):
+        raise ReleaseError(f"topic labels {labels} != firstread_core.topics.TOPIC_IDS")
+    policy = json.loads((sources.classifier_dir / "policy.json").read_text())
+    report = json.loads(sources.classifier_report.read_text())
+    map_sha = load_topic_map(sources.topic_map).sha256
+    if policy["topic_map_sha256"] != map_sha or report["topic_map_sha256"] != map_sha:
+        raise ReleaseError("the topic classifier was trained with a different topic_map.yaml")
+    if report["labels"] != labels or report["threshold"] != policy["threshold"]:
+        raise ReleaseError("the topic report doesn't describe this classifier")
+    if not report["gate"]["passed"]:
+        raise ReleaseError(f"topic gate failed: {report['gate']['failures']}")
+    return {
+        "kind": "topics",
+        "low_confidence_threshold": policy["threshold"],
+        "topic_map_sha256": map_sha,
+    }
+
+
 def build(
     version: str,
     sources: Sources,
@@ -322,31 +439,70 @@ def build(
         d.mkdir(parents=True)
     print(f"building release v{version} ({'dry run' if dry_run else commit[:12]}) -> {out}")
 
-    model, cfg = load_checkpoint(sources.checkpoint, torch.device("cpu"))
-    if cfg.seed != SHIPPED_SEED:
-        raise ReleaseError(f"checkpoint seed {cfg.seed} != shipped seed {SHIPPED_SEED}")
     clf = joblib.load(sources.classifier_dir / "model.joblib")
     labels = json.loads((sources.classifier_dir / "labels.json").read_text())
+    topic_fields = (
+        check_topic_classifier(sources, labels)
+        if (sources.classifier_dir / "policy.json").is_file()
+        else {"kind": "mind_categories"}
+    )
     meta = {"firstread_release": version, "hf_repo": HF_REPO}
-    enc = export_user_encoder(model, out / "user_encoder.onnx", meta)
     cls = export_classifier(clf, out / "category_classifier.onnx", meta | {"labels": "labels.json"})
 
     print("parity (PyTorch/sklearn vs ONNX Runtime, max abs diff):")
-    enc_parity = parity.check_user_encoder(model, enc)
-    real_parity = parity.check_user_encoder(
-        model, enc, parity.default_cases() | real_history_cases(sources.emb, sources.histories)
-    )
-    for case, diff in real_parity.max_abs_diff.items():
-        print(f"  user_encoder {case}: {diff:.2e}")
-    print(f"  user_encoder batch invariance: {real_parity.batch_invariance:.2e}")
+    parity_metrics: dict[str, Any] = {}
+    if sources.inherit is not None:
+        prev = inherit_user_encoder(sources.inherit, out)
+        enc = out / "user_encoder.onnx"
+        encoder_block = {**prev["user_encoder"], "inherited_from": prev["tag"]}
+        parity_metrics["user_encoder"] = {
+            "inherited_from": prev["tag"],
+            "note": "byte-identical copy; parity was checked when that release was built",
+        }
+    else:
+        if sources.checkpoint is None:
+            raise ReleaseError("a build needs a checkpoint or an earlier release to inherit from")
+        model, cfg = load_checkpoint(sources.checkpoint, torch.device("cpu"))
+        if cfg.seed != SHIPPED_SEED:
+            raise ReleaseError(f"checkpoint seed {cfg.seed} != shipped seed {SHIPPED_SEED}")
+        enc = export_user_encoder(model, out / "user_encoder.onnx", meta)
+        enc_parity = parity.check_user_encoder(model, enc)
+        real_parity = parity.check_user_encoder(
+            model, enc, parity.default_cases() | real_history_cases(sources.emb, sources.histories)
+        )
+        for case, diff in real_parity.max_abs_diff.items():
+            print(f"  user_encoder {case}: {diff:.2e}")
+        print(f"  user_encoder batch invariance: {real_parity.batch_invariance:.2e}")
+        if not (enc_parity.ok and real_parity.ok):
+            raise ReleaseError(f"user encoder parity above {parity.TOLERANCE}")
+        parity_metrics["user_encoder_synthetic"] = enc_parity.as_dict()
+        parity_metrics["user_encoder_real"] = real_parity.as_dict()
+        np.save(out / "population.npy", model.population.numpy().astype(np.float32))
+        (out / "config.yaml").write_text(yaml.safe_dump(cfg.model_dump(), sort_keys=False))
+        encoder_block = {
+            "file": "user_encoder.onnx",
+            "inputs": {
+                "hist": ["batch", HISTORY_LEN, EMBED_DIM],
+                "mask": ["batch", HISTORY_LEN],
+            },
+            "input_dtypes": {"hist": "float32", "mask": "bool"},
+            "output": {"user_vec": ["batch", EMBED_DIM]},
+            "opset": OPSET,
+            "score_scale": float(model.scale.detach()),
+            "alpha": float(model.alpha.detach()),
+            "seed": cfg.seed,
+            "checkpoint_id": sources.checkpoint.name,
+            "trained_on": "MIND-large train (all days)",
+        }
     x = sources.emb[np.random.default_rng(0).choice(len(sources.emb), 2048)]
     cls_parity = parity.check_classifier(clf, cls, x)
     print(
         f"  classifier: {cls_parity['max_abs_diff']:.2e}, "
         f"label mismatches {cls_parity['label_mismatches']}/{cls_parity['n']}"
     )
-    if not (enc_parity.ok and real_parity.ok and cls_parity["ok"]):
-        raise ReleaseError(f"parity above {parity.TOLERANCE}")
+    if not cls_parity["ok"]:
+        raise ReleaseError(f"classifier parity above {parity.TOLERANCE}")
+    parity_metrics["classifier"] = cls_parity
 
     code, gate_result = sources.gate(enc, work / "eval_gate.json")
     if code != 0:
@@ -356,16 +512,10 @@ def build(
     latency = {"machine": machine(), "onnxruntime": ort.__version__, "rows": bench(enc)}
 
     (out / "labels.json").write_text(json.dumps(labels) + "\n")
-    np.save(out / "population.npy", model.population.numpy().astype(np.float32))
-    (out / "config.yaml").write_text(yaml.safe_dump(cfg.model_dump(), sort_keys=False))
     metrics = dev_metrics(
         json.loads(sources.results.read_text()), json.loads(sources.classifier_report.read_text())
     ) | {
-        "parity": {
-            "user_encoder_synthetic": enc_parity.as_dict(),
-            "user_encoder_real": real_parity.as_dict(),
-            "classifier": cls_parity,
-        },
+        "parity": parity_metrics,
         "eval_gate_real": {k: gate_result[k] for k in ("ndcg@10", "meta", "slices", "passed")},
         "latency": latency,
     }
@@ -385,38 +535,17 @@ def build(
             for n in FILES
             if n != "manifest.json"
         },
-        "user_encoder": {
-            "file": "user_encoder.onnx",
-            "inputs": {
-                "hist": ["batch", HISTORY_LEN, EMBED_DIM],
-                "mask": ["batch", HISTORY_LEN],
-            },
-            "input_dtypes": {"hist": "float32", "mask": "bool"},
-            "output": {"user_vec": ["batch", EMBED_DIM]},
-            "opset": OPSET,
-            "score_scale": float(model.scale.detach()),
-            "alpha": float(model.alpha.detach()),
-            "seed": cfg.seed,
-            "checkpoint_id": sources.checkpoint.name,
-            "trained_on": "MIND-large train (all days)",
-        },
+        "user_encoder": encoder_block,
         "category_classifier": {
             "file": "category_classifier.onnx",
             "input": {"embedding": ["batch", EMBED_DIM]},
             "outputs": {"label": ["batch"], "probabilities": ["batch", len(labels)]},
             "labels": "labels.json",
             "n_labels": len(labels),
+            **topic_fields,
         },
-        "features": {"history_len": HISTORY_LEN, "embed_dim": EMBED_DIM, "right_aligned": True},
-        "embedding": {
-            "model": EMBED_MODEL,
-            "source": EMBED_MODEL_SOURCE,
-            "revision": EMBED_MODEL_REVISION,
-            "file": EMBED_MODEL_FILE,
-            "fastembed": FASTEMBED_VERSION,
-            "text_prep_version": TEXT_PREP_VERSION,
-            "l2_normalized": True,
-        },
+        "features": _current_block("features"),
+        "embedding": _current_block("embedding"),
         "dataset": {"name": "MIND", "revision": HF_REVISION, "license": "MSR License Terms"},
         "license": "other (MIND-derived weights, non-commercial; see README.md)",
         "versions": {

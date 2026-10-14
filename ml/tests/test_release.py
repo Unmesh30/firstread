@@ -311,3 +311,106 @@ def test_find_checkpoint_requires_exactly_one_match(tmp_path: Path) -> None:
     assert release.find_checkpoint(tmp_path, NRMSLiteConfig(seed=0), "e1").name == "a"
     with pytest.raises(release.ReleaseError):
         release.find_checkpoint(tmp_path, NRMSLiteConfig(seed=0), "other-embeddings")
+
+
+# ---------------------------------------------------------------- v0.2.0: inherit + topics
+
+TOPIC_MAP_YAML = "version: 1\ncategories:\n  news: {default: us}\n"
+
+
+def topic_sources(built: dict[str, Any], **overrides: Any) -> release.Sources:
+    """Sources for a v0.2.0-style build: the encoder comes from ``built['out']``."""
+    from firstread_core.topics import TOPIC_IDS
+    from firstread_ml.models.topic_classifier import load_topic_map
+
+    repo, s = built["repo"], built["sources"]
+    topic_map = repo / "ml" / "configs" / "topic_map.yaml"
+    topic_map.parent.mkdir(parents=True, exist_ok=True)
+    topic_map.write_text(TOPIC_MAP_YAML)
+    sha = load_topic_map(topic_map).sha256
+    cls_dir = repo / "data" / "models" / "topic_classifier"
+    cls_dir.mkdir(parents=True, exist_ok=True)
+    labels = list(TOPIC_IDS)
+    y = np.arange(len(s.emb)) % len(labels)
+    joblib.dump(LogisticRegression(max_iter=500).fit(s.emb, y), cls_dir / "model.joblib")
+    (cls_dir / "labels.json").write_text(json.dumps(labels))
+    (cls_dir / "policy.json").write_text(json.dumps({"threshold": 0.4, "topic_map_sha256": sha}))
+    per_mode = {"accuracy": 0.8, "macro_f1": 0.7, "majority_class_accuracy": 0.3, "per_class": []}
+    report = repo / "ml" / "reports" / "topic-classifier-mind-large.json"
+    report.write_text(
+        json.dumps(
+            {
+                "labels": labels,
+                "topic_map_sha256": sha,
+                "threshold": 0.4,
+                "n_test_dev_only": 10,
+                "gate": {"passed": True, "failures": []},
+                "test": {"title_abstract": per_mode, "title_only": per_mode},
+            }
+        )
+    )
+    commit_all(repo, "topic fixtures")
+    fields = {
+        **s.__dict__,
+        "checkpoint": None,
+        "classifier_dir": cls_dir,
+        "classifier_report": report,
+        "inherit": built["out"],
+        "topic_map": topic_map,
+    }
+    return release.Sources(**(fields | overrides))
+
+
+def build_from(built: dict[str, Any], sources: release.Sources, root: str = "release2") -> Path:
+    repo = built["repo"]
+    return release.build(
+        "0.0.2", sources, dry_run=True, repo=repo, out_root=repo / "data" / root, bench=fast_bench
+    )
+
+
+def test_inherited_encoder_is_byte_identical_and_topics_ship(built: dict[str, Any]) -> None:
+    prev = json.loads((built["out"] / "manifest.json").read_text())
+    out = build_from(built, topic_sources(built))
+    manifest = release.verify_folder(out)
+    for name in release.INHERITED_FILES:
+        assert manifest["files"][name]["sha256"] == prev["files"][name]["sha256"]
+    assert manifest["user_encoder"]["inherited_from"] == prev["tag"]
+    assert manifest["user_encoder"]["score_scale"] == prev["user_encoder"]["score_scale"]
+    cc = manifest["category_classifier"]
+    assert cc["kind"] == "topics"
+    assert cc["n_labels"] == 13
+    assert cc["low_confidence_threshold"] == 0.4
+    metrics = json.loads((out / "metrics.json").read_text())
+    assert metrics["parity"]["user_encoder"]["inherited_from"] == prev["tag"]
+    assert metrics["classifier"]["kind"] == "topics"
+
+
+def test_tampered_inherited_encoder_is_refused(built: dict[str, Any]) -> None:
+    sources = topic_sources(built)
+    (built["out"] / "population.npy").write_bytes(b"not the released vector")
+    with pytest.raises(release.ReleaseError, match="sha256"):
+        build_from(built, sources)
+
+
+def test_topic_classifier_must_match_the_committed_topic_map(built: dict[str, Any]) -> None:
+    sources = topic_sources(built)
+    assert sources.topic_map is not None
+    sources.topic_map.write_text(TOPIC_MAP_YAML + "  sports: {default: sports}\n")
+    with pytest.raises(release.ReleaseError, match="different topic_map"):
+        build_from(built, sources)
+
+
+def test_topic_classifier_must_cover_every_topic(built: dict[str, Any]) -> None:
+    sources = topic_sources(built)
+    (sources.classifier_dir / "labels.json").write_text(json.dumps(["us", "world"]))
+    with pytest.raises(release.ReleaseError, match="TOPIC_IDS"):
+        build_from(built, sources)
+
+
+def test_failed_topic_gate_blocks_the_release(built: dict[str, Any]) -> None:
+    sources = topic_sources(built)
+    report = json.loads(sources.classifier_report.read_text())
+    report["gate"] = {"passed": False, "failures": ["autos: title-only F1 0.1 < 0.3"]}
+    sources.classifier_report.write_text(json.dumps(report))
+    with pytest.raises(release.ReleaseError, match="topic gate failed"):
+        build_from(built, sources)
