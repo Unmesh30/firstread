@@ -16,6 +16,11 @@ dependencies = [
   "pyyaml>=6.0.3",
   "pydantic>=2.14.1",
   "mlflow>=3.17.1",  # sqlite tracking backend; ml only (never in the API image)
+  # ONNX export (1c). onnxscript is required by torch's dynamo exporter.
+  "onnx>=1.23.2",
+  "onnxscript>=0.7.2",
+  "onnxruntime>=1.31.0",
+  "skl2onnx>=1.20.0",
 ]
 
 [project.scripts]
