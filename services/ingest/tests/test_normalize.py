@@ -87,3 +87,20 @@ def test_normalize_all_counts_drops_by_reason() -> None:
     kept, dropped = normalize_all(items, NOW)
     assert len(kept) == 1
     assert dropped == {"short_title": 2, "non_english": 1}
+
+
+@pytest.mark.parametrize(
+    ("title", "english"),
+    [
+        ("Hay que repensar cómo hablamos del cambio climático", False),
+        ("Les incendies se propagent dans le sud de la France", False),
+        ("Die Regierung will das Gesetz nicht ändern", False),
+        ("Earthquake hits northern Japan", True),
+        ("Real Madrid stun Roma after dramatic late comeback", True),
+        ("Pope Leo XIV has lung cancer and underwent successful surgery", True),
+        ("Cinco de Mayo parade draws crowds in the city", True),
+    ],
+)
+def test_items_in_other_languages_are_dropped(title: str, english: bool) -> None:
+    out = normalize(replace(BASE, title=title, description=None), NOW)
+    assert (out != "non_english") is english
