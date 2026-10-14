@@ -94,9 +94,11 @@ async def test_fetch_filters_places_and_requests_fresh_lastupdate(
     assert (by_domain["jpost.com"].geo, by_domain["jpost.com"].source_country) == ("intl", "IL")
     assert by_domain["gazetteseries.co.uk"].source_country == "GB"
     assert all(i.origin == "gdelt" and i.description is None for i in r.items)
-    assert r.cursor == LATEST
     assert not r.stale
     assert len(r.files) == 8  # first run: 7 older slots (404 here) + the newest
+    # 404s older than 90 min count as skipped; younger ones are pending, so the cursor
+    # holds at 17:30 and the next run retries 17:45 onwards.
+    assert r.cursor == LATEST - timedelta(minutes=75)
     assert r.summary()["top_domains"]["iheart.com"] == 1
 
 
@@ -147,3 +149,32 @@ def test_parse_lookup_keeps_the_top_country() -> None:
     assert parse_lookup("domain,countrycode,cnt\na.com,US,5\na.com,UK,9\nb.com,FR,x\n") == {
         "a.com": "UK"
     }
+
+
+async def test_recent_404s_are_pending_and_hold_the_cursor(
+    no_network: respx.MockRouter, places: DomainCountries
+) -> None:
+    blob = FIX.read_bytes()
+    newest = LATEST + timedelta(minutes=30)  # listed, but its file (and 19:00's) 404s
+    no_network.get(gkg.LASTUPDATE).mock(
+        return_value=httpx.Response(200, text=lastupdate(newest, blob))
+    )
+    no_network.get(gkg.slot_url(LATEST)).mock(return_value=httpx.Response(200, content=blob))
+    no_network.get(url__regex=r".*\.gkg\.csv\.zip$").mock(return_value=httpx.Response(404))
+    cursor = LATEST - timedelta(minutes=15)
+    async with make_client() as c:
+        r = await gkg.fetch_gkg(c, cursor, newest + timedelta(minutes=2), places)
+    assert r.items  # 18:45 was processed ...
+    assert r.cursor == LATEST  # ... but the cursor stops before the pending 19:00 slot
+    assert [f.get("pending", False) for f in r.files] == [False, True, True]
+
+
+async def test_old_404s_are_skipped_slots(
+    no_network: respx.MockRouter, places: DomainCountries
+) -> None:
+    mock_gdelt(no_network, FIX.read_bytes())
+    cursor = LATEST - timedelta(minutes=30)
+    async with make_client() as c:  # three hours later, 18:30 is long overdue
+        r = await gkg.fetch_gkg(c, cursor, LATEST + timedelta(hours=3), places)
+    assert r.files[0].get("missing")
+    assert r.cursor == LATEST
