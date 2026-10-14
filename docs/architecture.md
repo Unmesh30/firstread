@@ -69,12 +69,26 @@ flowchart LR
 
 All ports bind to `127.0.0.1` only. `api` starts only after `db` and `redis` report healthy.
 
+## Offline ML pipeline (Phase 1)
+
+```mermaid
+flowchart LR
+  HF[(HF Recommenders/MIND<br/>pinned + SHA256)] -->|make mind-download| RAW[data/mind/raw]
+  RAW --> PQ[processed parquet]
+  PQ -->|packages/core: article_text + Embedder| EMB[embedding cache<br/>keyed by model + text prep]
+  PQ --> SPL[holdout / dev splits]
+  EMB --> SC[baselines / models]
+  SPL --> SC --> MET[metrics x slices] --> REP[ml/reports: aggregates only]
+```
+
+The embedding function lives only in `packages/core` (`firstread-core[embed]`); the API image installs core without the `embed` extra, and CI fails if ML packages appear in it.
+
 ## Status by phase
 
 | Phase | What exists |
 |---|---|
 | **P0 Bootstrap** ✅ | uv workspace (4 members), FastAPI `/healthz` + `/readyz`, structlog JSON logs, Expo app placeholder with web export under `/firstread`, Docker Compose stack, Makefile, pre-commit, CI (`python`, `mobile`, `docker`, `secrets`), Dependabot, docs |
-| P1 Offline ML | — |
+| P1 Offline ML | 🚧 **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. 1b models and 1c release next. |
 | P2 Ingestion | — |
 | P3 API | — |
 | P4 App | — |
