@@ -237,7 +237,13 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - **`pgrep -f <pattern>` matches the loop that runs it.** A shell `until ! pgrep -f "firstread-ml embed"` loop contains the pattern in its own command line, so it never exits. Wait on a PID or a log line instead.
 - **`--import-mode=importlib` means test modules can't import each other.** Shared test builders live in `firstread_ml.testing`.
 - **Two `conftest.py` files in one mypy run collide** ("Duplicate module named conftest"). `ml/tests/__init__.py` gives the ml one a distinct module name.
-- **Golden vectors and CPU architecture.** The golden file was generated on macOS arm64; CI runs Linux x86-64. An int8 model can differ slightly across CPUs. The test's failure message prints the measured difference and both platforms. If CI ever fails only for this reason, measure it, record it here, and set the tolerance to ~3× the measurement. The negative control must still pass. Don't just loosen it.
+- **Golden vectors differ across CPU architectures. This really happened in CI.** The golden file was generated on macOS arm64. On GitHub's Linux x86-64 runner the same pinned int8 model gave **max abs diff 2.30e-4** (the initial tolerance was 1e-4) and **min cosine 0.99999964** (1 − cos = 3.6e-7). int8 matrix-multiply kernels differ by CPU, so outputs are close but not bit-identical. What we did, in order:
+  1. The failure message printed the measured values and both platforms.
+  2. We measured the negative control locally: a one-word change moves vectors by ≥ 0.083 max abs and ≥ 0.109 in 1 − cos.
+  3. We set the tolerances to ~3× the measurement: max abs ≤ 7e-4, and 1 − cos ≤ 1.1e-6 (the cosine check got *tighter* than the original 1e-4).
+  4. We added a test that keeps both tolerances within 2–4× of the recorded measurement, so they can't be loosened quietly. A one-word change is still ≥ 119× (abs) and ≥ 99,000× (cosine) outside them.
+
+  Lesson: golden tests for quantized models need a cross-platform tolerance, measured rather than guessed.
 
 ---
 

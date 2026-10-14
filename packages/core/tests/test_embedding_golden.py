@@ -28,10 +28,18 @@ pytestmark = pytest.mark.model
 
 GOLDEN = json.loads((Path(__file__).parent / "data" / "golden_bge_small_en_v1_5.json").read_text())
 
-# Tolerances. A one-word change to the text must move the vector by at least
-# NEGATIVE_CONTROL_MARGIN times these, otherwise the test could not tell models apart.
-MAX_ABS_DIFF = 1e-4
-MIN_COSINE = 0.9999
+# Cross-platform difference measured in CI (2026-10-14): golden vectors from macOS
+# arm64 vs. the same pinned int8 model on GitHub's Linux x86-64 runner. The int8
+# kernels differ by CPU, so vectors are close but not bit-identical.
+MEASURED_MAX_ABS_DIFF = 2.30e-4
+MEASURED_ONE_MINUS_COS = 3.6e-7
+
+# Tolerances: ~3x the measured cross-platform difference. A one-word change to the
+# text must move the vector by at least NEGATIVE_CONTROL_MARGIN times these
+# (measured: >= 0.083 max abs diff, >= 0.109 in 1 - cosine), so the test still
+# tells different inputs or models apart. Never loosen these without re-measuring.
+MAX_ABS_DIFF = 7e-4
+MIN_COSINE = 1.0 - 1.1e-6
 NEGATIVE_CONTROL_MARGIN = 10.0
 
 
@@ -43,6 +51,13 @@ def embedder() -> Embedder:
 def _golden() -> tuple[list[str], np.ndarray[Any, Any]]:
     texts = [article_text(i["title"], i["summary"]) for i in GOLDEN["items"]]
     return texts, np.array([i["vector"] for i in GOLDEN["items"]], dtype=np.float32)
+
+
+def test_tolerances_stay_tied_to_the_measurement() -> None:
+    # Guards against quietly loosening the gate: tolerances must stay within
+    # 2-4x of the measured cross-platform difference.
+    assert 2 * MEASURED_MAX_ABS_DIFF <= MAX_ABS_DIFF <= 4 * MEASURED_MAX_ABS_DIFF
+    assert 2 * MEASURED_ONE_MINUS_COS <= 1 - MIN_COSINE <= 4 * MEASURED_ONE_MINUS_COS
 
 
 def test_golden_metadata_matches_pins() -> None:
