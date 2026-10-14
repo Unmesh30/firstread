@@ -324,6 +324,13 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - More data helps the learned part. The gain over mean_history grew from +0.017 (MIND-small) to +0.024 (MIND-large) overall, with the same config and no retuning.
 - Against the published NRMS (MIND-large **test**, nDCG@10 0.4163, AUC 0.6776), NRMS-lite's dev 0.4145 / 0.6621 is in the same range. It is not directly comparable: a different split, and NRMS learns its own news encoder (ADR 0004).
 - Category classifier: **accuracy 0.721, macro-F1 0.598** on 2,624 dev-only articles (majority-class reference 0.326; `ml/reports/classifier-mind-large.md`). MIND-large's train news covers far more of dev, so this test set is 5× smaller than MIND-small's, with a different class mix. Don't compare the two accuracies directly.
+- **Where NRMS-lite loses.** In the per-category table (candidates restricted to one category), NRMS-lite is below mean_history in 4 of 14 categories on MIND-large dev, on all three seeds:
+  - tv: −0.028 nDCG@10 (20,840 impressions)
+  - weather: −0.011 (2,263)
+  - video: −0.007 (10,924)
+  - lifestyle: −0.0025 (69,053)
+
+  None of these is flagged low-n. We have no per-category CIs, though, so the lifestyle gap may be noise; tv is the clearest loss. The other ten categories gain, from +0.015 (entertainment) to +0.060 (autos). The aggregate win doesn't mean NRMS-lite is better for every kind of content. Possible reasons are discussed in interview question 16; none has been tested.
 
 Measured runtimes for MIND-large on an M-series Mac (16 GB):
 
@@ -339,6 +346,9 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
 - **Acceptance lines.** `ACCEPT PASS [overall]` and `[cold_candidates]` mean *every* NRMS-lite seed beat the best baseline. One seed below the bar is a FAIL, by design.
 - **Per-seed rows plus `mean ± std`.** If std is comparable to the gap over the baseline, the gain isn't solid.
 - **Paired bootstrap table.** The 95% CI of the nDCG@10 gain over mean_history. A CI entirely above 0, with "resamples with gain ≤ 0" at 0.0%, is the evidence that the gain is real, not noise. Pairing (comparing both models on the *same* impressions) removes impression-difficulty variance, which is why the CI is much tighter than the per-model metric spread.
+  - **Caveat: impressions aren't independent.** The bootstrap resamples impressions as if each were an independent draw, but one user contributes many impressions, and their gains are correlated. An impression-level bootstrap therefore somewhat understates the uncertainty.
+  - A user-level (cluster) bootstrap would be more honest and wider: resample users, then take all their impressions.
+  - We haven't run it. With CIs this far from zero (MIND-large overall [+0.0232, +0.0248]), widening them by any plausible factor wouldn't reach 0, so the conclusion holds. Still, quote the interval as impression-level.
 - **Classifier (`classifier-mind-<variant>.md`).** Compare accuracy with the majority-class reference. Macro-F1 is pulled down by tiny or ambiguous classes (kids, video, tv); per-class F1 shows which ones.
 ---
 
@@ -456,7 +466,17 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
     The same config with two other seeds gave much less, and constant-LR curves swung by ±0.01 between epochs. So we added LR decay, chose the config by its mean across seeds, trained the final model with 3 seeds, required every seed to pass, and reported a paired bootstrap CI for the gain.
 
 15. **Why a *paired* bootstrap?**
-    Impressions vary hugely in difficulty, and both models see the same ones. Resampling per-impression *differences* cancels that shared variance, so the CI reflects the model difference, not which impressions happened to be drawn. Unpaired CIs on each model's mean would overlap even for a real gain.
+    Impressions vary hugely in difficulty, and both models see the same ones. Resampling per-impression *differences* cancels that shared variance, so the CI reflects the model difference, not which impressions happened to be drawn. Unpaired CIs on each model's mean would overlap even for a real gain. One caveat: impressions from the same user aren't independent, so a user-level (cluster) bootstrap would give a wider, more honest interval. Ours is far enough from zero that the conclusion survives that.
+
+16. **Where does your model fail, and why might that be?**
+    Per category on MIND-large dev, NRMS-lite is below the mean-of-history baseline in tv, weather, video and lifestyle, on all three seeds. tv is the clearest loss (−0.028 nDCG@10); lifestyle (−0.0025) may be noise, since there are no per-category CIs.
+
+    I haven't tested why, so these are hypotheses:
+    - Within one category, the ranking may depend on things a generic sentence embedding captures poorly. For tv that might be specific shows or celebrities; for weather, location and timeliness. A learned attention re-weighting of history may then add noise compared with a plain average.
+    - Training optimizes the overall softmax loss across all categories mixed together, so it can trade small losses in some categories for larger gains in big ones like news and sports.
+    - Video items may have short or generic text ("Watch: ..."), which leaves the embedding little to work with.
+
+    I'd check these by slicing the per-category gain by history length and abstract length, and by trying a per-category bootstrap. A mixed approach could also help, falling back toward mean-of-history where the model is less certain. I wouldn't tune anything against dev categories to close the gap.
 
 ---
 
