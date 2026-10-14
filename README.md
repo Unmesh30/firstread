@@ -38,6 +38,18 @@ cd apps/mobile && npx expo start   # app (press w for web)
 
 `make help` lists every command. The step-by-step explanation of the tooling is in [docs/learn/00-bootstrap.md](docs/learn/00-bootstrap.md).
 
+### Offline evaluation on MIND
+
+MIND is license-gated: read the [terms](https://github.com/msnews/MIND/blob/master/MSR%20License_Data.pdf) first.
+
+```bash
+make mind-download VARIANT=small ACCEPT_LICENSE=1   # verified download into data/ (gitignored)
+make eval VARIANT=small                              # baselines -> ml/reports/results-mind-small-*.md
+make eda VARIANT=small                               # aggregate dataset report
+```
+
+Results and the evaluation protocol: [ml/reports/](ml/reports/), [ADR 0003](docs/adr/0003-mind-data-and-eval-protocol.md), [docs/learn/01-offline-ml.md](docs/learn/01-offline-ml.md).
+
 ## Repository layout
 
 ```
@@ -53,7 +65,7 @@ docs/              architecture, ADRs, learn chapters
 ## Data and credits
 
 - News metadata from the [GDELT Project](https://www.gdeltproject.org/).
-- Models are trained and evaluated on [MIND](https://msnews.github.io/) under the Microsoft Research License (research use only; not redistributed here).
+- Models are trained and evaluated on [MIND](https://msnews.github.io/) under the Microsoft Research License (research use only; not redistributed here). See [docs/data-card.md](docs/data-card.md).
 
 ## License
 

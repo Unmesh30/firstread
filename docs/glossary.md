@@ -10,12 +10,16 @@ Project-wide terms. Each learn chapter also has its own glossary.
 | **Cold start (user)** | A new reader has no history; we start from their chosen topics. |
 | **Conventional Commits** | Commit message format `type: summary` (`feat:`, `fix:`, `docs:`...). |
 | **CI** | Continuous Integration: every push/PR is automatically linted, type-checked, tested and built. |
+| **Cold-start candidate** | An article never clicked in the training period (the offline stand-in for "brand-new"). |
 | **Docker Compose** | Tool that starts several containers (db, redis, api) together from one YAML file. |
 | **Embedding** | A fixed-length vector (here 384 numbers) representing the meaning of a text. |
+| **Eval gate** | A CI check that fails if offline metrics drop; ours runs on synthetic data (MIND can't be redistributed). |
 | **Expo Router** | File-based routing for Expo/React Native: each file in `src/app/` is a screen/URL. |
 | **GDELT** | Global Database of Events, Language and Tone; our free live news source. Must be credited with a link to gdeltproject.org. |
+| **Golden test** | Compares outputs (e.g. embedding vectors) with stored known-good values to catch silent changes. |
 | **Healthcheck** | A command/endpoint that tells an orchestrator whether a service is working. |
 | **Liveness vs readiness** | `/healthz`: is the process alive? `/readyz`: can it serve traffic (dependencies reachable)? |
+| **Impression** | One feed shown to one user: their click history plus candidates labelled clicked / not clicked. |
 | **Lockfile** | A file (`uv.lock`, `package-lock.json`) recording the exact version of every dependency so installs are reproducible. |
 | **MIND** | Microsoft News Dataset; used for training and offline evaluation only (research license). |
 | **mypy** | Static type checker for Python. |
