@@ -1,0 +1,237 @@
+{
+ "dropped_labels": [
+  "games",
+  "middleeast",
+  "northamerica"
+ ],
+ "labels": [
+  "autos",
+  "entertainment",
+  "finance",
+  "foodanddrink",
+  "health",
+  "kids",
+  "lifestyle",
+  "movies",
+  "music",
+  "news",
+  "sports",
+  "travel",
+  "tv",
+  "video",
+  "weather"
+ ],
+ "min_train_per_class": 10,
+ "n_test_dev_only": 2624,
+ "n_test_excluded_unknown_label": 0,
+ "n_train": 101523,
+ "seconds": 43.5,
+ "selection": {
+  "best": {
+   "C": 30.0,
+   "class_weight": "none",
+   "val_accuracy": 0.7524869496700483,
+   "val_macro_f1": 0.5935826226600551
+  },
+  "grid": [
+   {
+    "C": 0.1,
+    "class_weight": "none",
+    "val_accuracy": 0.740470796808825,
+    "val_macro_f1": 0.5053542032792662
+   },
+   {
+    "C": 0.1,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6486752683935783,
+    "val_macro_f1": 0.5361881199210129
+   },
+   {
+    "C": 0.3,
+    "class_weight": "none",
+    "val_accuracy": 0.7499261302078204,
+    "val_macro_f1": 0.5548385451276747
+   },
+   {
+    "C": 0.3,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6558652614990643,
+    "val_macro_f1": 0.5431223371122755
+   },
+   {
+    "C": 1.0,
+    "class_weight": "none",
+    "val_accuracy": 0.7550477691322762,
+    "val_macro_f1": 0.5797204663633937
+   },
+   {
+    "C": 1.0,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6606914212548015,
+    "val_macro_f1": 0.551303462446357
+   },
+   {
+    "C": 3.0,
+    "class_weight": "none",
+    "val_accuracy": 0.754456810794839,
+    "val_macro_f1": 0.5824033727500587
+   },
+   {
+    "C": 3.0,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6592140254112085,
+    "val_macro_f1": 0.5462165609860155
+   },
+   {
+    "C": 10.0,
+    "class_weight": "none",
+    "val_accuracy": 0.7520929774450901,
+    "val_macro_f1": 0.591831942949866
+   },
+   {
+    "C": 10.0,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6572441642864179,
+    "val_macro_f1": 0.5369334706065227
+   },
+   {
+    "C": 30.0,
+    "class_weight": "none",
+    "val_accuracy": 0.7524869496700483,
+    "val_macro_f1": 0.5935826226600551
+   },
+   {
+    "C": 30.0,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6547818378804294,
+    "val_macro_f1": 0.5323516508233158
+   },
+   {
+    "C": 100.0,
+    "class_weight": "none",
+    "val_accuracy": 0.7514035260514134,
+    "val_macro_f1": 0.5904810310197423
+   },
+   {
+    "C": 100.0,
+    "class_weight": "balanced",
+    "val_accuracy": 0.6551758101053876,
+    "val_macro_f1": 0.532362241929267
+   }
+  ],
+  "val_fraction": 0.1
+ },
+ "test": {
+  "accuracy": 0.7214176829268293,
+  "macro_f1": 0.5984492354428844,
+  "majority_class_accuracy": 0.3254573170731707,
+  "per_class": [
+   {
+    "f1": 0.6065573770491803,
+    "label": "autos",
+    "precision": 0.6065573770491803,
+    "recall": 0.6065573770491803,
+    "support": 61
+   },
+   {
+    "f1": 0.6875,
+    "label": "entertainment",
+    "precision": 0.9166666666666666,
+    "recall": 0.55,
+    "support": 20
+   },
+   {
+    "f1": 0.5306122448979592,
+    "label": "finance",
+    "precision": 0.5234899328859061,
+    "recall": 0.5379310344827586,
+    "support": 145
+   },
+   {
+    "f1": 0.6696428571428571,
+    "label": "foodanddrink",
+    "precision": 0.6198347107438017,
+    "recall": 0.7281553398058253,
+    "support": 103
+   },
+   {
+    "f1": 0.584070796460177,
+    "label": "health",
+    "precision": 0.6,
+    "recall": 0.5689655172413793,
+    "support": 58
+   },
+   {
+    "f1": 0.5,
+    "label": "kids",
+    "precision": 1.0,
+    "recall": 0.3333333333333333,
+    "support": 3
+   },
+   {
+    "f1": 0.5728155339805825,
+    "label": "lifestyle",
+    "precision": 0.6145833333333334,
+    "recall": 0.5363636363636364,
+    "support": 110
+   },
+   {
+    "f1": 0.5882352941176471,
+    "label": "movies",
+    "precision": 0.625,
+    "recall": 0.5555555555555556,
+    "support": 18
+   },
+   {
+    "f1": 0.8076923076923077,
+    "label": "music",
+    "precision": 0.875,
+    "recall": 0.75,
+    "support": 28
+   },
+   {
+    "f1": 0.7200429876410532,
+    "label": "news",
+    "precision": 0.6653426017874876,
+    "recall": 0.7845433255269321,
+    "support": 854
+   },
+   {
+    "f1": 0.9345911949685535,
+    "label": "sports",
+    "precision": 0.9440914866581956,
+    "recall": 0.925280199252802,
+    "support": 803
+   },
+   {
+    "f1": 0.4380165289256198,
+    "label": "travel",
+    "precision": 0.49074074074074076,
+    "recall": 0.39552238805970147,
+    "support": 134
+   },
+   {
+    "f1": 0.4,
+    "label": "tv",
+    "precision": 0.375,
+    "recall": 0.42857142857142855,
+    "support": 21
+   },
+   {
+    "f1": 0.3382352941176471,
+    "label": "video",
+    "precision": 0.5227272727272727,
+    "recall": 0.25,
+    "support": 184
+   },
+   {
+    "f1": 0.5987261146496815,
+    "label": "weather",
+    "precision": 0.6266666666666667,
+    "recall": 0.573170731707317,
+    "support": 82
+   }
+  ]
+ },
+ "variant": "large"
+}
