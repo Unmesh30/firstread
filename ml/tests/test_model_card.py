@@ -20,7 +20,8 @@ def load(name: str) -> dict[str, Any]:
 
 
 RESULTS = load("results-mind-large-dev.json")
-CLASSIFIER = load("classifier-mind-large.json")
+TOPICS = load("topic-classifier-mind-large.json")
+SKEW = load("skew-title-only-mind-small.json")
 
 
 def ndcg(model: str, sl: str) -> str:
@@ -63,9 +64,13 @@ def test_category_losses_match_report() -> None:
         assert f"| {cat} | {ndcg('nrms_lite_s0', sl)} | {ndcg('mean_history', sl)} |" in CARD
 
 
-def test_classifier_and_gate_numbers_match() -> None:
-    t = CLASSIFIER["test"]
-    assert f"accuracy {t['accuracy']:.4f}, macro-F1 {t['macro_f1']:.4f}" in CARD
+def test_topic_classifier_skew_and_gate_numbers_match() -> None:
+    for mode in ("title_abstract", "title_only"):
+        t = TOPICS["test"][mode]
+        assert f"accuracy {t['accuracy']:.4f}, macro-F1 {t['macro_f1']:.4f}" in CARD
+    assert f"C = {TOPICS['selection']['best']['C']}" in CARD
+    assert f"low_confidence_threshold` = {TOPICS['threshold']:.2f}" in CARD
+    assert f"by {SKEW['decision']['relative_loss_C']:.1%} relative" in CARD
     gate = json.loads(gate_real.REFERENCE.read_text())["ndcg@10"]
     for sl in ("overall", "cold_candidates"):
         assert f"{gate['onnx_release'][sl]:.4f} vs {gate['mean_history'][sl]:.4f}" in CARD
@@ -73,4 +78,5 @@ def test_classifier_and_gate_numbers_match() -> None:
 
 def test_card_links_the_hub_repo_and_tag() -> None:
     assert f"https://huggingface.co/{HF_REPO}" in CARD
-    assert f"https://huggingface.co/{HF_REPO}/tree/v0.1.0" in CARD
+    assert f"https://huggingface.co/{HF_REPO}/tree/v0.2.0" in CARD
+    assert "byte-for-byte copies of v0.1.0" in CARD

@@ -15,25 +15,31 @@ datasets:
   - Recommenders/MIND
 ---
 
-# FirstRead models v0.1.0
+# FirstRead models v0.2.0
 
 Model artifacts for [FirstRead](https://github.com/Unmesh30/firstread), a real-time news recommender that ranks brand-new articles before they have any clicks.
 
-- **Hub:** [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models). This release is the git tag [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
+- **Hub:** [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models). This release is the git tag [`v0.2.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.2.0). The previous release is [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
 - **Pin a tag, not `main`.** Every file's SHA256 is listed in `manifest.json`.
 
 > **License: these weights are MIND-derived and non-commercial.** They were trained on the Microsoft News Dataset (MIND) and are released under its [Microsoft Research License Terms](https://github.com/msnews/MIND/blob/master/MSR%20License_Data.pdf), **not** under the MIT license of the FirstRead code. Use them for non-commercial research and demonstration only.
+
+## What changed in v0.2.0
+
+- **The classifier now predicts 13 app topics** (us, world, politics, business, tech_science, health, sports, entertainment, lifestyle, food_drink, travel, autos, weather) instead of MIND's 15 categories. Labels come from MIND (category, subcategory) pairs through one reviewed table, [`ml/configs/topic_map.yaml`](https://github.com/Unmesh30/firstread/blob/main/ml/configs/topic_map.yaml) ([ADR 0006](https://github.com/Unmesh30/firstread/blob/main/docs/adr/0006-topic-taxonomy-and-classifier.md)). MIND's categories have no tech, politics or world label, and "news" covered about a third of articles.
+- **It is trained for headlines without summaries.** Each training article contributes its title+abstract embedding and its title-only embedding, because live GDELT articles have no summary.
+- **The user encoder is unchanged.** `user_encoder.onnx`, `population.npy` and `config.yaml` are byte-for-byte copies of v0.1.0 (same SHA256), verified against the v0.1.0 manifest at build time. `manifest.json` → `user_encoder.inherited_from` says so. All user-encoder numbers below are from v0.1.0 and still apply.
 
 ## What's in this release
 
 | File | What it is |
 |---|---|
-| `user_encoder.onnx` | NRMS-lite user encoder. Turns a reader's last 50 clicked-article embeddings into a user vector. |
-| `category_classifier.onnx` | Logistic regression that maps an article embedding to one of 15 MIND categories. |
-| `labels.json` | Category names, in the classifier's output order. |
+| `user_encoder.onnx` | NRMS-lite user encoder. Turns a reader's last 50 clicked-article embeddings into a user vector. Same file as v0.1.0. |
+| `category_classifier.onnx` | Logistic regression that maps an article embedding to one of 13 app topics. |
+| `labels.json` | Topic ids, in the classifier's output order. |
 | `population.npy` | The 384-d user vector for a reader with no history: the normalized mean embedding of all training clicks. It is also baked into `user_encoder.onnx`. |
 | `config.yaml` | The training config of the shipped model. |
-| `metrics.json` | Dev results for all three seeds, bootstrap CIs, classifier metrics, parity, the real-data eval gate and latency. |
+| `metrics.json` | Dev results for all three seeds, bootstrap CIs, topic-classifier metrics (both text modes), parity, the real-data eval gate and latency. |
 | `manifest.json` | SHA256 and size of every file, plus the git commit, embedding-model pins, feature constants and library versions. |
 
 **What is not in this release:** MIND rows, article text, impression logs, user ids or embedding caches. Only learned weights and aggregate numbers are shipped. A build fails if its folder holds any file outside the list above.
@@ -58,10 +64,12 @@ Model artifacts for [FirstRead](https://github.com/Unmesh30/firstread), a real-t
   - `BAAI/bge-small-en-v1.5`, the int8 ONNX export `Qdrant/bge-small-en-v1.5-onnx-Q` at a pinned revision, run through fastembed 0.9.0.
   - Text is `title + ". " + abstract`, cleaned (text-prep version 1). Vectors are L2-normalized and 384-d.
   - **Embed with exactly these pins** (see `manifest.json` → `embedding`). Vectors from any other embedding model are meaningless to this encoder.
-- **Category classifier:**
+- **Topic classifier:**
   - Input `embedding`: float32 `[batch, 384]`.
-  - Outputs: `label` (int64 index into `labels.json`) and `probabilities` (float32 `[batch, 15]`).
-  - Multinomial logistic regression, C = 30.
+  - Outputs: `label` (int64 index into `labels.json`) and `probabilities` (float32 `[batch, 13]`).
+  - Multinomial logistic regression, C = 1.0, trained on 97,651 MIND-large train articles × 2 text modes. C and class weighting were chosen by mean validation macro-F1 over both modes.
+  - `manifest.json` → `category_classifier.low_confidence_threshold` = 0.50: below it, FirstRead lets a feed's topic hint break the tie if the hint is in the model's top 3. It is the lowest validation confidence from which every 0.05-wide bin is at least 50% accurate.
+  - **Topic meaning:** `us` and `politics` are US domestic news (MIND is US news), `world` is news about places outside the US, the other ten are global subjects. FirstRead applies a geo rule on top: an article from a non-US source labelled us or politics becomes world.
 - **Export:** PyTorch 2.14 dynamo exporter, opset 18; skl2onnx with zipmap off. Only the batch dimension is dynamic.
 - **Parity (ONNX Runtime vs PyTorch/sklearn):**
   - Max abs difference ≤ 1e-4, checked on empty, partial and full histories, on real MIND histories and on mixed batches.
@@ -73,7 +81,7 @@ Model artifacts for [FirstRead](https://github.com/Unmesh30/firstread), a real-t
 ## Intended use
 
 - **Use it for:** ranking English news articles for a reader, given that reader's recent clicks, in the non-commercial FirstRead demo. In particular, scoring **brand-new articles with no clicks**, from their text alone.
-- **Use the classifier for:** a coarse topic label for live articles during ingestion.
+- **Use the classifier for:** a topic label for live English headlines during ingestion, with or without a summary.
 - **Out of scope:**
   - commercial use (the license forbids it);
   - non-English text;
@@ -120,7 +128,7 @@ Model artifacts for [FirstRead](https://github.com/Unmesh30/firstread), a real-t
 **Real-data release gate:**
 - Before release, the exported ONNX file is scored on a fixed 5,000-impression MIND-small dev subset.
 - It must beat mean_history and must not regress more than 1% against the committed reference.
-- v0.1.0: nDCG@10 0.4217 vs 0.3946 overall, and 0.4600 vs 0.4329 on cold-start candidates.
+- v0.1.0 and v0.2.0 (same encoder): nDCG@10 0.4217 vs 0.3946 overall, and 0.4600 vs 0.4329 on cold-start candidates.
 
 ### Where the model fails
 
@@ -149,15 +157,16 @@ Model artifacts for [FirstRead](https://github.com/Unmesh30/firstread), a real-t
 - **Popularity and exposure bias.** Clicks are only observed on what MSN chose to show.
 - **Text-only.** The model knows an article only by its headline and summary, through a frozen general-purpose embedding. It can't see images, the publisher's reputation or the full text.
 - **English only.**
-- **The classifier's labels are MIND's categories.**
-  - On dev-only articles: accuracy 0.7214, macro-F1 0.5984; majority-class accuracy is 0.3255.
-  - The weakest classes are video (F1 0.34), tv (0.40) and travel (0.44); kids has only 3 test articles.
-  - Three rare MIND categories (games, middleeast, northamerica) are not predicted at all.
-  - Report: [`ml/reports/classifier-mind-large.md`](https://github.com/Unmesh30/firstread/blob/main/ml/reports/classifier-mind-large.md).
+- **The topic classifier learned US news from 2019.**
+  - On 2,457 dev-only articles: accuracy 0.7346, macro-F1 0.6371 with title + abstract; accuracy 0.7184, macro-F1 0.6244 from titles only. Majority-class accuracy is 0.3268.
+  - The weakest topics from titles only are world (F1 0.44; recall 0.35), travel (0.45) and autos (0.53). us/politics/world boundaries in MIND are noisy.
+  - World has only 2,531 training articles. Live news from outside the US looks different from MIND's, so FirstRead audits the classifier on live articles separately (learn chapter 02).
+  - Report: [`ml/reports/topic-classifier-mind-large.md`](https://github.com/Unmesh30/firstread/blob/main/ml/reports/topic-classifier-mind-large.md).
+- **Headlines without summaries cost little.** On the real-gate subset, scoring with titles only (history and candidates) lowers the user encoder's nDCG@10 by 2.1% relative (0.4217 → 0.4130); it still beats mean_history (0.3748). Cold users lose more. Report: [`ml/reports/skew-title-only-mind-small.md`](https://github.com/Unmesh30/firstread/blob/main/ml/reports/skew-title-only-mind-small.md).
 
 ## Latency (ONNX Runtime, CPU)
 
-User encoder, full 50-click histories, after 50 warm-up runs, 1,000 timed runs per row. **Measured on the owner's Mac (Apple Silicon), not on Cloud Run.** P3 re-measures inside the API container.
+User encoder, full 50-click histories, after 50 warm-up runs, 1,000 timed runs per row. **Measured on the owner's Mac (Apple Silicon) for v0.1.0, not on Cloud Run;** v0.2.0 ships the same file, and each build's own run is in `metrics.json`. P3 re-measures inside the API container.
 
 Apple M4 (10 cores), macOS 26.3, ONNX Runtime 1.31.0:
 
@@ -182,7 +191,7 @@ These weights may not be used commercially. Before any commercial launch, FirstR
 ## Verifying a download
 
 ```bash
-hf download Unmesh30/firstread-models --revision v0.1.0 --local-dir firstread-models
+hf download Unmesh30/firstread-models --revision v0.2.0 --local-dir firstread-models
 cd firstread-models && python -c "
 import hashlib, json; m = json.load(open('manifest.json'))
 for n, f in m['files'].items():
@@ -190,7 +199,7 @@ for n, f in m['files'].items():
 print('all', len(m['files']), 'files match')"
 ```
 
-Or, from the FirstRead repo: `make release-verify VERSION=0.1.0`.
+Or, from the FirstRead repo: `make release-verify VERSION=0.2.0`.
 
 ## Citation
 
