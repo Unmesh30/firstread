@@ -208,6 +208,7 @@ Rerunning `make eval VARIANT=small` produces a byte-identical `results-mind-smal
 - [ADR 0003](../adr/0003-mind-data-and-eval-protocol.md): HF mirror with SHA pins, license gate, time-based holdout, slice definitions, tie-breaking, eval-gate strategy.
 - **fastembed as an optional extra** rather than a hard dependency of core: the API image never embeds text, so it shouldn't carry ONNX Runtime and tokenizers (until P3, which needs ONNX Runtime for the user encoder only). CI checks that ML packages stay out of the image.
 - **Pinning the model revision ourselves** instead of trusting fastembed's "latest". It costs one `snapshot_download` call and buys reproducibility.
+- **Keep the pinned int8 model (`Qdrant/bge-small-en-v1.5-onnx-Q`) rather than switching to BAAI's fp32 ONNX export.** fp32 might embed faster on ARM, but embedding is a one-time, cached cost (MIND-small 14 min, MIND-large ~25–30 min), and switching would change every pin (source repo, revision, file SHA256), the cache key and the golden file. int8's small numeric effects (cross-platform ≤ 2.3e-4, padding ≤ 4.4e-4) are bounded by tests and far below anything that changes a ranking. Owner decision, 2026-10-14.
 - **polars + numpy** instead of pandas: MIND-large has ~83M candidate rows in train, and polars parses it in seconds.
 - **SVG plots** so the existing `*.png` ignore rule stays, and diffs are text.
 
