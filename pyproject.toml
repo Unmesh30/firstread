@@ -17,6 +17,7 @@ dev = [
   "pytest-asyncio>=1.4.0",
   "httpx2>=2.13.1",
   "pre-commit>=4.7.0",
+  "respx==0.23.1",
 ]
 
 [tool.uv]
@@ -66,6 +67,9 @@ files = [
 strict = true
 warn_unreachable = true
 pretty = true
+# Its fixtures live in firstread_ingest.testing; the file only re-exports them, and
+# a second module named "conftest" (next to services/api's) would clash in mypy.
+exclude = ['^services/ingest/tests/conftest\.py$']
 
 # ml is research code: type-checked, but not strictly.
 [[tool.mypy.overrides]]
@@ -82,7 +86,8 @@ disallow_untyped_calls = false
 [[tool.mypy.overrides]]
 module = [
   "asyncpg", "asyncpg.*", "sklearn", "sklearn.*", "yaml", "joblib",
-  "onnxruntime", "onnxruntime.*", "skl2onnx", "skl2onnx.*",
+  "onnxruntime", "onnxruntime.*", "skl2onnx", "skl2onnx.*", "feedparser", "pgvector",
+  "pgvector.*",
 ]
 ignore_missing_imports = true
 
