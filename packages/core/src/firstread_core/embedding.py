@@ -44,8 +44,9 @@ FASTEMBED_VERSION = "0.9.0"
 
 # Measured on an M-series Mac (docs/learn/01-offline-ml.md): with length-sorted
 # input, batch 16 and 4 ONNX threads were fastest (~100 texts/s); bigger batches
-# waste compute on padding and more threads contend. Vectors are bit-identical
-# across these settings.
+# waste compute on padding and more threads contend. Thread count doesn't change
+# vectors; padding does, slightly (<= ~4.4e-4 abs, 1 - cos <= ~5e-7), which
+# test_vectors_do_not_depend_on_batch_composition bounds.
 DEFAULT_BATCH_SIZE = 16
 DEFAULT_THREADS = 4
 
@@ -182,8 +183,9 @@ class Embedder:
         if not texts:
             return np.zeros((0, EMBED_DIM), dtype=np.float32)
         # Embed shortest-first so each batch pads to similar lengths (much less
-        # wasted compute), then restore the caller's order. Padding is masked
-        # inside the model, so this changes speed, not vectors (beyond float rounding).
+        # wasted compute), then restore the caller's order. A text's vector can
+        # shift very slightly with how much padding its batch has (see the
+        # batch-invariance test), far below anything that changes a ranking.
         order = np.argsort([len(t) for t in texts], kind="stable")
         rows = list(self._get_backend()([texts[i] for i in order]))
         sorted_out = np.asarray(rows, dtype=np.float32)
