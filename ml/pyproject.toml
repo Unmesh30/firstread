@@ -15,7 +15,7 @@ dependencies = [
   "torch>=2.14.1",
   "pyyaml>=6.0.3",
   "pydantic>=2.14.1",
-  "mlflow-skinny>=3.17.1",
+  "mlflow>=3.17.1",  # sqlite tracking backend; ml only (never in the API image)
 ]
 
 [project.scripts]

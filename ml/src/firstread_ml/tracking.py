@@ -1,10 +1,9 @@
-"""Local experiment tracking with MLflow (file store in ``data/mlruns``).
+"""Local experiment tracking with MLflow, sqlite backend.
 
-We use mlflow-skinny (no server, no SQL deps). MLflow 3 puts its file store in
-"maintenance mode" and raises unless MLFLOW_ALLOW_FILE_STORE is set; the
-file store is enough for a single-machine project. Browse runs with
-``uvx --from mlflow mlflow ui --backend-store-uri data/mlruns``.
-Tracking is best-effort: if MLflow fails, training continues.
+Runs are stored in ``data/mlruns/mlflow.db`` (sqlite) with artifacts in
+``data/mlruns/artifacts``, all gitignored. Full mlflow is an ``ml``-only
+dependency; the API image never installs it. Browse runs with ``make mlflow-ui``.
+Tracking is best-effort context: ``FIRSTREAD_TRACKING=0`` disables it (tests do).
 """
 
 import contextlib
@@ -15,8 +14,15 @@ from typing import Any
 
 from firstread_ml.paths import data_dir
 
-os.environ.setdefault("MLFLOW_ALLOW_FILE_STORE", "true")
 os.environ.setdefault("MLFLOW_DISABLE_AGENT_HINT", "1")
+
+
+def store_dir(root: Path | None = None) -> Path:
+    return (root or data_dir()) / "mlruns"
+
+
+def tracking_uri(root: Path | None = None) -> str:
+    return f"sqlite:///{(store_dir(root) / 'mlflow.db').resolve()}"
 
 
 class Run:
@@ -42,16 +48,26 @@ class Run:
             mlflow.log_artifact(str(path))
 
 
+def _experiment_id(name: str, root: Path | None) -> str:
+    import mlflow
+
+    exp = mlflow.get_experiment_by_name(name)
+    if exp is not None:
+        return str(exp.experiment_id)
+    artifacts = (store_dir(root) / "artifacts" / name).resolve()
+    return str(mlflow.create_experiment(name, artifact_location=artifacts.as_uri()))
+
+
 @contextlib.contextmanager
-def run(name: str, experiment: str = "firstread", enabled: bool = True) -> Iterator[Run]:
+def run(
+    name: str, experiment: str = "firstread", enabled: bool = True, root: Path | None = None
+) -> Iterator[Run]:
     if not enabled or os.environ.get("FIRSTREAD_TRACKING", "1") == "0":
         yield Run(active=False)
         return
     import mlflow
 
-    store = data_dir() / "mlruns"
-    store.mkdir(parents=True, exist_ok=True)
-    mlflow.set_tracking_uri(store.resolve().as_uri())
-    mlflow.set_experiment(experiment)
-    with mlflow.start_run(run_name=name):
+    store_dir(root).mkdir(parents=True, exist_ok=True)
+    mlflow.set_tracking_uri(tracking_uri(root))
+    with mlflow.start_run(run_name=name, experiment_id=_experiment_id(experiment, root)):
         yield Run(active=True)

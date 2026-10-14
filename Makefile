@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate reproduce
+.PHONY: help setup fmt lint typecheck test up down logs mind-download eda eval eval-gate reproduce mlflow-ui
 
 VARIANT ?= small
 
@@ -60,12 +60,16 @@ eval: ## Reproduce the baseline eval: prepare, embed, holdout + dev reports (VAR
 	uv run firstread-ml eval --variant $(VARIANT) --split dev
 
 ALL_MODELS := random,popularity,recency,mean_history,nrms_lite
+SEEDS ?= 0,1,2
 
 reproduce: ## All Phase 1 numbers for VARIANT: EDA, holdout + dev eval incl. NRMS-lite, classifier
 	uv run firstread-ml eda --variant $(VARIANT)
-	uv run firstread-ml eval --variant $(VARIANT) --split holdout --models $(ALL_MODELS)
-	uv run firstread-ml eval --variant $(VARIANT) --split dev --models $(ALL_MODELS)
+	uv run firstread-ml eval --variant $(VARIANT) --split holdout --models $(ALL_MODELS) --seeds $(SEEDS)
+	uv run firstread-ml eval --variant $(VARIANT) --split dev --models $(ALL_MODELS) --seeds $(SEEDS)
 	uv run firstread-ml classify --variant $(VARIANT)
 
 eval-gate: ## Synthetic eval-regression gate (no MIND needed; also runs in CI via pytest)
 	uv run firstread-ml eval-gate
+
+mlflow-ui: ## Browse local MLflow runs (sqlite store in data/mlruns) at http://127.0.0.1:5000
+	uv run mlflow ui --backend-store-uri sqlite:///$(CURDIR)/data/mlruns/mlflow.db --host 127.0.0.1
