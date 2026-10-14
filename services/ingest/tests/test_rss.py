@@ -15,9 +15,12 @@ FIX = Path(__file__).parent / "fixtures" / "rss"
 NOW = datetime(2026, 10, 14, 20, 0, tzinfo=UTC)
 
 
-def feed(fid: str = "f1", host: str = "feeds.example.com", geo: Geo = "us") -> Feed:
+def feed(
+    fid: str = "f1", host: str = "feeds.example.com", geo: Geo = "us", allow_images: bool = True
+) -> Feed:
     return Feed(id=fid, url=f"https://{host}/{fid}.xml", source_name="Example News",
-                domain="example.com", region="US", geo=geo, topic_hint="world")  # fmt: skip
+                domain="example.com", region="US", geo=geo, topic_hint="world",
+                terms="website_with_attribution", allow_images=allow_images)  # fmt: skip
 
 
 @pytest.mark.parametrize("name", sorted(p.name for p in FIX.glob("*.xml")))
@@ -128,3 +131,10 @@ async def test_same_host_feeds_are_fetched_one_at_a_time(no_network: respx.MockR
         results = await rss.fetch_all(c, feeds, {}, concurrency=8)
     assert len(results) == 4
     assert peak == 1
+
+
+def test_feeds_without_image_permission_store_no_thumbnails() -> None:
+    body = (FIX / "rss2_media_thumbnail.xml").read_bytes()
+    items = rss.parse_feed(feed(allow_images=False), body, NOW)
+    assert items
+    assert all(it.image_url is None for it in items)

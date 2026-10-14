@@ -6,9 +6,12 @@
 # - geo: `us` for US-domestic coverage, `intl` otherwise (Guardian US = us). It drives
 #   the geo rule in firstread_core.topics.resolve_topic.
 # - topic_hint breaks ties only when the classifier is unsure (ADR 0006).
-# - A feed with unclear terms ships `enabled: false` until the owner decides.
-# - terms: website_with_attribution | personal_noncommercial | forbidden | unverified
-#   (what the publisher's own RSS/terms page says; checked 2026-10-14).
+# - Only feeds whose own terms EXPLICITLY allow showing headlines on a website (with
+#   attribution) are enabled. "Personal, non-commercial use" does not cover a public
+#   app (owner decision 2026-10-14; App Store guideline 5.2.2 needs explicit permission).
+#   Everything else ships `enabled: false`, with the reason, until a publisher agrees.
+# - terms: website_with_attribution | personal_noncommercial | forbidden | no_explicit_permission
+#   (what the publisher’s own RSS/terms page says; checked 2026-10-14).
 version: 1
 feeds:
   - id: npr-news
@@ -18,7 +21,7 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.npr.org/rss/
@@ -30,7 +33,7 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.pbs.org/newshour/about/pbs-news-rss-feeds
@@ -54,9 +57,9 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: nbc-news
@@ -66,7 +69,7 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.nbcnews.com/id/wbna5216556
@@ -78,7 +81,7 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.nytimes.com/rss
@@ -90,7 +93,7 @@ feeds:
     region: US
     geo: us
     topic_hint: politics
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.nytimes.com/rss
@@ -102,9 +105,9 @@ feeds:
     region: US
     geo: us
     topic_hint: business
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: techcrunch
@@ -126,9 +129,9 @@ feeds:
     region: US
     geo: us
     topic_hint: tech_science
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: ars-technica
@@ -138,9 +141,9 @@ feeds:
     region: US
     geo: us
     topic_hint: tech_science
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: sciencedaily
@@ -151,10 +154,10 @@ feeds:
     geo: us
     topic_hint: tech_science
     enabled: true
-    terms_checked: false
-    terms: unverified
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.sciencedaily.com/newsfeeds.htm
+    terms_url: https://www.sciencedaily.com/newsfeeds.htm
   - id: bbc-world
     url: https://feeds.bbci.co.uk/news/world/rss.xml
     source_name: "BBC News"
@@ -186,7 +189,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: world
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -198,7 +201,7 @@ feeds:
     region: UK
     geo: us
     topic_hint: us
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -210,7 +213,7 @@ feeds:
     region: Middle East
     geo: intl
     topic_hint: world
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: null
@@ -222,9 +225,9 @@ feeds:
     region: Europe
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: france24-en
@@ -234,9 +237,9 @@ feeds:
     region: Europe
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: scmp-world
@@ -246,9 +249,9 @@ feeds:
     region: Asia
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: the-hindu-intl
@@ -258,9 +261,9 @@ feeds:
     region: Asia
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: straits-times-world
@@ -270,9 +273,9 @@ feeds:
     region: Asia
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: japan-times
@@ -282,9 +285,9 @@ feeds:
     region: Asia
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: mail-guardian
@@ -294,9 +297,9 @@ feeds:
     region: Africa
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: daily-maverick
@@ -306,9 +309,9 @@ feeds:
     region: Africa
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: nation-africa
@@ -318,9 +321,9 @@ feeds:
     region: Africa
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: premium-times
@@ -330,9 +333,9 @@ feeds:
     region: Africa
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: mercopress
@@ -343,10 +346,10 @@ feeds:
     geo: intl
     topic_hint: world
     enabled: true
-    terms_checked: false
-    terms: unverified
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://en.mercopress.com/feeds
+    terms_url: https://en.mercopress.com/feeds
   - id: ba-times
     url: https://www.batimes.com.ar/feed
     source_name: "Buenos Aires Times"
@@ -354,9 +357,9 @@ feeds:
     region: Latin America
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: mexico-news-daily
@@ -366,9 +369,9 @@ feeds:
     region: Latin America
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: abc-australia
@@ -378,9 +381,9 @@ feeds:
     region: Oceania
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: rnz-world
@@ -402,7 +405,7 @@ feeds:
     region: US
     geo: us
     topic_hint: health
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.npr.org/rss/
@@ -414,9 +417,9 @@ feeds:
     region: US
     geo: us
     topic_hint: health
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: bbc-health
@@ -438,9 +441,9 @@ feeds:
     region: US
     geo: us
     topic_hint: entertainment
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: hollywood-reporter
@@ -450,9 +453,9 @@ feeds:
     region: US
     geo: us
     topic_hint: entertainment
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: bbc-entertainment
@@ -474,7 +477,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: lifestyle
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -486,7 +489,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: food_drink
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -498,9 +501,9 @@ feeds:
     region: US
     geo: us
     topic_hint: food_drink
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: cn-traveler
@@ -510,9 +513,9 @@ feeds:
     region: US
     geo: us
     topic_hint: travel
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: skift
@@ -522,9 +525,9 @@ feeds:
     region: US
     geo: us
     topic_hint: travel
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: guardian-travel
@@ -534,7 +537,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: travel
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -546,9 +549,9 @@ feeds:
     region: US
     geo: us
     topic_hint: autos
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: the-drive
@@ -558,9 +561,9 @@ feeds:
     region: US
     geo: us
     topic_hint: autos
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: electrek
@@ -570,9 +573,9 @@ feeds:
     region: US
     geo: us
     topic_hint: autos
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: guardian-extreme-weather
@@ -582,7 +585,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: weather
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
@@ -595,10 +598,11 @@ feeds:
     geo: us
     topic_hint: weather
     enabled: true
-    terms_checked: false
-    terms: unverified
-    rss_page_url: null
-    terms_url: null
+    allow_images: false  # CC BY-NC-ND covers text only; images are licensed
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://yaleclimateconnections.org/use-policy/
+    terms_url: https://yaleclimateconnections.org/use-policy/
   - id: cbs-sports
     url: https://www.cbssports.com/rss/headlines/
     source_name: "CBS Sports"
@@ -618,9 +622,9 @@ feeds:
     region: US
     geo: us
     topic_hint: sports
-    enabled: true
-    terms_checked: false
-    terms: unverified
+    enabled: false  # no explicit permission found
+    terms_checked: true
+    terms: no_explicit_permission
     rss_page_url: null
     terms_url: null
   - id: bbc-sport
@@ -642,7 +646,7 @@ feeds:
     region: UK
     geo: intl
     topic_hint: sports
-    enabled: true
+    enabled: false  # terms allow personal, non-commercial use only
     terms_checked: true
     terms: personal_noncommercial
     rss_page_url: https://www.theguardian.com/help/feeds
