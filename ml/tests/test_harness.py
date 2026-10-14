@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -106,3 +107,43 @@ def test_eda_report_has_aggregates_only(synthetic_root: Path, tmp_path: Path) ->
     assert "Synthetic abstract" not in md
     assert " N1" not in md
     assert len(list((tmp_path / "figures").glob("*.svg"))) == 3
+
+
+def test_nrms_lite_trains_scores_and_reuses_checkpoint(synthetic_root: Path) -> None:
+    from firstread_ml.paths import REPO_ROOT
+
+    kwargs: dict[str, Any] = {
+        "embedder": Embedder(backend=synthetic.hash_backend),
+        "data_root": synthetic_root,
+        "raw_dir": synthetic_root / "mind" / "raw",
+        "nrms_config": REPO_ROOT / "ml" / "configs" / "nrms_lite_ci.yaml",
+    }
+    first = harness.run(synthetic.VARIANT, "holdout", ["mean_history", "nrms_lite"], **kwargs)
+    res = first["results"]["nrms_lite"]["overall"]
+    assert 0.0 <= res["auc"] <= 1.0
+    ckpts = list((synthetic_root / "models" / synthetic.VARIANT / "holdout").glob("nrms_lite/*"))
+    assert len(ckpts) == 1
+    second = harness.run(synthetic.VARIANT, "holdout", ["nrms_lite"], **kwargs)
+    assert second["results"]["nrms_lite"] == first["results"]["nrms_lite"]  # reused
+
+
+def test_category_classifier_on_synthetic(
+    synthetic_root: Path, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from firstread_ml import embed_cache
+    from firstread_ml.models import classifier
+
+    # Use the hash embedder (no model download) for any cache miss.
+    real = embed_cache.load_or_build
+    monkeypatch.setattr(
+        classifier,
+        "load_or_build",
+        lambda v, news, emb, root: real(v, news, Embedder(backend=synthetic.hash_backend), root),
+    )
+    r = classifier.run(synthetic.VARIANT, data_root=synthetic_root, out_dir=tmp_path)
+    assert r["labels"] == [f"topic{i}" for i in range(synthetic.N_TOPICS)]
+    assert r["n_test_dev_only"] > 0  # articles that appear only in dev
+    assert r["test"]["accuracy"] > 0.9  # the topic word dominates the synthetic embedding
+    assert 0.0 <= r["test"]["macro_f1"] <= 1.0
+    assert (tmp_path / "classifier-mind-synthetic.md").is_file()
+    assert (synthetic_root / "models" / synthetic.VARIANT / "classifier" / "model.joblib").is_file()

@@ -10,6 +10,15 @@ from typing import Any
 from firstread_ml.eval.metrics import METRICS
 
 HEADLINE_SLICES = ("overall", "cold_candidates", "cold_users")
+
+# Wu et al., "MIND: A Large-scale Dataset for News Recommendation", ACL 2020,
+# Table 3: MIND **test** set (MIND-large, via leaderboard), mean of 10 runs.
+# NRMS there learns its own news encoder from GloVe-initialized word embeddings.
+PAPER_NRMS: dict[str, Any] = {
+    "source": "Wu et al., ACL 2020 (MIND paper), Table 3, MIND-large test set, mean of 10 runs",
+    "overall": {"auc": 0.6776, "mrr": 0.3305, "ndcg@5": 0.3594, "ndcg@10": 0.4163},
+    "unseen_users": {"auc": 0.6741, "mrr": 0.3305, "ndcg@5": 0.3588, "ndcg@10": 0.4155},
+}
 PRIMARY = "ndcg@10"
 TITLES = {
     "overall": "Overall",
@@ -85,6 +94,23 @@ def to_markdown(report: dict[str, Any], baselines: list[str], candidate: str | N
         )
         out += ["", f"## {TITLES[sl]}", "", f"Impressions: {info['n_impressions']:,}{extra}", ""]
         out += _table(res, sl)
+
+    if candidate:
+        p = PAPER_NRMS
+        out += [
+            "",
+            "## Reference: published NRMS (not directly comparable)",
+            "",
+            f"{p['source']}. Different split (test vs our dev), and NRMS learns its own "
+            "news encoder, while NRMS-lite uses frozen bge-small embeddings (ADR 0004).",
+            "",
+            "| | " + " | ".join(m.upper() for m in METRICS) + " |",
+            "|---|" + "---:|" * len(METRICS),
+            "| NRMS, overall | " + " | ".join(f"{p['overall'][m]:.4f}" for m in METRICS) + " |",
+            "| NRMS, unseen users | "
+            + " | ".join(f"{p['unseen_users'][m]:.4f}" for m in METRICS)
+            + " |",
+        ]
 
     cats = [s for s in slices if s.startswith("category:") and slices[s]["n_impressions"] > 0]
     empty = [s.split(":", 1)[1] for s in slices if s.startswith("category:") and s not in cats]

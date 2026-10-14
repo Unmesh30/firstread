@@ -10,6 +10,12 @@ dependencies = [
   "matplotlib>=3.11.2",
   # fastembed 0.9.0 caps huggingface-hub below 2.0.
   "huggingface-hub>=0.36,<2.0",
+  # On Linux this resolves from the PyTorch CPU index (root pyproject), not
+  # PyPI's multi-GB CUDA wheels. macOS arm64 wheels come from PyPI (MPS built in).
+  "torch>=2.14.1",
+  "pyyaml>=6.0.3",
+  "pydantic>=2.14.1",
+  "mlflow-skinny>=3.17.1",
 ]
 
 [project.scripts]

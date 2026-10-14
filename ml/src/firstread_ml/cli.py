@@ -6,6 +6,7 @@ uv run firstread-ml eval --variant small --split dev
 
 import argparse
 from collections.abc import Sequence
+from pathlib import Path
 
 DEFAULT_BASELINES = "random,popularity,recency,mean_history"
 
@@ -36,12 +37,33 @@ def _eval(args: argparse.Namespace) -> None:
     from firstread_ml.paths import reports_dir
 
     models = args.models.split(",")
-    result = harness.run(args.variant, args.split, models, seed=args.seed)
+    result = harness.run(args.variant, args.split, models, seed=args.seed, nrms_config=args.config)
     baselines = [m for m in models if m in DEFAULT_BASELINES.split(",")]
-    j, m = report.write(result, reports_dir(), baselines)
-    for line in report.acceptance(result, None, baselines):
+    candidate = "nrms_lite" if "nrms_lite" in models else None
+    j, m = report.write(result, reports_dir(), baselines, candidate)
+    for line in report.acceptance(result, candidate, baselines):
         print(line)
     print(f"wrote {j} and {m}")
+
+
+def _tune(args: argparse.Namespace) -> None:
+    from firstread_ml.config import load_config
+    from firstread_ml.models.scorer import DEFAULT_CONFIG
+    from firstread_ml.models.tune import apply_overrides, tune
+
+    cfg = apply_overrides(load_config(args.config or DEFAULT_CONFIG), args.set)
+    tune(args.variant, cfg, args.label)
+
+
+def _classify(args: argparse.Namespace) -> None:
+    from firstread_ml.models.classifier import run
+
+    r = run(args.variant)
+    t = r["test"]
+    print(
+        f"classifier: accuracy {t['accuracy']:.4f}, macro-F1 {t['macro_f1']:.4f} "
+        f"on {r['n_test_dev_only']:,} dev-only articles"
+    )
 
 
 def _eda(args: argparse.Namespace) -> None:
@@ -85,7 +107,19 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--split", choices=["holdout", "dev"], default="dev")
     p.add_argument("--models", default=DEFAULT_BASELINES)
     p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--config", type=Path, default=None, help="NRMS-lite YAML config")
     p.set_defaults(func=_eval)
+
+    p = sub.add_parser("tune", help="train on fit days, eval holdout every epoch (no dev)")
+    variant_arg(p)
+    p.add_argument("--config", type=Path, default=None)
+    p.add_argument("--set", action="append", default=[], help="override, e.g. train.lr=0.0003")
+    p.add_argument("--label", required=True, help="run name in the tuning log")
+    p.set_defaults(func=_tune)
+
+    p = sub.add_parser("classify", help="train + evaluate the category classifier")
+    variant_arg(p)
+    p.set_defaults(func=_classify)
 
     p = sub.add_parser("eda", help="aggregate EDA report -> ml/reports/eda-mind-<variant>.md")
     variant_arg(p)

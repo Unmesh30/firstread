@@ -27,9 +27,16 @@ members = ["packages/core", "services/api", "services/ingest", "ml"]
 
 [tool.uv.sources]
 firstread-core = { workspace = true }
+# CPU-only torch on Linux (CI, Docker); see https://docs.astral.sh/uv/guides/integration/pytorch/
+torch = [{ index = "pytorch-cpu", marker = "sys_platform == 'linux'" }]
 firstread-api = { workspace = true }
 firstread-ingest = { workspace = true }
 firstread-ml = { workspace = true }
+
+[[tool.uv.index]]
+name = "pytorch-cpu"
+url = "https://download.pytorch.org/whl/cpu"
+explicit = true
 
 # ---------- ruff ----------
 [tool.ruff]
@@ -65,9 +72,15 @@ pretty = true
 module = ["firstread_ml", "firstread_ml.*"]
 strict = false
 disallow_untyped_defs = false
+disallow_untyped_calls = false  # torch's Tensor.backward is untyped
+
+# ml's tests (package "tests" via ml/tests/__init__.py) call torch the same way.
+[[tool.mypy.overrides]]
+module = ["tests", "tests.*"]
+disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*", "sklearn", "sklearn.*"]
+module = ["asyncpg", "asyncpg.*", "sklearn", "sklearn.*", "yaml", "joblib"]
 ignore_missing_imports = true
 
 # ---------- pytest ----------
