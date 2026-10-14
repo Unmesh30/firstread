@@ -27,31 +27,50 @@ TITLES = {
 }
 
 
+REQUIRED_BASELINES = ("random", "popularity", "recency", "mean_history")
+ACCEPT_SLICES = ("overall", "cold_candidates")
+
+
+class IncompleteReportError(ValueError):
+    """A results report must list every baseline next to the model."""
+
+
+def seed_models(results: dict[str, Any]) -> list[str]:
+    return sorted(m for m in results if m.startswith("nrms_lite_s"))
+
+
 def best_by(results: dict[str, Any], slice_name: str, models: list[str]) -> tuple[str, float]:
     scored = [(m, results[m][slice_name][PRIMARY]) for m in models if slice_name in results[m]]
     return max(scored, key=lambda x: x[1])
 
 
-def acceptance(report: dict[str, Any], candidate: str | None, baselines: list[str]) -> list[str]:
-    """P1 acceptance: the candidate beats the best baseline on nDCG@10 overall
-    and on cold-start candidates. Without a candidate, name the bar to beat."""
+def acceptance(report: dict[str, Any]) -> list[str]:
+    """P1 acceptance: **every** NRMS-lite seed beats the best baseline on nDCG@10,
+    overall and on cold-start candidates. Without NRMS-lite, name the bar to beat."""
     res = report["results"]
+    baselines = [b for b in REQUIRED_BASELINES if b in res]
+    seeds = seed_models(res)
     lines = []
-    for sl in ("overall", "cold_candidates"):
-        b_name, b_val = best_by(res, sl, [b for b in baselines if b in res])
-        if candidate and candidate in res:
-            c_val = res[candidate][sl][PRIMARY]
-            verdict = "PASS" if c_val > b_val else "FAIL"
-            lines.append(
-                f"ACCEPT {verdict} [{sl}] {candidate} {c_val:.4f} vs best baseline "
-                f"{b_name} {b_val:.4f}"
-            )
-        else:
+    for sl in ACCEPT_SLICES:
+        b_name, b_val = best_by(res, sl, baselines)
+        if not seeds:
             lines.append(f"Bar to beat [{sl}]: {b_name} nDCG@10 = {b_val:.4f}")
+            continue
+        vals = [res[m][sl][PRIMARY] for m in seeds]
+        verdict = "PASS" if all(v > b_val for v in vals) else "FAIL"
+        per_seed = ", ".join(
+            f"{m.removeprefix('nrms_lite_')} {v:.4f}" for m, v in zip(seeds, vals, strict=True)
+        )
+        lines.append(
+            f"ACCEPT {verdict} [{sl}] every NRMS-lite seed must beat {b_name} {b_val:.4f}: "
+            f"{per_seed}"
+        )
     return lines
 
 
-def _table(res: dict[str, Any], slice_name: str) -> list[str]:
+def _table(
+    res: dict[str, Any], slice_name: str, summary: dict[str, Any] | None = None
+) -> list[str]:
     models = [m for m in res if slice_name in res[m]]
     best = {k: max(res[m][slice_name][k] for m in models) for k in METRICS}
     lines = ["| Model | " + " | ".join(m.upper() for m in METRICS) + " |"]
@@ -62,10 +81,43 @@ def _table(res: dict[str, Any], slice_name: str) -> list[str]:
             v = res[m][slice_name][k]
             cells.append(f"**{v:.4f}**" if v == best[k] else f"{v:.4f}")
         lines.append(f"| {m} | " + " | ".join(cells) + " |")
+    if summary and slice_name in summary:
+        n = len([m for m in models if m.startswith("nrms_lite_s")])
+        cells = [
+            f"{summary[slice_name][k]['mean']:.4f} ± {summary[slice_name][k]['std']:.4f}"
+            for k in METRICS
+        ]
+        lines.append(f"| **nrms_lite, mean ± std ({n} seeds)** | " + " | ".join(cells) + " |")
     return lines
 
 
-def to_markdown(report: dict[str, Any], baselines: list[str], candidate: str | None) -> str:
+def _bootstrap_section(report: dict[str, Any]) -> list[str]:
+    b = report.get("bootstrap")
+    if not b:
+        return []
+    first = next(iter(b["slices"].values()))
+    out = [
+        "",
+        f"## nDCG@10 gain over {b['baseline']} (paired bootstrap)",
+        "",
+        f"Per impression: mean nDCG@10 over NRMS-lite seeds minus {b['baseline']}'s, on the "
+        f"same impression. {first['resamples']:,} resamples of impressions with replacement "
+        f"(seed {first['bootstrap_seed']}); 95% CI = 2.5th to 97.5th percentile of the mean gain.",
+        "",
+        "| Slice | Impressions | Mean gain | 95% CI | Resamples with gain ≤ 0 | Gain per seed |",
+        "|---|---:|---:|---|---:|---|",
+    ]
+    for sl, r in b["slices"].items():
+        per_seed = ", ".join(f"{g:+.4f}" for g in r["per_seed_gain"])
+        out.append(
+            f"| {sl} | {r['n_impressions']:,} | {r['gain_mean']:+.4f} "
+            f"| [{r['ci95_low']:+.4f}, {r['ci95_high']:+.4f}] "
+            f"| {r['share_resamples_gain_le_0']:.1%} | {per_seed} |"
+        )
+    return out
+
+
+def to_markdown(report: dict[str, Any]) -> str:
     meta, res, slices = report["meta"], report["results"], report["slices"]
     v, sp = meta["variant"], meta["split"]
     out = [
@@ -84,7 +136,8 @@ def to_markdown(report: dict[str, Any], baselines: list[str], candidate: str | N
     if "embedding_cache_id" in meta:
         out.append(f"- Embedding cache id: `{meta['embedding_cache_id']}`")
     out.append("")
-    out += [f"> {line}" for line in acceptance(report, candidate, baselines)]
+    out += [f"> {line}" for line in acceptance(report)]
+    summary = report.get("nrms_lite", {}).get("summary")
     for sl in HEADLINE_SLICES:
         info = slices[sl]
         extra = (
@@ -93,9 +146,11 @@ def to_markdown(report: dict[str, Any], baselines: list[str], candidate: str | N
             else ""
         )
         out += ["", f"## {TITLES[sl]}", "", f"Impressions: {info['n_impressions']:,}{extra}", ""]
-        out += _table(res, sl)
+        out += _table(res, sl, summary)
 
-    if candidate:
+    out += _bootstrap_section(report)
+
+    if seed_models(res):
         p = PAPER_NRMS
         out += [
             "",
@@ -133,16 +188,19 @@ def to_markdown(report: dict[str, Any], baselines: list[str], candidate: str | N
     return "\n".join(out) + "\n"
 
 
-def write(
-    report: dict[str, Any],
-    out_dir: Path,
-    baselines: list[str],
-    candidate: str | None = None,
-) -> tuple[Path, Path]:
+def write(report: dict[str, Any], out_dir: Path) -> tuple[Path, Path]:
+    """Write ``results-mind-<variant>-<split>.{json,md}``.
+
+    Refuses a report that doesn't list all four baselines, so a partial run
+    can never overwrite a committed results report.
+    """
+    missing = [b for b in REQUIRED_BASELINES if b not in report["results"]]
+    if missing:
+        raise IncompleteReportError(f"results report is missing baselines: {missing}")
     meta = report["meta"]
     stem = f"results-mind-{meta['variant']}-{meta['split']}"
     out_dir.mkdir(parents=True, exist_ok=True)
     j, m = out_dir / f"{stem}.json", out_dir / f"{stem}.md"
     j.write_text(json.dumps(report, indent=1, sort_keys=True) + "\n")
-    m.write_text(to_markdown(report, baselines, candidate))
+    m.write_text(to_markdown(report))
     return j, m

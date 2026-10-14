@@ -15,8 +15,9 @@ from firstread_core.embedding import Embedder, embedding_cache_key
 from firstread_ml import __version__
 from firstread_ml.baselines import BASELINES, FitContext, Scorer
 from firstread_ml.embed_cache import load_or_build
-from firstread_ml.eval.metrics import METRICS, mean_metrics
+from firstread_ml.eval.metrics import METRICS, per_impression
 from firstread_ml.eval.slices import LOW_N, build_slices
+from firstread_ml.eval.stats import paired_bootstrap, seed_summary
 from firstread_ml.mind.data import Impressions
 from firstread_ml.mind.load import load_impressions, load_news, prepare
 from firstread_ml.mind.manifest import HF_REVISION
@@ -28,15 +29,26 @@ TRAINABLE = ("nrms_lite",)
 MODELS = (*BASELINES, *TRAINABLE)
 
 
-def make_scorer(name: str, nrms_config: Path | None = None) -> Scorer:
+BOOTSTRAP_SLICES = ("overall", "cold_candidates")
+BOOTSTRAP_BASELINE = "mean_history"
+
+
+def make_scorers(
+    name: str, nrms_config: Path | None = None, nrms_seeds: list[int] | None = None
+) -> list[Scorer]:
+    """One scorer per baseline; NRMS-lite gives one scorer per seed (``nrms_lite_s<seed>``)."""
     if name in BASELINES:
         scorer: Scorer = BASELINES[name]()
-        return scorer
+        return [scorer]
     if name == "nrms_lite":
         from firstread_ml.models.scorer import DEFAULT_CONFIG, NRMSLiteScorer
 
-        return NRMSLiteScorer(nrms_config or DEFAULT_CONFIG)
+        return [NRMSLiteScorer(nrms_config or DEFAULT_CONFIG, seed=s) for s in nrms_seeds or [0]]
     raise ValueError(f"unknown model {name!r}; available: {list(MODELS)}")
+
+
+def seed_models(results: dict[str, Any]) -> list[str]:
+    return sorted(m for m in results if m.startswith("nrms_lite_s"))  # see report.seed_models
 
 
 @dataclass
@@ -82,17 +94,22 @@ def evaluate(
         data.category_names,
     )
     results: dict[str, dict[str, dict[str, float]]] = {}
+    per_imp: dict[str, dict[str, Any]] = {}  # nDCG@10 per impression, for the bootstrap
     for scorer in scorers:
         t0 = time.perf_counter()
         scorer.fit(ctx)
         scores = scorer.score(data.test)
         if scores.shape != data.test.cand.shape:
             raise ValueError(f"{scorer.name} returned {scores.shape} scores")
-        results[scorer.name] = {
-            s.name: mean_metrics(scores[s.idx], data.test.label[s.idx], s.offsets, seed)
-            for s in slices
-            if s.n_impressions > 0
-        }
+        results[scorer.name] = {}
+        per_imp[scorer.name] = {}
+        for s in slices:
+            if s.n_impressions == 0:
+                continue
+            m = per_impression(scores[s.idx], data.test.label[s.idx], s.offsets, seed)
+            results[scorer.name][s.name] = {k: float(v.mean()) for k, v in m.items()}
+            if s.name in BOOTSTRAP_SLICES:
+                per_imp[scorer.name][s.name] = m["ndcg@10"]
         print(f"  {scorer.name}: {time.perf_counter() - t0:.1f}s", flush=True)
     return {
         "slices": {
@@ -100,7 +117,30 @@ def evaluate(
             for s in slices
         },
         "results": results,
+        **_seed_stats(results, per_imp),
     }
+
+
+def _seed_stats(results: dict[str, Any], per_imp: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    seeds = seed_models(results)
+    if not seeds:
+        return {}
+    out: dict[str, Any] = {
+        "nrms_lite": {"seed_models": seeds, "summary": seed_summary(results, seeds)}
+    }
+    if BOOTSTRAP_BASELINE in per_imp:
+        out["bootstrap"] = {
+            "baseline": BOOTSTRAP_BASELINE,
+            "metric": "ndcg@10",
+            "slices": {
+                sl: paired_bootstrap(
+                    [per_imp[m][sl] for m in seeds], per_imp[BOOTSTRAP_BASELINE][sl]
+                )
+                for sl in BOOTSTRAP_SLICES
+                if sl in per_imp[BOOTSTRAP_BASELINE]
+            },
+        }
+    return out
 
 
 def run(
@@ -112,6 +152,7 @@ def run(
     data_root: Path | None = None,
     raw_dir: Path | None = None,
     nrms_config: Path | None = None,
+    nrms_seeds: list[int] | None = None,
 ) -> dict[str, Any]:
     """Prepare (cached), embed (cached) and evaluate ``models`` on ``split``."""
     unknown = set(models) - set(MODELS)
@@ -123,7 +164,7 @@ def run(
         out_dir=processed_dir(variant, data_root),
     )
     data = load_eval_data(variant, split, data_root)
-    scorers = [make_scorer(m, nrms_config) for m in models]
+    scorers = [s for m in models for s in make_scorers(m, nrms_config, nrms_seeds)]
     emb = None
     meta: dict[str, Any] = {
         "variant": variant,

@@ -60,8 +60,12 @@ class NRMSLiteScorer:
     name = "nrms_lite"
     needs_embeddings = True
 
-    def __init__(self, config: NRMSLiteConfig | Path = DEFAULT_CONFIG) -> None:
-        self.cfg = config if isinstance(config, NRMSLiteConfig) else load_config(config)
+    def __init__(
+        self, config: NRMSLiteConfig | Path = DEFAULT_CONFIG, seed: int | None = None
+    ) -> None:
+        cfg = config if isinstance(config, NRMSLiteConfig) else load_config(config)
+        self.cfg = cfg if seed is None else cfg.model_copy(update={"seed": seed})
+        self.name = f"nrms_lite_s{self.cfg.seed}"
         self.device = resolve_device(self.cfg.train.device)
         self.history: list[dict[str, Any]] = []
         self.checkpoint: Path | None = None
