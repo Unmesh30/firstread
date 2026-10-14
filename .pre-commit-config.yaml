@@ -4,8 +4,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
     hooks:
+      # Generated matplotlib SVGs carry trailing spaces in path data.
       - id: trailing-whitespace
+        exclude: ^ml/reports/figures/.*\.svg$
       - id: end-of-file-fixer
+        exclude: ^ml/reports/figures/.*\.svg$
       - id: check-yaml
       - id: check-toml
       - id: check-json

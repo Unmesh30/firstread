@@ -42,6 +42,13 @@ EMBED_MODEL_FILES = (
 EMBED_DIM = 384
 FASTEMBED_VERSION = "0.9.0"
 
+# Measured on an M-series Mac (docs/learn/01-offline-ml.md): with length-sorted
+# input, batch 16 and 4 ONNX threads were fastest (~100 texts/s); bigger batches
+# waste compute on padding and more threads contend. Vectors are bit-identical
+# across these settings.
+DEFAULT_BATCH_SIZE = 16
+DEFAULT_THREADS = 4
+
 Vectors = NDArray[np.float32]
 Backend = Callable[[list[str]], Iterable[NDArray[Any]]]
 
@@ -157,8 +164,8 @@ class Embedder:
     def __init__(
         self,
         cache_dir: Path | None = None,
-        threads: int | None = None,
-        batch_size: int = 256,
+        threads: int | None = DEFAULT_THREADS,
+        batch_size: int = DEFAULT_BATCH_SIZE,
         backend: Backend | None = None,
     ) -> None:
         self._cache_dir = cache_dir
@@ -174,10 +181,16 @@ class Embedder:
     def embed(self, texts: Sequence[str]) -> Vectors:
         if not texts:
             return np.zeros((0, EMBED_DIM), dtype=np.float32)
-        rows = list(self._get_backend()(list(texts)))
-        out = np.asarray(rows, dtype=np.float32)
-        if out.shape != (len(texts), EMBED_DIM):
+        # Embed shortest-first so each batch pads to similar lengths (much less
+        # wasted compute), then restore the caller's order. Padding is masked
+        # inside the model, so this changes speed, not vectors (beyond float rounding).
+        order = np.argsort([len(t) for t in texts], kind="stable")
+        rows = list(self._get_backend()([texts[i] for i in order]))
+        sorted_out = np.asarray(rows, dtype=np.float32)
+        if sorted_out.shape != (len(texts), EMBED_DIM):
             raise EmbeddingModelError(
-                f"expected shape {(len(texts), EMBED_DIM)}, model returned {out.shape}"
+                f"expected shape {(len(texts), EMBED_DIM)}, model returned {sorted_out.shape}"
             )
+        out = np.empty_like(sorted_out)
+        out[order] = sorted_out
         return l2_normalize(out)
