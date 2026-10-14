@@ -1,0 +1,21 @@
+{
+ "meta": {
+  "dataset_revision": "2115068f457b577f93a268fffe22373e45727d89",
+  "split": "dev",
+  "subset_seed": 0,
+  "subset_size": 5000,
+  "variant": "small"
+ },
+ "ndcg@10": {
+  "mean_history": {
+   "cold_candidates": 0.432943,
+   "cold_users": 0.348226,
+   "overall": 0.39458
+  },
+  "onnx_release": {
+   "cold_candidates": 0.460018,
+   "cold_users": 0.366311,
+   "overall": 0.421722
+  }
+ }
+}
