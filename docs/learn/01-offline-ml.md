@@ -1,7 +1,7 @@
 # 01: Offline ML on MIND
 
 > Phase 1 of [SPEC.md §16](../../SPEC.md). This chapter grows with each PR:
-> **1a: data, shared embedder, eval harness, baselines** · **1b: NRMS-lite and the category classifier** · 1c: ONNX export and the Hugging Face release.
+> **1a: data, shared embedder, eval harness, baselines** · **1b: NRMS-lite and the category classifier** · **1c: ONNX export and the Hugging Face release.**
 
 ---
 
@@ -22,6 +22,18 @@ Before training any model we need three things we can trust:
 - **A category classifier** lets ingestion label live articles ("sports", "finance", ...) from their embedding alone.
 
 **Analogy, continued.** If 1a timed ordinary runners, 1b is the coached runner. The coach (NRMS-lite) doesn't change the shoes (frozen article embeddings), only the running style (how the reader's history is summarized). We start the coached runner from the best ordinary runner's style (mean-of-history), so coaching can only add.
+
+**1c ships the models.**
+- The trained PyTorch and scikit-learn models are converted to **ONNX**, a framework-neutral format. The API and the ingestion job can then run them with the small `onnxruntime` library instead of PyTorch.
+- We prove the conversion changed nothing (a **parity test**) and check that the exact exported file still beats the baseline on real data (the **real-data gate**).
+- We time it, and publish it on the Hugging Face Hub as an immutable, hash-verified, tagged release with a **model card** that states its license and its weaknesses.
+
+**Analogy, continued.** The coached runner is now entered in races elsewhere.
+- **ONNX** is the standard race-entry form, which any track can read.
+- The **parity test** checks the form describes the same runner.
+- The **gate** is a qualifying time on a known track.
+- The **manifest** is a tamper-evident seal on the envelope.
+- The **model card** is the runner's honest bio, including which events they lose.
 
 ---
 
@@ -109,6 +121,46 @@ Softmax over a row where *every* position is masked divides 0 by 0, which gives 
 ### 2.16 Tuning without fooling yourself
 On the holdout we look at the whole epoch curve, not just the final number, and repeat promising configs with different **seeds**. If two configs differ by less than seed-to-seed variation, the difference isn't real. The full log is committed: `ml/reports/tuning-nrms-lite-small.md`.
 
+### 2.17 ONNX and opsets (1c)
+ONNX is a file format for computation graphs: nodes such as MatMul or Softmax, the weights, and the input and output types.
+- An **opset** is a versioned set of operator definitions. Opset 18 fixes exactly what each node means.
+- Any runtime that supports opset 18 computes the same function. **ONNX Runtime** is the reference CPU runtime: one small wheel with no PyTorch.
+- That keeps the Cloud Run image small and cold starts fast.
+
+### 2.18 Exporting PyTorch: dynamo vs TorchScript (1c)
+`torch.onnx.export(..., dynamo=True)` uses `torch.export` to trace the model into a graph and then translates that graph to ONNX (it needs `onnxscript`). The older TorchScript exporter (`dynamo=False`) traces by running the model on example inputs.
+- Both capture **one path** through Python control flow. Our model uses `torch.where` instead of `if empty:`, so both branches are in the graph and an empty history works at serving time.
+- `dynamic_shapes` marks the batch dimension as symbolic, so the API can send 1 or 32 users in one call. History length (50) and embedding size (384) stay fixed. That catches shape bugs at load time.
+- `nn.MultiheadAttention` has a fused "fast path" in eval mode. If an exporter can't handle it, `torch.backends.mha.set_fastpath_enabled(False)` turns it off during export. We didn't need that: the dynamo exporter handled it directly.
+
+### 2.19 Parity tests and tolerance (1c)
+"The ONNX file behaves like the PyTorch model" has to be measured: run both on the same inputs and take the **max absolute difference**.
+- Float32 kernels sum in different orders, so expect ~1e-7, not 0. Our bar is 1e-4 (SPEC §7.7).
+- The test cases are chosen to hit every code path:
+  - empty history (the population-vector branch);
+  - 1 click, 7, 49 and 50 (partial and full);
+  - a mixed batch;
+  - **real MIND histories**;
+  - **batch invariance**: the same user scored alone and inside a batch of 32 must match. P3's micro-batching depends on it.
+- With α set non-zero in the tiny CI model, attention actually contributes. Otherwise the test would only compare means.
+
+### 2.20 Latency percentiles and threads (1c)
+- **p50** is the median call; **p95** is the slowest 1 in 20. SLOs use p95 because users notice the tail.
+- Measure after **warm-up** (the first calls allocate memory and pick kernels) and over many runs (1,000).
+- ONNX Runtime's `intra_op_num_threads` splits one operator across cores. It only pays off for big enough work: batch 32 got faster with 4 threads, batch 1 didn't.
+- Laptop numbers are not cloud numbers, so they are labelled with the machine and re-measured in P3.
+
+### 2.21 Content hashes, manifests and provenance (1c)
+- A **SHA256** of a file is a fingerprint: change one byte and it changes completely. A **manifest** lists every file's hash, so anyone can verify a download.
+- **Provenance** links an artifact to the exact code that built it. The manifest records the git commit, and that same commit is then tagged.
+- Because GitHub's rebase-merge creates new commits, the real build runs on `main` after the merge. On a branch, only a "dry run" is possible, and it can't be uploaded.
+- Tags on the Hub are treated as **immutable**: a release never changes under a service that pinned it.
+
+### 2.22 Model cards and the license of derived weights (1c)
+A **model card** documents intended use, training data, metrics with uncertainty, failure modes, biases and license (Mitchell et al., 2018).
+- Weights trained on MIND inherit MIND's **non-commercial** research license. That is a different license from the repo's MIT code, so the card says `license: other` and links the MSR terms.
+- What ships is weights plus aggregates only, never rows or text. "No redistribution" applies to the data, and an allowlist enforces it.
+
 ---
 
 ## 3. Architecture of this phase (1a)
@@ -144,6 +196,22 @@ flowchart LR
   EMB --> SC
   SC --> CE[softmax CE over click + 4 same-impression negatives]
   EMB --> LR[logistic regression] --> CAT[MIND category]
+```
+
+### 1c: export, gate and release
+
+```mermaid
+flowchart LR
+  CK[(data/models/large/dev<br/>seed-0 checkpoint)] --> EU[export_user_encoder<br/>dynamo, opset 18, dynamic batch]
+  CL[(data/models/large/classifier)] --> EC[export_classifier<br/>skl2onnx, zipmap off]
+  EU --> P1{parity: synthetic +<br/>real histories + batch invariance}
+  EC --> P2{parity: probs + labels}
+  P1 --> G{gate: ONNX vs mean_history<br/>5,000 MIND-small dev imps<br/>+ 1% vs eval-gate-real.json}
+  G --> B[ORT latency<br/>batch 1/32 × threads 1/4]
+  B --> R[data/release/vX.Y.Z<br/>allowlist + manifest.json]
+  R -->|upload, owner approves| HUB[(HF Hub tag vX.Y.Z)]
+  HUB -->|re-download + SHA256| V[verify]
+  V -->|owner approves| T[git tag vX.Y.Z + GitHub release]
 ```
 
 ---
@@ -186,6 +254,22 @@ flowchart LR
 | `ml/configs/nrms_lite.yaml`, `nrms_lite_ci.yaml` | The committed training config (chosen on the holdout), and a tiny CPU config for tests and the CI gate. |
 | `ml/src/firstread_ml/tracking.py` | MLflow (skinny) file store in `data/mlruns`. Best-effort; `FIRSTREAD_TRACKING=0` disables it. |
 | `docs/adr/0004-identity-item-tower.md` | Why the article tower is the frozen embedding. |
+
+**1c files**
+
+| File | What it does / why it exists |
+|---|---|
+| `ml/src/firstread_ml/export/user_encoder.py` | Dynamo export of NRMS-lite: inputs `hist [B,50,384]` float32 and `mask [B,50]` bool, output `user_vec [B,384]`. Only the batch dimension is dynamic. Writes `score_scale`, `history_len` and the embedding pins into ONNX metadata. |
+| `ml/src/firstread_ml/export/classifier.py` | skl2onnx export with `zipmap=False`. Outputs are renamed to `label` / `probabilities`. |
+| `ml/src/firstread_ml/export/parity.py` | Shared parity checks (`check_user_encoder`, `check_classifier`), the standard cases, the ORT `session()` helper with an explicit thread count. |
+| `ml/src/firstread_ml/models/onnx_scorer.py` | `ORTUserEncoderScorer`: an eval-harness scorer that encodes users through ONNX Runtime, so the gate measures the shipped file. |
+| `ml/src/firstread_ml/eval/gate_real.py` | The real-data gate: fixed 5,000-impression MIND-small dev subset, must-beat-mean_history rule, 1% regression rule against `ml/reports/eval-gate-real.json`. Only `--update` rewrites the reference. |
+| `ml/src/firstread_ml/release.py` | `build` (dry run or real), `upload`, `verify_remote`, `verify_tag`. Also: the allowlist, the manifest, the latency benchmark, git checks (clean, on main, equal to origin/main, `git status` unchanged by the build). |
+| `ml/tests/test_export.py` | CI parity on tiny random models, plus the ONNX signature (names, dtypes, dynamic batch). |
+| `ml/tests/test_release.py` | A synthetic end-to-end build in a temporary git repo:<br>- writes exactly the allowlisted files;<br>- leaves `git status` clean;<br>- fails on tampering and on extra files;<br>- refuses real builds off a clean main;<br>- upload and verify-tag against a fake Hub. |
+| `ml/tests/test_model_card.py` | Every headline number in the card must match the committed report JSONs. |
+| `docs/model-card.md` | The model card, shipped as the Hub `README.md`. |
+| `docs/adr/0005-model-artifacts-on-hf-hub.md` | Why the Hub, tags, manifest, allowlist and provenance rules. |
 ---
 
 ## 5. Rebuild from scratch
@@ -248,6 +332,36 @@ make reproduce VARIANT=small          # ~35 min on an M-series Mac
 make mind-download VARIANT=large ACCEPT_LICENSE=1
 make reproduce VARIANT=large          # ~7 h 50 min after a 56 min one-time embed (section 6)
 make mlflow-ui                        # browse runs at http://127.0.0.1:5000
+```
+
+**1c, in order:**
+
+```bash
+git checkout -b phase-1c-release
+# ml/pyproject.toml adds: "onnx>=1.23.2", "onnxscript>=0.7.2", "onnxruntime>=1.31.0", "skl2onnx>=1.20.0"
+# root pyproject.toml: add onnxruntime and skl2onnx to mypy's ignore_missing_imports (no type stubs)
+uv lock && uv sync --all-packages
+
+# Write: export/{user_encoder,classifier,parity}.py, models/onnx_scorer.py,
+#        eval/gate_real.py, release.py, CLI `eval-gate --real` and `release`, Makefile targets (section 4)
+make lint typecheck test
+
+# First dry run (any branch). The first time, it stops at the gate: there is no reference yet.
+make release-build VERSION=0.1.0 DRY_RUN=1
+# Write the gate reference ONCE, from that same export, and commit it (aggregates only)
+uv run firstread-ml eval-gate --real --update --release data/release/dry-run
+git add ml/reports/eval-gate-real.json
+make release-build VERSION=0.1.0 DRY_RUN=1          # now passes: parity, gate, latency, manifest
+
+# Write docs/model-card.md (paste the latency table from the dry run), then open the PR.
+# After the PR merges, release from main:
+git checkout main && git pull
+make release-build VERSION=0.1.0                     # real build: manifest git_commit = HEAD of main
+make release-upload VERSION=0.1.0                    # needs HF_TOKEN in .env; uploads, tags, re-verifies
+git tag v0.1.0 && git push origin v0.1.0             # the same commit as manifest git_commit
+make release-verify-tag VERSION=0.1.0
+gh release create v0.1.0 --title "FirstRead models v0.1.0" \
+  --notes "ONNX models: https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0 (MIND-derived, non-commercial)"
 ```
 ---
 
@@ -350,6 +464,43 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
   - A user-level (cluster) bootstrap would be more honest and wider: resample users, then take all their impressions.
   - We haven't run it. With CIs this far from zero (MIND-large overall [+0.0232, +0.0248]), widening them by any plausible factor wouldn't reach 0, so the conclusion holds. Still, quote the interval as impression-level.
 - **Classifier (`classifier-mind-<variant>.md`).** Compare accuracy with the majority-class reference. Macro-F1 is pulled down by tiny or ambiguous classes (kids, video, tv); per-class F1 shows which ones.
+
+**1c verification:**
+
+```bash
+make test                                    # test_export, test_release, test_gate_real, test_model_card
+make eval-gate-real                          # GATE PASS / GATE FAIL (local; needs MIND-small)
+make release-build VERSION=0.1.0 DRY_RUN=1   # parity, gate, latency, manifest, "git status unchanged"
+make release-verify VERSION=0.1.0            # after upload: every file at the tag matches manifest.json
+```
+
+The v0.1.0 dry run on the real weights (Apple M4):
+
+| Check | Result |
+|---|---|
+| User encoder parity, max abs diff (empty / 1 / 7 / 49 / 50 clicks, mixed, batch 32) | 0 / 3.3e-7 / 1.5e-7 / 1.8e-7 / 1.3e-7 / 2.4e-7 / 1.8e-7 |
+| User encoder parity on 512 real MIND-small dev histories | 6.3e-7 |
+| Batch invariance (alone vs in a batch of 32) | 0 |
+| Classifier: probabilities / labels on 2,048 real embeddings | 2.4e-7 / 0 mismatches |
+| Real-data gate, nDCG@10 overall (ONNX vs mean_history) | 0.4217 vs 0.3946 |
+| Real-data gate, nDCG@10 cold candidates | 0.4600 vs 0.4329 |
+| ORT latency, batch 1, 1 thread, p50 / p95 | 0.174 / 0.179 ms |
+| ORT latency, batch 32, 1 thread | 4.273 / 4.744 ms |
+| ORT latency, batch 32, 4 threads | 3.363 / 3.885 ms |
+| Release folder | 8 files; `user_encoder.onnx` 3.4 MB, classifier 29 KB |
+
+How to read it:
+- **Parity at 1e-7** means the export is exact up to float rounding. Anything near 1e-4 would point to a real difference, for example dropout left on or a mask handled differently.
+- An exactly-0 diff on the empty-history case is expected: both sides return the same stored population vector.
+- **The gate numbers** are on MIND-small dev with a MIND-large-trained model, so they are higher than the MIND-small results above. Only the comparison with mean_history and with the reference matters.
+- **Latency:** batching 32 users costs ~0.13 ms per user against 0.17 ms one at a time. Micro-batching (SPEC §8) is mostly about cutting per-call overhead under concurrency, and P3 measures that in the container.
+
+**What I checked against official docs (2026-10-14):**
+- The PyPI versions of onnx 1.23.2, onnxscript 0.7.2, skl2onnx 1.20.0 (Jan 2026; predates scikit-learn 1.9.1, so parity is checked) and onnxruntime 1.31.0.
+- The `HfApi` signatures in huggingface_hub 1.33: `create_repo`, `upload_folder`, `create_tag`, `list_repo_refs`, `hf_hub_download`.
+  - 2.x exists, but fastembed 0.9.0 caps huggingface_hub below 2.0.
+- HF model-card metadata (`license: other` + `license_name` + `license_link`), from huggingface.co/docs/hub/model-cards.
+- The `hf download` CLI (the old `huggingface-cli` name is deprecated).
 ---
 
 ## 7. Decisions and alternatives considered
@@ -367,6 +518,18 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
 - **3 seeds, PASS only if every seed beats the bar, plus a paired bootstrap CI.** The first holdout margin (+0.016 from one lucky seed) was close to the ±0.01 epoch-to-epoch swing, so a single number wasn't evidence. Owner decision.
 - **MLflow: full `mlflow` with a sqlite store** (`data/mlruns/mlflow.db`) instead of mlflow-skinny's file store, which MLflow 3 has in maintenance mode and only allows behind `MLFLOW_ALLOW_FILE_STORE=true`. ml-only dependency; the API image check stays green. Owner decision.
 - **Classifier: logistic regression with C and class_weight chosen by validation macro-F1.** Macro-F1 because ingestion labels every topic, not just the big two. Categories with fewer than 10 training articles are dropped instead of being guessed. The test set is articles that appear only in dev, so it's honest for new articles.
+
+**1c decisions:**
+- [ADR 0005](../adr/0005-model-artifacts-on-hf-hub.md): HF Hub, immutable tags, SHA256 manifest, allowlist, provenance (real builds only on a clean main equal to origin/main; dry runs on branches), and `license: other`.
+- **Ship seed 0.** It's the config's pre-declared seed. All three seeds are in `metrics.json` and the card, so it isn't cherry-picked. Owner decision.
+- **The gate scores the ONNX file through ONNX Runtime,** not the PyTorch weights, so it tests what services will run.
+- **A first release must beat mean_history.** Later releases must also stay within 1% of the committed reference.
+- **The dynamo exporter** over TorchScript. It worked first try, so no fallback was needed.
+- **`score_scale` stays out of the graph** (metadata and manifest only): ranking ignores it, and the API can apply it when blending scores.
+- **The population vector ships twice:** inside the ONNX graph, so empty histories just work, and as `population.npy`, for inspection and as a fallback the API can use outside the graph. (Cold users with chosen topics start from topic centroids, SPEC §7.4.)
+- **Two owner corrections to the plan:**
+  - Never tag a PR-branch commit, because rebase-merge rewrites SHAs. Build the release from `main` after the merge.
+  - A build must not touch tracked files, or the clean-tree check would block the upload. A test enforces both.
 ---
 
 ## 8. What went wrong and the gotchas
@@ -417,9 +580,17 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
 - **The MIND-large embed estimate was off by 2×.** The plan extrapolated ~25–30 min from MIND-small's throughput. It took 56 min: ~31 texts/s against ~79/s on MIND-small, although text lengths are almost identical (abstract mean 36.4 vs 35.0 words, per the EDA reports). The cause wasn't isolated; it may be machine load or thermals during a long run, but that's unverified. Time a sample on the actual machine before promising a runtime, and budget for the long run being slower.
 - **The classifier test set shrinks with more training data.** "Articles that appear only in dev" is 13,955 for MIND-small but 2,624 for MIND-large, since the large train set already contains most dev articles. The large numbers are on a smaller, differently mixed test set.
 - **The published NRMS numbers had to be read, not recalled.** The paper's PDF text scrambles Table 3's layout. The columns were mapped by the repeating four-number groups and cross-checked against the paper's prose (NRMS best, DFM below DSSM). Our planning-stage recollection (nDCG@10 41.98) was wrong; the table says 41.63.
+
+**1c gotchas:**
+- **The first real dry run stopped at the gate, by design.** There was no `eval-gate-real.json` yet. The fix is to run the gate once with `--update` on the same export and commit the reference, rather than letting a build write it. A build that rewrites a tracked file would make the tree dirty and block the upload.
+- **The "axis name batch will not be used" warning.** Both inputs share one `torch.export.Dim("batch")` on purpose, and the exporter warns that the alias is unused. It's harmless, and the export suppresses that one message.
+- **onnxruntime and skl2onnx ship without type stubs.** They were added to mypy's `ignore_missing_imports`, like sklearn.
+- **skl2onnx 1.20.0 predates scikit-learn 1.9.1.** Logistic regression converted fine (parity 2.4e-7, 0 label mismatches), but that was only knowable by testing. That's why parity also runs on the real classifier.
+- **A model card drifts unless tested.** My first draft named the classifier's weakest classes from memory (kids, video, tv). The per-class table says video (F1 0.34), tv (0.40) and travel (0.44); kids has only 3 test articles. `test_model_card.py` now pins every headline number to the report JSONs.
+- **`huggingface-cli` is deprecated;** the card uses `hf download`.
 ---
 
-## 9. Ten interview questions (with strong answers)
+## 9. Interview questions (with strong answers)
 
 1. **Why evaluate per impression instead of pooling all candidates?**
    A user only ever sees their own list, so the question is "did we order *this* list well?" Pooling lets easy users dominate and mixes score scales across users. MIND's standard is per-impression averages.
@@ -451,7 +622,7 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
 10. **Your embedding job was 10× slower than estimated. How did you approach it?**
     Benchmark on a fixed sample, change one variable at a time, and diff the outputs for *every* variable. I initially only diffed thread counts, and a later test showed padding shifts vectors by up to 4.4e-4, so the "identical" claim had to be corrected and locked in with a test. Length-sorting removed padding waste (2×), smaller batches and 4 threads gave another ~1.5×, and multi-process parallelism didn't help. The remaining lever, an fp32 model, changes a pinned dependency, so it's a deliberate decision rather than a quick fix.
 
-**1b questions** (the list is trimmed to the best ten for the whole phase in 1c):
+**1b questions:**
 
 11. **Why not learn the article tower too?**
     Every model release would invalidate every stored article vector and the ANN index, and new articles would need a text model at request time. With the frozen embedding as the item tower, a release changes only the user encoder. The cost is a lower ceiling, which we accept and report (ADR 0004).
@@ -477,6 +648,32 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
     - Video items may have short or generic text ("Watch: ..."), which leaves the embedding little to work with.
 
     I'd check these by slicing the per-category gain by history length and abstract length, and by trying a per-category bootstrap. A mixed approach could also help, falling back toward mean-of-history where the model is less certain. I wouldn't tune anything against dev categories to close the gap.
+
+**1c questions:**
+
+17. **How do you know the ONNX model is the same model?**
+    A parity test runs PyTorch and ONNX Runtime on the same inputs and requires a max absolute difference ≤ 1e-4. The inputs cover every branch: empty, partial and full histories, mixed batches and real MIND histories. CI does this on tiny random models (with the residual weight α forced non-zero so attention matters), and the release re-runs it on the real weights. It came out at 6e-7. I also check batch invariance, because the API will micro-batch users.
+
+18. **Why only a dynamic batch dimension?**
+    Batch size changes per request, so it must be dynamic. History length and embedding size are contracts: 50 and 384 are fixed in `packages/core`, and fixing them in the graph means a wrong input fails loudly at the first call instead of quietly producing a different function.
+
+19. **How does the model handle a user with no history after export?**
+    The graph computes both branches and selects with `torch.where`. Empty rows get the population vector, which is baked in as a constant. A Python `if` would have been traced as one fixed path and silently broken one of the two cases.
+
+20. **What's in your release manifest, and why?**
+    It has the SHA256 and size of every file, which proves integrity. It has the git commit the release was built from, for provenance. It has the embedding-model pins and feature constants, because the encoder is meaningless with a different embedding model or history length. It also has the score scale and library versions. Services verify hashes and check the pins at startup, so a skew is an error, not a silent accuracy loss.
+
+21. **How do you make sure the tagged commit is the one that built the model?**
+    Real builds run only on a clean `main` equal to `origin/main` and record `HEAD`. On a branch, only an unuploadable dry run is possible, because rebase-merge rewrites SHAs. After uploading, I tag that same commit and `verify-tag` checks the Hub manifest's commit against `git rev-parse v0.1.0`. The build also fails if it changed any tracked file.
+
+22. **Your code is MIT. Can someone use your model commercially?**
+    No. The weights are derived from MIND, whose license is non-commercial research only. The Hub card says `license: other` and links the MSR terms, and it ships only weights and aggregates, never data. A commercial launch needs retraining on our own consented data.
+
+23. **What did you measure for latency, and how would you use it?**
+    ONNX Runtime CPU, p50 and p95 over 1,000 runs after warm-up, at batch 1 and 32, with 1 and 4 threads. On an M4 that was 0.17 ms per user alone and 4.3 ms for 32 users on one thread. It's a lower bound for planning the 20 ms scoring budget; the real number comes from the Cloud Run container in P3, under concurrent load, with p95 as the target.
+
+24. **How do you gate quality on real data when CI can't hold the dataset?**
+    CI gates code on a synthetic dataset. Before a release, a local gate scores the exported ONNX file on a fixed 5,000-impression MIND-small dev subset. It must beat mean_history and must not drop more than 1% against a committed aggregate reference. The release builder refuses to finish if it fails, and only an explicit `--update` in a PR changes the reference.
 
 ---
 
@@ -509,3 +706,18 @@ Measured runtimes for MIND-large on an M-series Mac (16 GB):
 | **Seed variance** | How much a result changes when only the random seed changes; the noise floor for comparisons. |
 | **Paired bootstrap** | Resample test units (impressions) with replacement, recomputing the mean *difference* between two models on the same units, to get a confidence interval. |
 | **Macro-F1** | The F1 score averaged over classes with equal weight, so small classes count as much as big ones. |
+| **ONNX** | Open Neural Network Exchange: a framework-neutral file format for models (graph + weights). |
+| **Opset** | A versioned set of ONNX operator definitions; it fixes what each node computes. |
+| **ONNX Runtime (ORT)** | Microsoft's runtime that executes ONNX models; CPU-only here, no PyTorch needed. |
+| **Dynamo exporter** | PyTorch's `torch.export`-based ONNX exporter (`dynamo=True`), the successor to TorchScript tracing. |
+| **Dynamic axis** | A tensor dimension left symbolic in the graph (here, batch) so any size works. |
+| **Parity test** | Run the original and exported models on the same inputs and bound the max absolute difference. |
+| **Batch invariance** | A row's output doesn't depend on which other rows share its batch. |
+| **Intra-op threads** | Threads ORT uses to parallelize a single operator. |
+| **p50 / p95** | The 50th / 95th percentile of measured latencies. |
+| **Manifest** | A file listing each artifact's hash, size and build metadata. |
+| **Provenance** | The verifiable link from an artifact back to the exact code and data that produced it. |
+| **Dry run (release)** | A full build that is marked as not uploadable, for review on a branch. |
+| **Model card** | Documentation of a model's use, data, metrics, limits, biases and license. |
+| **`license: other`** | HF metadata for a custom license, given with `license_name` and `license_link`. |
+| **Allowlist** | The only files permitted in a release; anything else fails the build. |

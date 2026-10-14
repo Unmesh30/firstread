@@ -47,7 +47,7 @@ flowchart LR
 | `apps/mobile` | Expo SDK 57 (React Native + TypeScript strict + Expo Router) | GitHub Pages (web) now; EAS builds later |
 | `services/api` | Python 3.12, FastAPI, uvicorn, asyncpg, redis-py, pydantic-settings, structlog | Google Cloud Run (us-east1) |
 | `services/ingest` | Python 3.12, httpx, feedparser, fastembed, asyncpg | GitHub Actions scheduled workflow |
-| `ml` | Python 3.12, PyTorch, scikit-learn, MLflow, ONNX export | Local Mac; Kaggle/Colab fallback |
+| `ml` | Python 3.12, PyTorch, scikit-learn, MLflow, ONNX export (onnx, onnxscript, skl2onnx, onnxruntime) | Local Mac; Kaggle/Colab fallback |
 | `packages/core` | Shared Python: text cleaning, URL canonicalization, embeddings, features, schemas | Imported by ml, ingest, api |
 | Data | Supabase Postgres + pgvector, Upstash Redis | Managed free tiers |
 
@@ -83,12 +83,33 @@ flowchart LR
 
 The embedding function lives only in `packages/core` (`firstread-core[embed]`); the API image installs core without the `embed` extra, and CI fails if ML packages appear in it.
 
+## Model release (Phase 1c)
+
+```mermaid
+flowchart LR
+  CK[seed-0 MIND-large checkpoint<br/>+ classifier, data/models] --> EX[ONNX export<br/>dynamo opset 18 · skl2onnx]
+  EX --> PA{parity ≤ 1e-4<br/>synthetic + real histories}
+  PA --> GT{real-data gate<br/>5,000 MIND-small dev imps<br/>vs mean_history + reference}
+  GT --> LAT[ORT CPU latency<br/>batch 1 / 32]
+  LAT --> DIR[data/release/vX.Y.Z<br/>allowlisted files + manifest.json SHA256]
+  DIR -->|make release-upload<br/>clean main == origin/main| HUB[(HF Hub Unmesh30/firstread-models<br/>tag vX.Y.Z)]
+  HUB -->|re-download + verify hashes| OK[git tag vX.Y.Z = manifest git_commit<br/>+ GitHub release linking the Hub]
+  HUB -.->|P2 pins tag| ING[ingest: classifier]
+  HUB -.->|P3 pins tag| API2[API: user encoder]
+```
+
+- Hub repo: [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models), release [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0).
+- Model card: [docs/model-card.md](model-card.md). Decision record: [ADR 0005](adr/0005-model-artifacts-on-hf-hub.md).
+- The weights are MIND-derived and **non-commercial** (MSR License Terms). The code is MIT.
+- The release ships only weights and aggregates: no MIND rows, text or embedding caches.
+- Services pin a tag and verify `manifest.json`. Article embeddings stay valid across releases (identity item tower, ADR 0004).
+
 ## Status by phase
 
 | Phase | What exists |
 |---|---|
 | **P0 Bootstrap** ✅ | uv workspace (4 members), FastAPI `/healthz` + `/readyz`, structlog JSON logs, Expo app placeholder with web export under `/firstread`, Docker Compose stack, Makefile, pre-commit, CI (`python`, `mobile`, `docker`, `secrets`), Dependabot, docs |
-| P1 Offline ML | 🚧 **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. **1b:** NRMS-lite user encoder (identity item tower, ADR 0004), 3-seed results with paired bootstrap CIs, category classifier, MLflow (sqlite) tracking, `make reproduce`; beats every baseline on MIND-large dev overall and on cold-start. 1c release next. |
+| **P1 Offline ML** ✅ | **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. **1b:** NRMS-lite user encoder (identity item tower, ADR 0004), 3-seed results with paired bootstrap CIs, category classifier, MLflow (sqlite) tracking, `make reproduce`; beats every baseline on MIND-large dev overall and on cold-start. **1c:** ONNX export (user encoder, classifier) with parity tests, ONNX-based real-data eval gate, release builder with SHA256 manifest, model card, HF Hub release `v0.1.0`. |
 | P2 Ingestion | — |
 | P3 API | — |
 | P4 App | — |
@@ -99,5 +120,6 @@ The embedding function lives only in `packages/core` (`firstread-core[embed]`); 
 
 ## Related
 
-- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md)
-- Learn chapters: [00 bootstrap](learn/00-bootstrap.md)
+- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md)
+- Learn chapters: [00 bootstrap](learn/00-bootstrap.md), [01 offline ML](learn/01-offline-ml.md)
+- [Model card](model-card.md), [data card](data-card.md)
