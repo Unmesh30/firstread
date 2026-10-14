@@ -57,6 +57,9 @@ class Feed(BaseModel):
     topic_hint: str | None = None
     enabled: bool = True
     terms_checked: bool = False
+    terms: Literal[
+        "website_with_attribution", "personal_noncommercial", "forbidden", "unverified"
+    ] = "unverified"
     rss_page_url: str | None = None
     terms_url: str | None = None
 

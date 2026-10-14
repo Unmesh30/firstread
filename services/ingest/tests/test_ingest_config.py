@@ -37,3 +37,12 @@ def test_default_settings_pin_the_topic_release() -> None:
 def test_empty_model_dir_means_download_from_the_hub(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("INGEST_MODEL_DIR", "")
     assert Settings(_env_file=None).ingest_model_dir is None  # type: ignore[call-arg]
+
+
+def test_feeds_whose_terms_forbid_website_use_are_disabled() -> None:
+    for f in load_feeds(enabled_only=False):
+        if f.terms == "forbidden":
+            assert not f.enabled, f.id
+        if f.terms != "unverified":
+            assert f.terms_checked
+            assert f.terms_url
