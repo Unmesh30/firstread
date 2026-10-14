@@ -80,7 +80,10 @@ module = ["tests", "tests.*"]
 disallow_untyped_calls = false
 
 [[tool.mypy.overrides]]
-module = ["asyncpg", "asyncpg.*", "sklearn", "sklearn.*", "yaml", "joblib"]
+module = [
+  "asyncpg", "asyncpg.*", "sklearn", "sklearn.*", "yaml", "joblib",
+  "onnxruntime", "onnxruntime.*", "skl2onnx", "skl2onnx.*",
+]
 ignore_missing_imports = true
 
 # ---------- pytest ----------
