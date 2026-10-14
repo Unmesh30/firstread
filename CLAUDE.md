@@ -49,3 +49,4 @@ Also:
 - GitHub scheduled workflows can run late, and are disabled after 60 days without repo activity.
 - Credit GDELT with a link to gdeltproject.org wherever its data appears.
 - Embeddings are L2-normalized, so inner product equals cosine similarity. Use the matching pgvector operator class.
+- pgvector lives in the `extensions` schema (Supabase convention, also locally), which isn't on the local `search_path`: write `extensions.halfvec(384)` and `OPERATOR(extensions.<#>)` explicitly in SQL.
