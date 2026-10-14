@@ -39,11 +39,22 @@ def pair_type(a: TextSource, b: TextSource) -> PairType:
     return (a, b) if a <= b else (b, a)  # order-free
 
 
+# Validated on 291 hand-labelled live pairs, 2026-10-14 (score_pairs.py, ADR 0009).
+# Per pair type: (tau_dup, tau_story). Every cosine bin at or above a threshold had
+# >= 95% precision; where the sample was thin or dominated by a few big stories, the
+# value was raised (never lowered) from what the data allowed.
+VALIDATED_BY_PAIR: dict[PairType, tuple[float, float]] = {
+    ("title", "title"): (0.975, 0.875),  # GDELT-GDELT: data said 0.975 / 0.875
+    ("title", "title_summary"): (0.95, 0.80),  # GDELT-RSS: data said 0.925* / 0.725
+    ("title_summary", "title_summary"): (0.97, 0.875),  # RSS-RSS: no dups labelled; 0.775*
+}
+
+
 @dataclass(frozen=True)
 class Thresholds:
-    tau_dup: float = 0.95
-    tau_story: float = 0.85
-    # Optional per-pair-type overrides: {("title", "title_summary"): (tau_dup, tau_story)}.
+    tau_dup: float = 0.975
+    tau_story: float = 0.875
+    # Per-pair-type values: {("title", "title_summary"): (tau_dup, tau_story)}.
     by_pair: Mapping[PairType, tuple[float, float]] = field(default_factory=dict)
 
     def for_pair(self, a: TextSource, b: TextSource) -> tuple[float, float]:

@@ -1,6 +1,6 @@
 import pytest
 
-from firstread_core.urls import InvalidURLError, canonicalize_url, source_domain
+from firstread_core.urls import InvalidURLError, canonical_host, canonicalize_url, source_domain
 
 CASES = [
     # scheme, host case, www, default port, fragment, trailing slash
@@ -33,6 +33,15 @@ CASES = [
     ("https://example.com/a%7Eb", "https://example.com/a~b"),
     ("https://example.com/a%2Fb/c", "https://example.com/a%2Fb/c"),
     ("https://example.com/a b", "https://example.com/a%20b"),
+    # BBC: RSS tracking params, and bbc.com / bbc.co.uk serve the same article ids
+    (
+        "https://www.bbc.co.uk/news/articles/cq80zk5k2ep4o?at_campaign=rss&at_medium=RSS",
+        "https://bbc.co.uk/news/articles/cq80zk5k2ep4o",
+    ),
+    (
+        "https://bbc.com/news/articles/cq80zk5k2ep4o",
+        "https://bbc.co.uk/news/articles/cq80zk5k2ep4o",
+    ),
     # IDNA host
     ("https://bücher.example/a", "https://xn--bcher-kva.example/a"),
     ("  https://example.com/a  ", "https://example.com/a"),
@@ -61,3 +70,9 @@ def test_invalid_urls_raise(bad: str) -> None:
 def test_source_domain() -> None:
     assert source_domain("https://www.nytimes.com/2026/10/14/us/x.html?smid=tw") == "nytimes.com"
     assert source_domain("http://feeds.bbci.co.uk/news/x") == "feeds.bbci.co.uk"
+
+
+def test_canonical_host_matches_canonical_urls() -> None:
+    assert canonical_host("www.BBC.com") == "bbc.co.uk"
+    assert canonical_host("m.nytimes.com") == "nytimes.com"
+    assert canonical_host("wisn.com") == "wisn.com"

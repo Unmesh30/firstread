@@ -20,7 +20,11 @@ _TRACKING_EXACT = frozenset(
         "guccounter", "guce_referrer", "guce_referrer_sig",
     }
 )  # fmt: skip
-_TRACKING_PREFIXES = ("utm_", "pk_", "hsa_", "__")
+# at_* is BBC's RSS tracking (at_medium=RSS, at_campaign=rss).
+_TRACKING_PREFIXES = ("utm_", "pk_", "hsa_", "at_", "__")
+# Hosts that serve the same article ids: the same BBC story appears as
+# bbc.co.uk/news/articles/<id> in RSS and bbc.com/news/articles/<id> in GDELT.
+_HOST_ALIASES = {"bbc.com": "bbc.co.uk"}
 _DEFAULT_PORTS = {"http": 80, "https": 443}
 
 
@@ -39,6 +43,7 @@ def _host(netloc_host: str) -> str:
         if host.startswith(prefix) and host.count(".") >= 2:
             host = host[len(prefix) :]
             break
+    host = _HOST_ALIASES.get(host, host)
     try:
         return host.encode("idna").decode("ascii")
     except UnicodeError:
@@ -77,6 +82,11 @@ def canonicalize_url(url: str) -> str:
         (k, v) for k, v in parse_qsl(parts.query, keep_blank_values=True) if not _is_tracking(k)
     )
     return urlunsplit(("https", netloc, _path(parts.path), urlencode(query), ""))
+
+
+def canonical_host(host: str) -> str:
+    """A bare host or domain normalized like a canonical URL's (no www., aliases applied)."""
+    return _host(host)
 
 
 def source_domain(url: str) -> str:

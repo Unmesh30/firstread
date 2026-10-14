@@ -33,9 +33,11 @@ class Settings(BaseSettings):
     ingest_model_dir: Path | None = None
     # RSS: concurrent feeds overall (each host is fetched one at a time).
     ingest_rss_concurrency: int = 8
-    # Dedupe / clustering (ADR 0009). Placeholders until validated.
-    ingest_tau_dup: float = 0.95
-    ingest_tau_story: float = 0.85
+    # Dedupe / clustering (ADR 0009): fallback thresholds, plus validated per-pair-type
+    # values in dedupe.VALIDATED_BY_PAIR (on unless INGEST_PER_PAIR_THRESHOLDS=false).
+    ingest_tau_dup: float = 0.975
+    ingest_tau_story: float = 0.875
+    ingest_per_pair_thresholds: bool = True
     ingest_dedupe_window_hours: int = 48
     ingest_fingerprint_window_hours: int = 72
     # Titles with fewer words are dropped.
