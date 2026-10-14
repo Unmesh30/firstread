@@ -80,6 +80,10 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci
+      # Fails (exit 1) if any installed Expo/React Native package doesn't match
+      # the Expo SDK, e.g. after a partial SDK bump.
+      - name: Expo SDK version check
+        run: npx expo install --check
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck
