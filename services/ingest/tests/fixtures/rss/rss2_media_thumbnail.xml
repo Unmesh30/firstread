@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?><rss xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:atom="http://www.w3.org/2005/Atom" version="2.0" xmlns:media="http://search.yahoo.com/mrss/">
+    <channel>
+        <title>Synthetic title 1 for fixture rss2_media_thumbnail.xml</title>
+        <description>Synthetic description 8 for fixture rss2_media_thumbnail.xml</description>
+        <link>https://example.com/news/world</link>
+        <image>
+            <url>https://img.example.com/image.jpg</url>
+            <title>Synthetic title 2 for fixture rss2_media_thumbnail.xml</title>
+            <link>https://example.com/news/world</link>
+        </image>
+        <generator>RSS for Node</generator>
+        <lastBuildDate>Wed, 14 Oct 2026 20:08:12 GMT</lastBuildDate>
+        <atom:link href="https://example.com/news/world/rss.xml" rel="self" type="application/rss+xml"/>
+        <copyright>Synthetic copyright 14 for fixture rss2_media_thumbnail.xml</copyright>
+        <language><![CDATA[en-gb]]></language>
+        <ttl>15</ttl>
+        <item>
+            <title>Synthetic title 3 for fixture rss2_media_thumbnail.xml</title>
+            <description>Synthetic description 9 for fixture rss2_media_thumbnail.xml</description>
+            <link>https://example.com/news/articles/cm2d6e62p49do?at_medium=RSS&amp;at_campaign=r</link>
+            <guid isPermaLink="false">https://example.com/news/articles/cm2d6e62p49do#0</guid>
+            <pubDate>Wed, 14 Oct 2026 13:11:17 GMT</pubDate>
+            <media:thumbnail width="240" height="135" url="https://img.example.com/image.jpg"/>
+        </item>
+        <item>
+            <title>Synthetic title 4 for fixture rss2_media_thumbnail.xml</title>
+            <description>Synthetic description 10 for fixture rss2_media_thumbnail.xml</description>
+            <link>https://example.com/news/articles/cwx28r0zvm6lo?at_medium=RSS&amp;at_campaign=r</link>
+            <guid isPermaLink="false">https://example.com/news/articles/cwx28r0zvm6lo#0</guid>
+            <pubDate>Wed, 14 Oct 2026 15:12:46 GMT</pubDate>
+            <media:thumbnail width="240" height="135" url="https://img.example.com/image.jpg"/>
+        </item>
+        <item>
+            <title>Synthetic title 5 for fixture rss2_media_thumbnail.xml</title>
+            <description>Synthetic description 11 for fixture rss2_media_thumbnail.xml</description>
+            <link>https://example.com/news/articles/cwy8lx3pg4k2o?at_medium=RSS&amp;at_campaign=r</link>
+            <guid isPermaLink="false">https://example.com/news/articles/cwy8lx3pg4k2o#0</guid>
+            <pubDate>Wed, 14 Oct 2026 15:26:14 GMT</pubDate>
+            <media:thumbnail width="240" height="135" url="https://img.example.com/image.jpg"/>
+        </item>
+        <item>
+            <title>Synthetic title 6 for fixture rss2_media_thumbnail.xml</title>
+            <description>Synthetic description 12 for fixture rss2_media_thumbnail.xml</description>
+            <link>https://example.com/news/articles/cw99zpmnxzmjo?at_medium=RSS&amp;at_campaign=r</link>
+            <guid isPermaLink="false">https://example.com/news/articles/cw99zpmnxzmjo#0</guid>
+            <pubDate>Wed, 14 Oct 2026 13:41:51 GMT</pubDate>
+            <media:thumbnail width="240" height="134" url="https://img.example.com/image.jpg"/>
+        </item>
+        <item>
+            <title>Synthetic title 7 for fixture rss2_media_thumbnail.xml</title>
+            <description>Synthetic description 13 for fixture rss2_media_thumbnail.xml</description>
+            <link>https://example.com/news/articles/crje5we583qwo?at_medium=RSS&amp;at_campaign=r</link>
+            <guid isPermaLink="false">https://example.com/news/articles/crje5we583qwo#0</guid>
+            <pubDate>Wed, 14 Oct 2026 13:35:29 GMT</pubDate>
+            <media:thumbnail width="240" height="135" url="https://img.example.com/image.jpg"/>
+        </item>
+    </channel>
+</rss>

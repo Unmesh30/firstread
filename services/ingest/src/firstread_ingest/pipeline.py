@@ -1,0 +1,282 @@
+"""One ingestion run: fetch -> normalize -> dedupe -> embed -> classify -> cluster -> upsert.
+
+Only ``store`` touches Postgres; with ``dry_run`` nothing is written and dedupe runs
+against an empty history. A failing source (or feed) is recorded and the run goes
+on; the run's status is ``ok``, ``partial`` (something failed) or ``failed``.
+"""
+
+from __future__ import annotations
+
+import time
+from collections import Counter
+from collections.abc import Callable, Sequence
+from dataclasses import dataclass, field
+from datetime import UTC, datetime, timedelta
+from typing import Any
+
+import numpy as np
+from numpy.typing import NDArray
+
+from firstread_core.embedding import EMBED_MODEL, Embedder, embedding_cache_key
+from firstread_core.topics import resolve_topic
+from firstread_ingest import store
+from firstread_ingest.config import Feed, Settings, load_feeds
+from firstread_ingest.dedupe import Decision, Item, Recent, Thresholds, decide
+from firstread_ingest.http import make_client
+from firstread_ingest.items import Candidate, RawItem
+from firstread_ingest.models import TopicClassifier
+from firstread_ingest.normalize import normalize_all
+from firstread_ingest.sources import rss
+
+EMBEDDING_MODEL_ID = f"{EMBED_MODEL}#{embedding_cache_key()[0][:12]}"
+EmbedFn = Callable[[Sequence[str]], NDArray[np.float32]]
+
+
+@dataclass
+class RunSummary:
+    started_at: datetime
+    fetched: int = 0
+    inserted: int = 0
+    duplicates: int = 0
+    near_duplicates: int = 0
+    clustered: int = 0
+    errors: int = 0
+    gdelt_calls: int = 0
+    dropped: Counter[str] = field(default_factory=Counter)
+    per_source: dict[str, dict[str, int]] = field(default_factory=dict)
+    feed_errors: dict[str, str] = field(default_factory=dict)
+    topics: Counter[str] = field(default_factory=Counter)
+    category_sources: Counter[str] = field(default_factory=Counter)
+    geos: Counter[str] = field(default_factory=Counter)
+    origins: Counter[str] = field(default_factory=Counter)
+    text_sources: Counter[str] = field(default_factory=Counter)
+    seconds: dict[str, float] = field(default_factory=dict)
+    status: str = "ok"
+    model_version: str = ""
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "fetched": self.fetched,
+            "inserted": self.inserted,
+            "duplicates": self.duplicates,
+            "near_duplicates": self.near_duplicates,
+            "clustered": self.clustered,
+            "errors": self.errors,
+            "gdelt_calls": self.gdelt_calls,
+            "status": self.status,
+            "details": {
+                "dropped": dict(self.dropped),
+                "per_source": self.per_source,
+                "feed_errors": self.feed_errors,
+                "topics": dict(self.topics),
+                "category_sources": dict(self.category_sources),
+                "geos": dict(self.geos),
+                "origins": dict(self.origins),
+                "text_sources": dict(self.text_sources),
+                "seconds": self.seconds,
+                "model_version": self.model_version,
+            },
+        }
+
+
+def needs_embedding(cands: Sequence[Candidate], recent: Recent) -> list[int]:
+    """Indices whose URL/fingerprint isn't already known: only these are embedded.
+
+    Mirrors the exact-duplicate rules in ``dedupe.decide``, so a skipped row is
+    always decided as a duplicate before its (zero) vector would be looked at.
+    """
+    urls, prints = set(recent.url_cluster), set(recent.fingerprint_cluster)
+    out = []
+    for i, c in enumerate(cands):
+        if c.url_canonical in urls or c.title_fingerprint in prints:
+            continue
+        urls.add(c.url_canonical)
+        prints.add(c.title_fingerprint)
+        out.append(i)
+    return out
+
+
+def build_rows(
+    cands: Sequence[Candidate],
+    decisions: Sequence[Decision],
+    vectors: NDArray[np.float32],
+    classifier: TopicClassifier,
+    summary: RunSummary,
+) -> list[store.ArticleRow]:
+    idx = [i for i, d in enumerate(decisions) if d.action == "insert"]
+    probs = classifier.probabilities(vectors[idx]) if idx else np.zeros((0, 0), np.float32)
+    rows = []
+    for k, i in enumerate(idx):
+        c, d = cands[i], decisions[i]
+        raw = c.raw
+        topic = resolve_topic(
+            probs[k], classifier.labels, raw.geo, classifier.threshold, raw.topic_hint
+        )
+        if d.article_id is None:
+            raise RuntimeError("an inserted decision has no article id")
+        rows.append(
+            store.ArticleRow(
+                id=d.article_id,
+                url=raw.url,
+                url_canonical=c.url_canonical,
+                title=c.title,
+                source_name=raw.source_name,
+                source_domain=raw.source_domain,
+                image_url=raw.image_url,
+                language="en",
+                source_country=raw.source_country,
+                geo=raw.geo,
+                category=topic.topic,
+                category_confidence=topic.confidence,
+                category_source=topic.source,
+                published_at=raw.published_at,
+                first_seen_at=raw.seen_at,
+                embedding=vectors[i],
+                embedding_model=EMBEDDING_MODEL_ID,
+                text_source=c.text_source,
+                title_fingerprint=c.title_fingerprint,
+                story_cluster_id=d.cluster_id,
+                origin=raw.origin,
+            )
+        )
+    return rows
+
+
+async def run(
+    settings: Settings,
+    classifier: TopicClassifier,
+    *,
+    embed: EmbedFn | None = None,
+    sources: Sequence[str] = ("rss",),
+    feeds: Sequence[Feed] | None = None,
+    dry_run: bool = False,
+    now: datetime | None = None,
+    client: Any = None,
+    conn: Any = None,
+) -> RunSummary:
+    now = now or datetime.now(UTC)
+    summary = RunSummary(started_at=now, model_version=classifier.version)
+    embed = embed or Embedder().embed
+    owns_conn = conn is None and not dry_run
+    if owns_conn:
+        from firstread_core.db import connect
+
+        conn = await connect(settings.database_url.get_secret_value())
+    run_id = None
+    try:
+        if conn is not None:
+            await store.register_codecs(conn)
+            run_id = await store.start_run(conn, now)
+        summary = await _run(
+            settings, classifier, embed, sources, feeds, conn, now, client, summary
+        )
+    except Exception as exc:
+        summary.status = "failed"
+        summary.feed_errors["_run"] = f"{type(exc).__name__}: {exc}"[:300]
+        summary.errors += 1
+        raise
+    finally:
+        if conn is not None and run_id is not None:
+            await store.finish_run(conn, run_id, summary.as_dict(), datetime.now(UTC))
+        if owns_conn and conn is not None:
+            await conn.close()
+    return summary
+
+
+async def _run(
+    settings: Settings,
+    classifier: TopicClassifier,
+    embed: EmbedFn,
+    sources: Sequence[str],
+    feeds: Sequence[Feed] | None,
+    conn: Any,
+    now: datetime,
+    client: Any,
+    summary: RunSummary,
+) -> RunSummary:
+    t0 = time.perf_counter()
+    raw: list[RawItem] = []
+    states: dict[str, rss.FeedState] = {}
+    owns_client = client is None
+    client = client or make_client()
+    try:
+        if "rss" in sources:
+            old_states = await store.load_feed_states(conn) if conn is not None else {}
+            feed_list = list(feeds) if feeds is not None else load_feeds()
+            results = await rss.fetch_all(
+                client, feed_list, old_states, settings.ingest_rss_concurrency
+            )
+            for r in results:
+                states[r.feed.id] = r.state
+                summary.per_source[r.feed.id] = {"fetched": len(r.items)}
+                if r.error:
+                    summary.feed_errors[r.feed.id] = r.error
+                    summary.errors += 1
+                raw.extend(r.items)
+    finally:
+        if owns_client:
+            await client.aclose()
+    summary.fetched = len(raw)
+    summary.seconds["fetch"] = round(time.perf_counter() - t0, 2)
+
+    cands, dropped = normalize_all(raw, now, settings.ingest_min_title_words)
+    summary.dropped = dropped
+    recent = (
+        await store.load_recent(
+            conn,
+            now,
+            timedelta(hours=settings.ingest_dedupe_window_hours),
+            timedelta(hours=settings.ingest_fingerprint_window_hours),
+        )
+        if conn is not None
+        else Recent.empty()
+    )
+
+    t1 = time.perf_counter()
+    todo = needs_embedding(cands, recent)
+    vectors = np.zeros((len(cands), recent.embeddings.shape[1]), np.float32)
+    if todo:
+        vectors[todo] = embed([cands[i].embed_text for i in todo])
+    summary.seconds["embed"] = round(time.perf_counter() - t1, 2)
+
+    items = [
+        Item(c.url_canonical, c.title_fingerprint, c.text_source, c.raw.seen_at) for c in cands
+    ]
+    thresholds = Thresholds(settings.ingest_tau_dup, settings.ingest_tau_story)
+    decisions = decide(items, vectors, recent, thresholds)
+    rows = build_rows(cands, decisions, vectors, classifier, summary)
+
+    inserted: set[str] = set()
+    if conn is not None:
+        async with conn.transaction():
+            inserted = await store.insert_articles(conn, rows)
+            coverage = [
+                (d.cluster_id, c.raw.source_domain, c.raw.seen_at)
+                for c, d in zip(cands, decisions, strict=True)
+            ]
+            await store.insert_coverage(conn, coverage)
+            await store.save_feed_states(conn, states, now)
+    else:
+        inserted = {r.url_canonical for r in rows}
+
+    for d in decisions:
+        if d.action == "duplicate":
+            summary.duplicates += 1
+        elif d.action == "near_duplicate":
+            summary.near_duplicates += 1
+    for row in rows:
+        if row.url_canonical not in inserted:  # lost a race with a concurrent writer
+            summary.duplicates += 1
+            continue
+        summary.inserted += 1
+        summary.topics[row.category] += 1
+        summary.category_sources[row.category_source] += 1
+        summary.geos[row.geo] += 1
+        summary.origins[row.origin] += 1
+        summary.text_sources[row.text_source] += 1
+        if row.story_cluster_id != row.id:
+            summary.clustered += 1
+    if summary.errors:
+        summary.status = "partial"
+    summary.seconds["total"] = round(time.perf_counter() - t0, 2)
+    return summary

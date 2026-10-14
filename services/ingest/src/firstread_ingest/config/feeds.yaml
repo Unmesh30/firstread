@@ -1,0 +1,594 @@
+# Curated RSS feeds (ADR 0007). Policy:
+# - Only feeds a publisher lists on its own RSS page for syndication, and whose terms
+#   allow showing the headline + link with attribution (rss_page_url, terms_url).
+# - We store headline, link, time and thumbnail only. The description is used in
+#   memory to build the embedding text and is never stored (SPEC section 4).
+# - geo: `us` for US-domestic coverage, `intl` otherwise (Guardian US = us). It drives
+#   the geo rule in firstread_core.topics.resolve_topic.
+# - topic_hint breaks ties only when the classifier is unsure (ADR 0006).
+# - A feed with unclear terms ships `enabled: false` until the owner decides.
+version: 1
+feeds:
+  - id: npr-news
+    url: https://feeds.npr.org/1001/rss.xml
+    source_name: "NPR"
+    domain: npr.org
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: pbs-newshour
+    url: https://www.pbs.org/newshour/feeds/rss/headlines
+    source_name: "PBS NewsHour"
+    domain: pbs.org
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: cbs-news
+    url: https://www.cbsnews.com/latest/rss/main
+    source_name: "CBS News"
+    domain: cbsnews.com
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: abc-news
+    url: https://abcnews.com/abcnews/topstories
+    source_name: "ABC News"
+    domain: abcnews.go.com
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: nbc-news
+    url: https://feeds.nbcnews.com/nbcnews/public/news
+    source_name: "NBC News"
+    domain: nbcnews.com
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: nyt-us
+    url: https://rss.nytimes.com/services/xml/rss/nyt/US.xml
+    source_name: "The New York Times"
+    domain: nytimes.com
+    region: US
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: nyt-politics
+    url: https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml
+    source_name: "The New York Times"
+    domain: nytimes.com
+    region: US
+    geo: us
+    topic_hint: politics
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: cnbc-top
+    url: https://www.cnbc.com/id/100003114/device/rss/rss.html
+    source_name: "CNBC"
+    domain: cnbc.com
+    region: US
+    geo: us
+    topic_hint: business
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: techcrunch
+    url: https://techcrunch.com/feed/
+    source_name: "TechCrunch"
+    domain: techcrunch.com
+    region: US
+    geo: us
+    topic_hint: tech_science
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: the-verge
+    url: https://www.theverge.com/rss/index.xml
+    source_name: "The Verge"
+    domain: theverge.com
+    region: US
+    geo: us
+    topic_hint: tech_science
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: ars-technica
+    url: https://feeds.arstechnica.com/arstechnica/index
+    source_name: "Ars Technica"
+    domain: arstechnica.com
+    region: US
+    geo: us
+    topic_hint: tech_science
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: sciencedaily
+    url: https://www.sciencedaily.com/rss/top/science.xml
+    source_name: "ScienceDaily"
+    domain: sciencedaily.com
+    region: US
+    geo: us
+    topic_hint: tech_science
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: bbc-world
+    url: https://feeds.bbci.co.uk/news/world/rss.xml
+    source_name: "BBC News"
+    domain: bbc.co.uk
+    region: UK
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: bbc-technology
+    url: https://feeds.bbci.co.uk/news/technology/rss.xml
+    source_name: "BBC News"
+    domain: bbc.co.uk
+    region: UK
+    geo: intl
+    topic_hint: tech_science
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-world
+    url: https://www.theguardian.com/world/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-us
+    url: https://www.theguardian.com/us-news/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: us
+    topic_hint: us
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: aljazeera
+    url: https://www.aljazeera.com/xml/rss/all.xml
+    source_name: "Al Jazeera English"
+    domain: aljazeera.com
+    region: Middle East
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: dw-english
+    url: https://rss.dw.com/rdf/rss-en-all
+    source_name: "DW"
+    domain: dw.com
+    region: Europe
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: france24-en
+    url: https://www.france24.com/en/rss
+    source_name: "France 24"
+    domain: france24.com
+    region: Europe
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: scmp-world
+    url: https://www.scmp.com/rss/91/feed/
+    source_name: "South China Morning Post"
+    domain: scmp.com
+    region: Asia
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: the-hindu-intl
+    url: https://www.thehindu.com/news/international/feeder/default.rss
+    source_name: "The Hindu"
+    domain: thehindu.com
+    region: Asia
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: straits-times-world
+    url: https://www.straitstimes.com/news/world/rss.xml
+    source_name: "The Straits Times"
+    domain: straitstimes.com
+    region: Asia
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: japan-times
+    url: https://www.japantimes.co.jp/feed/
+    source_name: "The Japan Times"
+    domain: japantimes.co.jp
+    region: Asia
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: mail-guardian
+    url: https://mg.co.za/rss
+    source_name: "Mail & Guardian"
+    domain: mg.co.za
+    region: Africa
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: daily-maverick
+    url: https://www.dailymaverick.co.za/dmrss/
+    source_name: "Daily Maverick"
+    domain: dailymaverick.co.za
+    region: Africa
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: nation-africa
+    url: https://nation.africa/kenya/rss.xml
+    source_name: "Nation"
+    domain: nation.africa
+    region: Africa
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: premium-times
+    url: https://www.premiumtimesng.com/feed
+    source_name: "Premium Times"
+    domain: premiumtimesng.com
+    region: Africa
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: mercopress
+    url: https://en.mercopress.com/rss
+    source_name: "MercoPress"
+    domain: en.mercopress.com
+    region: Latin America
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: ba-times
+    url: https://www.batimes.com.ar/feed
+    source_name: "Buenos Aires Times"
+    domain: batimes.com.ar
+    region: Latin America
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: mexico-news-daily
+    url: https://mexiconewsdaily.com/feed/
+    source_name: "Mexico News Daily"
+    domain: mexiconewsdaily.com
+    region: Latin America
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: abc-australia
+    url: https://www.abc.net.au/news/feed/2942460/rss.xml
+    source_name: "ABC News (Australia)"
+    domain: abc.net.au
+    region: Oceania
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: rnz-world
+    url: https://www.rnz.co.nz/rss/world.xml
+    source_name: "RNZ"
+    domain: rnz.co.nz
+    region: Oceania
+    geo: intl
+    topic_hint: world
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: npr-health
+    url: https://feeds.npr.org/1128/rss.xml
+    source_name: "NPR"
+    domain: npr.org
+    region: US
+    geo: us
+    topic_hint: health
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: stat-news
+    url: https://www.statnews.com/feed/
+    source_name: "STAT"
+    domain: statnews.com
+    region: US
+    geo: us
+    topic_hint: health
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: bbc-health
+    url: https://feeds.bbci.co.uk/news/health/rss.xml
+    source_name: "BBC News"
+    domain: bbc.co.uk
+    region: UK
+    geo: intl
+    topic_hint: health
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: variety
+    url: https://variety.com/feed/
+    source_name: "Variety"
+    domain: variety.com
+    region: US
+    geo: us
+    topic_hint: entertainment
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: hollywood-reporter
+    url: https://www.hollywoodreporter.com/feed/
+    source_name: "The Hollywood Reporter"
+    domain: hollywoodreporter.com
+    region: US
+    geo: us
+    topic_hint: entertainment
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: bbc-entertainment
+    url: https://feeds.bbci.co.uk/news/entertainment_and_arts/rss.xml
+    source_name: "BBC News"
+    domain: bbc.co.uk
+    region: UK
+    geo: intl
+    topic_hint: entertainment
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-lifeandstyle
+    url: https://www.theguardian.com/lifeandstyle/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: lifestyle
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-food
+    url: https://www.theguardian.com/food/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: food_drink
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: eater
+    url: https://www.eater.com/rss/index.xml
+    source_name: "Eater"
+    domain: eater.com
+    region: US
+    geo: us
+    topic_hint: food_drink
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: cn-traveler
+    url: https://www.cntraveler.com/feed/rss
+    source_name: "Condé Nast Traveler"
+    domain: cntraveler.com
+    region: US
+    geo: us
+    topic_hint: travel
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: skift
+    url: https://skift.com/feed/
+    source_name: "Skift"
+    domain: skift.com
+    region: US
+    geo: us
+    topic_hint: travel
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-travel
+    url: https://www.theguardian.com/travel/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: travel
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: car-and-driver
+    url: https://www.caranddriver.com/rss/all.xml/
+    source_name: "Car and Driver"
+    domain: caranddriver.com
+    region: US
+    geo: us
+    topic_hint: autos
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: the-drive
+    url: https://www.thedrive.com/feed
+    source_name: "The Drive"
+    domain: thedrive.com
+    region: US
+    geo: us
+    topic_hint: autos
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: electrek
+    url: https://electrek.co/feed/
+    source_name: "Electrek"
+    domain: electrek.co
+    region: US
+    geo: us
+    topic_hint: autos
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-extreme-weather
+    url: https://www.theguardian.com/world/extreme-weather/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: weather
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: yale-climate-connections
+    url: https://yaleclimateconnections.org/feed/
+    source_name: "Yale Climate Connections"
+    domain: yaleclimateconnections.org
+    region: US
+    geo: us
+    topic_hint: weather
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: cbs-sports
+    url: https://www.cbssports.com/rss/headlines/
+    source_name: "CBS Sports"
+    domain: cbssports.com
+    region: US
+    geo: us
+    topic_hint: sports
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: yahoo-sports
+    url: https://sports.yahoo.com/rss/
+    source_name: "Yahoo Sports"
+    domain: sports.yahoo.com
+    region: US
+    geo: us
+    topic_hint: sports
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: bbc-sport
+    url: https://feeds.bbci.co.uk/sport/rss.xml
+    source_name: "BBC Sport"
+    domain: bbc.co.uk
+    region: UK
+    geo: intl
+    topic_hint: sports
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null
+  - id: guardian-sport
+    url: https://www.theguardian.com/sport/rss
+    source_name: "The Guardian"
+    domain: theguardian.com
+    region: UK
+    geo: intl
+    topic_hint: sports
+    enabled: true
+    terms_checked: false
+    rss_page_url: null
+    terms_url: null

@@ -1,0 +1,207 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns="http://purl.org/rss/1.0/" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:sy="http://purl.org/rss/modules/syndication/" xmlns:content="http://purl.org/rss/1.0/modules/content/" xmlns:dwsyn="http://rss.dw.com/syndication/dwsyn/">
+ <channel rdf:about="https://example.com/syndication/feeds/rss-en-all.1573.rdf">
+  <description>Synthetic description 8 for fixture rdf.xml</description>
+  <link>https://example.com/english/?maca=en-rss-en-all-1573-rdf</link>
+  <title>Synthetic title 1 for fixture rdf.xml</title>
+  <sy:updatePeriod>hourly</sy:updatePeriod>
+  <sy:updateFequency>4</sy:updateFequency>
+  <sy:updateBase>2002-05-01T00:00:00Z</sy:updateBase>
+  <dc:date>2026-10-14T20:08:01Z</dc:date>
+  <image rdf:resource="https://img.example.com/image.jpg"/>
+  <items>
+   <rdf:Seq>
+    <rdf:li rdf:resource="https://example.com/en/ukraine-says-musk-s-spacex-limits-kyiv-s-starlink-access"/>
+    <rdf:li rdf:resource="https://example.com/en/nord-stream-trial-opens-in-germany-defense-seeks-dismiss"/>
+    <rdf:li rdf:resource="https://example.com/en/how-trump-s-diesel-deal-with-russia-will-impact-the-unit"/>
+    <rdf:li rdf:resource="https://example.com/en/japanese-journalist-arrest-in-russia-s-far-east-draws-re"/>
+    <rdf:li rdf:resource="https://example.com/en/turkey-government-raids-takes-over-top-news-channel/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/india-urges-russia-ukraine-to-protect-black-sea-shipping"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-far-right-afd-forges-a-pro-russia-alliance-wit"/>
+    <rdf:li rdf:resource="https://example.com/en/albania-fire-at-education-ministry-as-students-protest/a"/>
+    <rdf:li rdf:resource="https://example.com/en/climate-change-and-drone-attacks-exacerbate-the-humanita"/>
+    <rdf:li rdf:resource="https://example.com/en/indonesian-vip-prison-scandal-exposes-inequality-across-"/>
+    <rdf:li rdf:resource="https://example.com/en/trump-s-diesel-deal-with-russia-is-unlikely-to-significa"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-news-merz-attacks-extremes-for-fueling-division/"/>
+    <rdf:li rdf:resource="https://example.com/en/houthis-launch-fresh-wave-of-missiles-across-saudi-arabi"/>
+    <rdf:li rdf:resource="https://example.com/en/china-s-influence-in-the-gaming-industry-is-growing/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/nord-stream-germany-puts-suspected-ukrainian-pipeline-sa"/>
+    <rdf:li rdf:resource="https://example.com/en/trump-s-us-super-intelligence-force-and-ai-czar-jay-clay"/>
+    <rdf:li rdf:resource="https://example.com/en/trump-announces-plans-for-major-oil-gas-and-mineral-expl"/>
+    <rdf:li rdf:resource="https://example.com/en/fact-check-misleading-graph-about-alleged-russian-bot-ac"/>
+    <rdf:li rdf:resource="https://example.com/en/do-non-german-nationals-commit-more-crimes-than-germans/"/>
+    <rdf:li rdf:resource="https://example.com/en/fifpro-report-highlights-growing-pains-in-women-s-footba"/>
+    <rdf:li rdf:resource="https://example.com/en/the-hidden-treasure-in-discarded-wearable-and-fast-tech/"/>
+    <rdf:li rdf:resource="https://example.com/en/ukraine-allies-in-poland-after-starlink-sabotage-trump-d"/>
+    <rdf:li rdf:resource="https://example.com/en/ukraine-and-the-us-what-s-next-after-trump-s-diesel-deal"/>
+    <rdf:li rdf:resource="https://example.com/en/critics-warn-of-espionage-risks-as-slovakia-restores-mil"/>
+    <rdf:li rdf:resource="https://example.com/en/formula-1-rwanda-to-bring-sport-back-to-africa/a-7964921"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-china-calculation-shifts-as-import-pressures-e"/>
+    <rdf:li rdf:resource="https://example.com/en/125-years-of-thomas-mann-s-buddenbrooks/a-44107236?maca="/>
+    <rdf:li rdf:resource="https://example.com/en/what-is-holding-back-cyprus-s-schengen-ambitions/a-79641"/>
+    <rdf:li rdf:resource="https://example.com/en/uk-iran-highly-likely-to-be-behind-raf-fairford-incident"/>
+    <rdf:li rdf:resource="https://example.com/en/poland-reports-arrests-of-2-turkish-citizens-in-germany-"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-labor-minister-s-resignation-puts-a-spotlight-on"/>
+    <rdf:li rdf:resource="https://example.com/en/pope-lung-nodule-could-it-be-cancer/a-79641503?maca=en-r"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-women-ena-mahmutovic-makes-her-case-to-become-"/>
+    <rdf:li rdf:resource="https://example.com/en/how-green-is-europe-s-urban-public-transport-a-data-driv"/>
+    <rdf:li rdf:resource="https://example.com/en/uk-students-call-for-school-uniforms-to-be-banned-in-por"/>
+    <rdf:li rdf:resource="https://example.com/en/who-are-the-ukrainian-volunteers-under-russian-command/a"/>
+    <rdf:li rdf:resource="https://example.com/en/german-lawfare-when-lawsuits-become-a-political-weapon/a"/>
+    <rdf:li rdf:resource="https://example.com/en/trump-claims-russia-and-ukraine-agreed-to-energy-ceasefi"/>
+    <rdf:li rdf:resource="https://example.com/en/georgia-s-surrogacy-industry-is-booming-but-at-what-cost"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-population-is-shrinking-but-not-everywhere/a-7"/>
+    <rdf:li rdf:resource="https://example.com/en/ragebait-is-the-2026-german-youth-word-of-the-year/a-796"/>
+    <rdf:li rdf:resource="https://example.com/en/operations-plan-germany-how-the-bundeswehr-trains-for-na"/>
+    <rdf:li rdf:resource="https://example.com/en/schools-crisis-in-france-investment-fails-to-inspire-con"/>
+    <rdf:li rdf:resource="https://example.com/en/macron-and-steinmeier-struggle-to-revive-franco-german-t"/>
+    <rdf:li rdf:resource="https://example.com/en/author-or-artificial-intelligence-literature-in-crisis/a"/>
+    <rdf:li rdf:resource="https://example.com/en/art-for-freedom-maria-kalesnikava-in-bonn/a-79612009?mac"/>
+    <rdf:li rdf:resource="https://example.com/en/poland-lifeline-for-ukrainian-refugees-confronts-donor-f"/>
+    <rdf:li rdf:resource="https://example.com/en/world-cup-2034-does-saudi-arabia-shelving-neom-stadium-s"/>
+    <rdf:li rdf:resource="https://example.com/en/bosnia-herzegovina-will-soon-have-a-new-grand-mufti/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/finland-the-world-s-happiest-nation-faces-a-glum-winter/"/>
+    <rdf:li rdf:resource="https://example.com/en/eu-pulls-sponsorship-from-disinfo2026-event-in-lithuania"/>
+    <rdf:li rdf:resource="https://example.com/en/2026-nobel-prize-winner-anne-carson-where-to-start-readi"/>
+    <rdf:li rdf:resource="https://example.com/en/early-onset-cancer-rising-worldwide-causes-risk-preventi"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-news-uk-s-burnham-visits-berlin-for-talks-with-m"/>
+    <rdf:li rdf:resource="https://example.com/en/security-in-the-black-sea-region-is-bulgaria-the-weak-li"/>
+    <rdf:li rdf:resource="https://example.com/en/how-a-multibillion-dollar-oilfield-has-ignited-the-uk-ar"/>
+    <rdf:li rdf:resource="https://example.com/en/nobel-prize-in-literature-goes-to-canada-s-anne-carson/a"/>
+    <rdf:li rdf:resource="https://example.com/en/south-korea-recalls-ukraine-ambassador-amid-pow-dispute/"/>
+    <rdf:li rdf:resource="https://example.com/en/as-russia-steps-up-attacks-on-ukrainian-data-centers-cou"/>
+    <rdf:li rdf:resource="https://example.com/en/german-bundeswehr-a-new-naval-port-in-emden-aims-to-enha"/>
+    <rdf:li rdf:resource="https://example.com/en/middle-corridor-can-bulgaria-be-a-safe-gateway-for-asian"/>
+    <rdf:li rdf:resource="https://example.com/en/gerhard-schröder-visits-latest-russian-employer-hyperglo"/>
+    <rdf:li rdf:resource="https://example.com/en/90s-art-scene-in-the-uk-an-international-edgy-trendsette"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-news-merz-rails-against-extremism-afd-sympathize"/>
+    <rdf:li rdf:resource="https://example.com/en/german-spy-scandal-threatens-national-security/a-7958000"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-did-cdu-lawmakers-support-the-far-right-afd/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/nobel-prize-in-chemistry-goes-to-henri-b-kagan-and-kenso"/>
+    <rdf:li rdf:resource="https://example.com/en/suspected-pneumonic-plague-in-siberia-what-we-know-about"/>
+    <rdf:li rdf:resource="https://example.com/en/ronaldo-stays-on-under-cloud-as-messi-exits-internationa"/>
+    <rdf:li rdf:resource="https://example.com/en/nobelitis-how-winning-a-nobel-prize-can-give-you-delusio"/>
+    <rdf:li rdf:resource="https://example.com/en/emerging-economies-are-embracing-solar-power-and-skippin"/>
+    <rdf:li rdf:resource="https://example.com/en/munich-up-against-at-least-six-competitors-for-2036-olym"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-shaken-by-espionage-and-treason-allegations/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/paramount-and-warner-bros-merge-into-one-hollywood-giant"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-far-right-afd-makes-history-again-in-saxony-an"/>
+    <rdf:li rdf:resource="https://example.com/en/nobel-prize-in-literature-how-the-winner-is-secretly-cho"/>
+    <rdf:li rdf:resource="https://example.com/en/ai-models-keep-hacking-real-systems-during-tests-what-do"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-faces-a-triple-threat-from-russia-china-and-dome"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-news-far-right-afd-gets-first-house-speaker-in-a"/>
+    <rdf:li rdf:resource="https://example.com/en/merz-macron-seek-tougher-eu-measures-against-unfair-trad"/>
+    <rdf:li rdf:resource="https://example.com/en/australia-new-zealand-probe-flydubai-pilot-s-time-there/"/>
+    <rdf:li rdf:resource="https://example.com/en/euro-plummets-against-us-dollar-has-the-next-financial-c"/>
+    <rdf:li rdf:resource="https://example.com/en/trust-in-the-german-constitutional-court-is-eroding-how-"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-news-spy-chief-warns-russia-conflict-risk-growin"/>
+    <rdf:li rdf:resource="https://example.com/en/jürgen-klopp-faces-myriad-of-issues-after-rough-start-wi"/>
+    <rdf:li rdf:resource="https://example.com/en/german-reunification-how-inequality-is-shaping-a-new-eas"/>
+    <rdf:li rdf:resource="https://example.com/en/naza-israeli-military-issues-statement-on-film/a-7952048"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-franz-reindl-elected-new-iihf-president/a-7952"/>
+    <rdf:li rdf:resource="https://example.com/en/climate-leaders-called-for-solar-energy-for-everyone-eve"/>
+    <rdf:li rdf:resource="https://example.com/en/manchester-city-premier-league-charges-what-do-they-mean"/>
+    <rdf:li rdf:resource="https://example.com/en/ard-deutschlandtrend-survey-germans-unite-in-frustration"/>
+    <rdf:li rdf:resource="https://example.com/en/turkey-stock-market-scandal-hits-half-a-million-investor"/>
+    <rdf:li rdf:resource="https://example.com/en/klopp-wins-first-game-as-germany-coach-without-top-dogs/"/>
+    <rdf:li rdf:resource="https://example.com/en/weakened-us-fuel-efficiency-rules-and-promises-of-cheape"/>
+    <rdf:li rdf:resource="https://example.com/en/germans-biggest-fear-is-the-high-cost-of-living-an-annua"/>
+    <rdf:li rdf:resource="https://example.com/en/senegal-s-youth-olympics-makes-olympics-in-africa-logica"/>
+    <rdf:li rdf:resource="https://example.com/en/servers-at-munich-s-iconic-oktoberfest-call-for-more-res"/>
+    <rdf:li rdf:resource="https://example.com/en/is-us-president-donald-trump-right-to-rename-ai-as-super"/>
+    <rdf:li rdf:resource="https://example.com/en/ireland-will-boycott-eurovision-again-because-of-israel-"/>
+    <rdf:li rdf:resource="https://example.com/en/el-nino-is-a-postcard-from-the-future-and-could-cause-45"/>
+    <rdf:li rdf:resource="https://example.com/en/south-park-satirist-pushes-for-accountability-in-cornell"/>
+    <rdf:li rdf:resource="https://example.com/en/global-trade-weathers-iran-ukraine-and-trump-s-tariffs/a"/>
+    <rdf:li rdf:resource="https://example.com/en/spain-grows-fruit-and-vegetables-for-europe-but-it-s-run"/>
+    <rdf:li rdf:resource="https://example.com/en/what-do-manchester-city-s-charges-mean-for-german-footba"/>
+    <rdf:li rdf:resource="https://example.com/en/diesel-prices-are-surging-putting-further-pressure-on-eu"/>
+    <rdf:li rdf:resource="https://example.com/en/will-jürgen-klopp-s-charisma-be-enough-for-germany/a-794"/>
+    <rdf:li rdf:resource="https://example.com/en/ireland-beat-israel-3-0-in-nations-league-match-overshad"/>
+    <rdf:li rdf:resource="https://example.com/en/what-would-francis-of-assisi-make-of-his-fame-today/a-79"/>
+    <rdf:li rdf:resource="https://example.com/en/backlash-over-data-centers-tests-europe-s-ai-ambitions/a"/>
+    <rdf:li rdf:resource="https://example.com/en/dw-shows-solidarity-with-georgians-commitment-to-democra"/>
+    <rdf:li rdf:resource="https://example.com/en/bundesliga-other-top-european-leagues-call-for-major-fif"/>
+    <rdf:li rdf:resource="https://example.com/en/jürgen-klopp-starts-germany-job-with-shaky-netherlands-d"/>
+    <rdf:li rdf:resource="https://example.com/en/three-way-battle-for-power-in-world-chess-who-will-be-el"/>
+    <rdf:li rdf:resource="https://example.com/en/political-psychology-why-extremist-parties-are-thriving-"/>
+    <rdf:li rdf:resource="https://example.com/en/could-flattering-ai-make-humanity-turn-on-itself/a-79377"/>
+    <rdf:li rdf:resource="https://example.com/en/china-s-13-year-old-swimming-star-raises-questions-on-ch"/>
+    <rdf:li rdf:resource="https://example.com/en/munich-and-cologne-rhine-ruhr-germany-s-two-remaining-ol"/>
+    <rdf:li rdf:resource="https://example.com/en/el-nino-explained-how-the-weather-pattern-affects-hurric"/>
+    <rdf:li rdf:resource="https://example.com/en/china-s-new-travel-rules-unsettle-tech-giants-and-talent"/>
+    <rdf:li rdf:resource="https://example.com/en/living-in-the-shadow-of-la-s-hidden-oil-wells/a-79237420"/>
+    <rdf:li rdf:resource="https://example.com/en/could-we-see-mma-at-the-olympics/a-79369605?maca=en-rss-"/>
+    <rdf:li rdf:resource="https://example.com/en/male-infertility-is-grossly-underreported/a-79368722?mac"/>
+    <rdf:li rdf:resource="https://example.com/en/will-germany-have-enough-gas-this-winter-amid-energy-sup"/>
+    <rdf:li rdf:resource="https://example.com/en/princess-diana-s-brother-makes-explosive-claims-about-ro"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-s-car-crisis-can-the-35-hour-workweek-survive/a-"/>
+    <rdf:li rdf:resource="https://example.com/en/germany-faces-energy-tax-losses-as-ev-sales-rise/a-79320"/>
+    <rdf:li rdf:resource="https://example.com/en/summer-of-2026-broke-records-in-europe-and-caused-deaths"/>
+    <rdf:li rdf:resource="https://example.com/en/oktoberfest-2026-everything-you-need-to-know/a-79311285?"/>
+    <rdf:li rdf:resource="https://example.com/en/rebels-workers-radicals-the-making-of-red-berlin/a-79325"/>
+    <rdf:li rdf:resource="https://example.com/en/women-s-football-in-germany-booming-but-still-much-to-do"/>
+    <rdf:li rdf:resource="https://example.com/en/strait-of-hormuz-attacks-spill-oil-into-persian-gulf/a-7"/>
+    <rdf:li rdf:resource="https://example.com/en/dual-citizenship-means-germany-now-in-competition-for-ta"/>
+    <rdf:li rdf:resource="https://example.com/en/how-climate-change-worsened-nepal-s-deadly-mountain-coll"/>
+    <rdf:li rdf:resource="https://example.com/en/global-gender-gap-report-women-s-hard-won-gains-fragile/"/>
+    <rdf:li rdf:resource="https://example.com/en/how-extreme-heat-is-hitting-wallets/a-79268306?maca=en-r"/>
+    <rdf:li rdf:resource="https://example.com/en/spanish-scientists-find-first-evidence-of-diplodocus-din"/>
+    <rdf:li rdf:resource="https://example.com/en/why-the-era-of-cheap-government-debt-is-over/a-79259272?"/>
+    <rdf:li rdf:resource="https://example.com/en/why-ai-researchers-warn-humanity-could-face-extinction/a"/>
+    <rdf:li rdf:resource="https://example.com/en/iran-and-us-two-countries-and-the-pistachio-between-them"/>
+   </rdf:Seq>
+  </items>
+ </channel>
+ <image rdf:about="https://img.example.com/image.jpg">
+  <url>https://img.example.com/image.jpg</url>
+  <link>https://example.com/english/?maca=en-rss-en-all-1573-rdf</link>
+  <title>Synthetic title 2 for fixture rdf.xml</title>
+  <description>Synthetic description 9 for fixture rdf.xml</description>
+ </image>
+ <item rdf:about="https://example.com/en/ukraine-says-musk-s-spacex-limits-kyiv-s-starlink-access">
+  <title>Synthetic title 3 for fixture rdf.xml</title>
+  <link>https://example.com/en/ukraine-says-musk-s-spacex-limits-kyiv-s-starlink-access</link>
+  <description>Synthetic description 10 for fixture rdf.xml</description>
+  <dc:date>2026-10-14T18:28:00Z</dc:date>
+  <dc:subject>News</dc:subject>
+  <dc:language>en</dc:language>
+  <dwsyn:contentID>79658015</dwsyn:contentID>
+ </item>
+ <item rdf:about="https://example.com/en/nord-stream-trial-opens-in-germany-defense-seeks-dismiss">
+  <title>Synthetic title 4 for fixture rdf.xml</title>
+  <link>https://example.com/en/nord-stream-trial-opens-in-germany-defense-seeks-dismiss</link>
+  <description>Synthetic description 11 for fixture rdf.xml</description>
+  <dc:date>2026-10-14T18:00:00Z</dc:date>
+  <dc:subject>News</dc:subject>
+  <dc:language>en</dc:language>
+  <dwsyn:contentID>79662942</dwsyn:contentID>
+ </item>
+ <item rdf:about="https://example.com/en/how-trump-s-diesel-deal-with-russia-will-impact-the-unit">
+  <title>Synthetic title 5 for fixture rdf.xml</title>
+  <link>https://example.com/en/how-trump-s-diesel-deal-with-russia-will-impact-the-unit</link>
+  <description>Synthetic description 12 for fixture rdf.xml</description>
+  <dc:date>2026-10-14T17:55:00Z</dc:date>
+  <dc:subject>World</dc:subject>
+  <dc:language>en</dc:language>
+  <dwsyn:contentID>79658596</dwsyn:contentID>
+ </item>
+ <item rdf:about="https://example.com/en/japanese-journalist-arrest-in-russia-s-far-east-draws-re">
+  <title>Synthetic title 6 for fixture rdf.xml</title>
+  <link>https://example.com/en/japanese-journalist-arrest-in-russia-s-far-east-draws-re</link>
+  <description>Synthetic description 13 for fixture rdf.xml</description>
+  <dc:date>2026-10-14T17:28:00Z</dc:date>
+  <dc:subject>News</dc:subject>
+  <dc:language>en</dc:language>
+  <dwsyn:contentID>79663428</dwsyn:contentID>
+ </item>
+ <item rdf:about="https://example.com/en/turkey-government-raids-takes-over-top-news-channel/a-79">
+  <title>Synthetic title 7 for fixture rdf.xml</title>
+  <link>https://example.com/en/turkey-government-raids-takes-over-top-news-channel/a-79</link>
+  <description>Synthetic description 14 for fixture rdf.xml</description>
+  <dc:date>2026-10-14T16:07:00Z</dc:date>
+  <dc:subject>News</dc:subject>
+  <dc:language>en</dc:language>
+  <dwsyn:contentID>79662749</dwsyn:contentID>
+ </item>
+</rdf:RDF>
