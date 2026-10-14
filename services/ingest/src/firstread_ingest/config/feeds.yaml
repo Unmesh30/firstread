@@ -7,6 +7,8 @@
 #   the geo rule in firstread_core.topics.resolve_topic.
 # - topic_hint breaks ties only when the classifier is unsure (ADR 0006).
 # - A feed with unclear terms ships `enabled: false` until the owner decides.
+# - terms: website_with_attribution | personal_noncommercial | forbidden | unverified
+#   (what the publisher's own RSS/terms page says; checked 2026-10-14).
 version: 1
 feeds:
   - id: npr-news
@@ -17,9 +19,10 @@ feeds:
     geo: us
     topic_hint: us
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.npr.org/rss/
+    terms_url: https://www.npr.org/about-npr/179876898/terms-of-use
   - id: pbs-newshour
     url: https://www.pbs.org/newshour/feeds/rss/headlines
     source_name: "PBS NewsHour"
@@ -28,9 +31,10 @@ feeds:
     geo: us
     topic_hint: us
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.pbs.org/newshour/about/pbs-news-rss-feeds
+    terms_url: https://www.pbs.org/newshour/about/pbs-news-rss-feeds
   - id: cbs-news
     url: https://www.cbsnews.com/latest/rss/main
     source_name: "CBS News"
@@ -38,10 +42,11 @@ feeds:
     region: US
     geo: us
     topic_hint: us
-    enabled: true
-    terms_checked: false
+    enabled: false  # terms forbid display on a website
+    terms_checked: true
+    terms: forbidden
     rss_page_url: null
-    terms_url: null
+    terms_url: https://webarchive.library.unt.edu/web/20130107051717mp_/http://www.cbsinteractive.com/terms_of_use.php
   - id: abc-news
     url: https://abcnews.com/abcnews/topstories
     source_name: "ABC News"
@@ -51,6 +56,7 @@ feeds:
     topic_hint: us
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: nbc-news
@@ -61,9 +67,10 @@ feeds:
     geo: us
     topic_hint: us
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.nbcnews.com/id/wbna5216556
+    terms_url: https://www.nbcnews.com/id/wbna5216556
   - id: nyt-us
     url: https://rss.nytimes.com/services/xml/rss/nyt/US.xml
     source_name: "The New York Times"
@@ -72,9 +79,10 @@ feeds:
     geo: us
     topic_hint: us
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.nytimes.com/rss
+    terms_url: https://www.nytimes.com/rss
   - id: nyt-politics
     url: https://rss.nytimes.com/services/xml/rss/nyt/Politics.xml
     source_name: "The New York Times"
@@ -83,9 +91,10 @@ feeds:
     geo: us
     topic_hint: politics
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.nytimes.com/rss
+    terms_url: https://www.nytimes.com/rss
   - id: cnbc-top
     url: https://www.cnbc.com/id/100003114/device/rss/rss.html
     source_name: "CNBC"
@@ -95,6 +104,7 @@ feeds:
     topic_hint: business
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: techcrunch
@@ -105,9 +115,10 @@ feeds:
     geo: us
     topic_hint: tech_science
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://techcrunch.com/rss-terms-of-use/
+    terms_url: https://techcrunch.com/rss-terms-of-use/
   - id: the-verge
     url: https://www.theverge.com/rss/index.xml
     source_name: "The Verge"
@@ -117,6 +128,7 @@ feeds:
     topic_hint: tech_science
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: ars-technica
@@ -128,6 +140,7 @@ feeds:
     topic_hint: tech_science
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: sciencedaily
@@ -139,6 +152,7 @@ feeds:
     topic_hint: tech_science
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: bbc-world
@@ -149,9 +163,10 @@ feeds:
     geo: intl
     topic_hint: world
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.bbc.co.uk/news/10628494
+    terms_url: https://www.bbc.co.uk/news/10628494
   - id: bbc-technology
     url: https://feeds.bbci.co.uk/news/technology/rss.xml
     source_name: "BBC News"
@@ -160,9 +175,10 @@ feeds:
     geo: intl
     topic_hint: tech_science
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.bbc.co.uk/news/10628494
+    terms_url: https://www.bbc.co.uk/news/10628494
   - id: guardian-world
     url: https://www.theguardian.com/world/rss
     source_name: "The Guardian"
@@ -171,9 +187,10 @@ feeds:
     geo: intl
     topic_hint: world
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: guardian-us
     url: https://www.theguardian.com/us-news/rss
     source_name: "The Guardian"
@@ -182,9 +199,10 @@ feeds:
     geo: us
     topic_hint: us
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: aljazeera
     url: https://www.aljazeera.com/xml/rss/all.xml
     source_name: "Al Jazeera English"
@@ -193,9 +211,10 @@ feeds:
     geo: intl
     topic_hint: world
     enabled: true
-    terms_checked: false
+    terms_checked: true
+    terms: personal_noncommercial
     rss_page_url: null
-    terms_url: null
+    terms_url: https://www.aljazeera.com/terms-and-conditions/
   - id: dw-english
     url: https://rss.dw.com/rdf/rss-en-all
     source_name: "DW"
@@ -205,6 +224,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: france24-en
@@ -216,6 +236,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: scmp-world
@@ -227,6 +248,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: the-hindu-intl
@@ -238,6 +260,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: straits-times-world
@@ -249,6 +272,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: japan-times
@@ -260,6 +284,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: mail-guardian
@@ -271,6 +296,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: daily-maverick
@@ -282,6 +308,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: nation-africa
@@ -293,6 +320,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: premium-times
@@ -304,6 +332,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: mercopress
@@ -315,6 +344,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: ba-times
@@ -326,6 +356,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: mexico-news-daily
@@ -337,6 +368,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: abc-australia
@@ -348,6 +380,7 @@ feeds:
     topic_hint: world
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: rnz-world
@@ -357,10 +390,11 @@ feeds:
     region: Oceania
     geo: intl
     topic_hint: world
-    enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    enabled: false  # terms forbid display on a website
+    terms_checked: true
+    terms: forbidden
+    rss_page_url: https://www.rnz.co.nz/rss
+    terms_url: https://www.rnz.co.nz/rss
   - id: npr-health
     url: https://feeds.npr.org/1128/rss.xml
     source_name: "NPR"
@@ -369,9 +403,10 @@ feeds:
     geo: us
     topic_hint: health
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.npr.org/rss/
+    terms_url: https://www.npr.org/about-npr/179876898/terms-of-use
   - id: stat-news
     url: https://www.statnews.com/feed/
     source_name: "STAT"
@@ -381,6 +416,7 @@ feeds:
     topic_hint: health
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: bbc-health
@@ -391,9 +427,10 @@ feeds:
     geo: intl
     topic_hint: health
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.bbc.co.uk/news/10628494
+    terms_url: https://www.bbc.co.uk/news/10628494
   - id: variety
     url: https://variety.com/feed/
     source_name: "Variety"
@@ -403,6 +440,7 @@ feeds:
     topic_hint: entertainment
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: hollywood-reporter
@@ -414,6 +452,7 @@ feeds:
     topic_hint: entertainment
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: bbc-entertainment
@@ -424,9 +463,10 @@ feeds:
     geo: intl
     topic_hint: entertainment
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.bbc.co.uk/news/10628494
+    terms_url: https://www.bbc.co.uk/news/10628494
   - id: guardian-lifeandstyle
     url: https://www.theguardian.com/lifeandstyle/rss
     source_name: "The Guardian"
@@ -435,9 +475,10 @@ feeds:
     geo: intl
     topic_hint: lifestyle
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: guardian-food
     url: https://www.theguardian.com/food/rss
     source_name: "The Guardian"
@@ -446,9 +487,10 @@ feeds:
     geo: intl
     topic_hint: food_drink
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: eater
     url: https://www.eater.com/rss/index.xml
     source_name: "Eater"
@@ -458,6 +500,7 @@ feeds:
     topic_hint: food_drink
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: cn-traveler
@@ -469,6 +512,7 @@ feeds:
     topic_hint: travel
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: skift
@@ -480,6 +524,7 @@ feeds:
     topic_hint: travel
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: guardian-travel
@@ -490,9 +535,10 @@ feeds:
     geo: intl
     topic_hint: travel
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: car-and-driver
     url: https://www.caranddriver.com/rss/all.xml/
     source_name: "Car and Driver"
@@ -502,6 +548,7 @@ feeds:
     topic_hint: autos
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: the-drive
@@ -513,6 +560,7 @@ feeds:
     topic_hint: autos
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: electrek
@@ -524,6 +572,7 @@ feeds:
     topic_hint: autos
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: guardian-extreme-weather
@@ -534,9 +583,10 @@ feeds:
     geo: intl
     topic_hint: weather
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
   - id: yale-climate-connections
     url: https://yaleclimateconnections.org/feed/
     source_name: "Yale Climate Connections"
@@ -546,6 +596,7 @@ feeds:
     topic_hint: weather
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: cbs-sports
@@ -555,10 +606,11 @@ feeds:
     region: US
     geo: us
     topic_hint: sports
-    enabled: true
-    terms_checked: false
+    enabled: false  # terms forbid display on a website
+    terms_checked: true
+    terms: forbidden
     rss_page_url: null
-    terms_url: null
+    terms_url: https://webarchive.library.unt.edu/web/20130107051717mp_/http://www.cbsinteractive.com/terms_of_use.php
   - id: yahoo-sports
     url: https://sports.yahoo.com/rss/
     source_name: "Yahoo Sports"
@@ -568,6 +620,7 @@ feeds:
     topic_hint: sports
     enabled: true
     terms_checked: false
+    terms: unverified
     rss_page_url: null
     terms_url: null
   - id: bbc-sport
@@ -578,9 +631,10 @@ feeds:
     geo: intl
     topic_hint: sports
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: website_with_attribution
+    rss_page_url: https://www.bbc.co.uk/news/10628494
+    terms_url: https://www.bbc.co.uk/news/10628494
   - id: guardian-sport
     url: https://www.theguardian.com/sport/rss
     source_name: "The Guardian"
@@ -589,6 +643,7 @@ feeds:
     geo: intl
     topic_hint: sports
     enabled: true
-    terms_checked: false
-    rss_page_url: null
-    terms_url: null
+    terms_checked: true
+    terms: personal_noncommercial
+    rss_page_url: https://www.theguardian.com/help/feeds
+    terms_url: https://www.theguardian.com/help/feeds
