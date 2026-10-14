@@ -1,0 +1,137 @@
+# MIND (category, subcategory) -> FirstRead app topic. The one reviewed table (ADR 0006).
+#
+# Topic ids are firstread_core.topics.TOPIC_IDS. "exclude" drops the pair from
+# training (formats such as video or photo galleries, not topics).
+#
+# Matching:
+# - `subcategories` maps exact subcategory names. Names repeat across categories
+#   (video, news, voices, causes), so they are always read inside their category.
+# - `default` covers every other subcategory of that category.
+# - A category without `default` must list every subcategory, and a category not
+#   listed here at all fails the build: nothing is dropped silently.
+#
+# Meaning: us and politics = US domestic; world = places outside the US; the
+# other ten topics are global subjects. MIND is US news from 2019, so the
+# ingestion geo rule (firstread_core.topics.resolve_topic) moves non-US items
+# labelled us/politics to world.
+version: 1
+
+categories:
+  news:
+    subcategories:
+      newsus: us
+      newscrime: us
+      newsoffbeat: us              # judgement call (kept): mostly US local oddities
+      newsgoodnews: us
+      newsnational: us
+      newspolitics: politics
+      newsopinion: politics        # judgement call (kept): MIND opinion is mostly political
+      elections-2020-us: politics
+      newselection2020: politics
+      factcheck: politics
+      newsfactcheck: politics
+      newslocalpolitics: politics
+      newsworld: world
+      newsworldpolitics: world
+      narendramodi_opinion: world
+      newsscienceandtechnology: tech_science
+      newsscience: tech_science
+      newstechnology: tech_science
+      technology: tech_science
+      newsbusiness: business
+      newsrealestate: business
+      personalfinance: business
+      newsweather: weather
+      # Formats or too vague to label.
+      newsphotos: exclude
+      photos: exclude
+      newsvideo: exclude
+      newsvideos: exclude
+      newstvmedia: exclude
+      indepth: exclude
+      other: exclude
+      newsother: exclude
+      yearinoffbeatgoodnews: exclude
+      causes: exclude
+      causes-environment: exclude
+      causes-disaster-relief: exclude
+      causes-poverty: exclude
+      causes-military-appreciation: exclude
+      empowering-the-planet: exclude
+
+  middleeast:
+    default: world
+
+  finance:
+    default: business
+    subcategories:
+      finance-technology: tech_science
+      technologyinvesting: tech_science
+
+  health:
+    default: health
+    subcategories:
+      recipes: food_drink
+
+  sports:
+    default: sports
+
+  entertainment:
+    default: entertainment
+  movies:
+    default: entertainment
+  music:
+    default: entertainment
+  tv:
+    default: entertainment
+  games:
+    default: entertainment
+
+  lifestyle:
+    default: lifestyle
+    subcategories:
+      pregnancyparenting: health
+      lifestyletravel: travel
+      travel: travel
+
+  foodanddrink:
+    default: food_drink
+
+  travel:
+    default: travel
+
+  autos:
+    default: autos
+
+  weather:
+    default: weather
+
+  video:
+    subcategories:
+      science: tech_science
+      sports: sports
+      popculture: entertainment
+      tunedin: entertainment
+      lifestyle: lifestyle
+      animals: lifestyle
+      healthandfitness: health
+      foodanddrink: food_drink
+      news: exclude                # 3.5K clips that could be us, world or politics
+      viral: exclude
+      wonder: exclude
+      downtime: exclude
+      watch: exclude
+      comedy: exclude
+      peopleandplaces: exclude
+
+  kids:
+    subcategories:
+      science: tech_science
+      sports: sports
+      animals: lifestyle
+      fun: exclude
+      video: exclude
+      people-places: exclude
+
+  northamerica:
+    default: exclude
