@@ -5,6 +5,7 @@ uv run firstread-ml eval --variant small --split dev
 """
 
 import argparse
+import json
 from collections.abc import Sequence
 from pathlib import Path
 
@@ -34,15 +35,27 @@ def _embed(args: argparse.Namespace) -> None:
 
 def _eval(args: argparse.Namespace) -> None:
     from firstread_ml.eval import harness, report
-    from firstread_ml.paths import reports_dir
+    from firstread_ml.paths import data_dir, reports_dir
 
     models = args.models.split(",")
-    result = harness.run(args.variant, args.split, models, seed=args.seed, nrms_config=args.config)
-    baselines = [m for m in models if m in DEFAULT_BASELINES.split(",")]
-    candidate = "nrms_lite" if "nrms_lite" in models else None
-    j, m = report.write(result, reports_dir(), baselines, candidate)
-    for line in report.acceptance(result, candidate, baselines):
+    seeds = [int(x) for x in args.seeds.split(",")]
+    result = harness.run(
+        args.variant, args.split, models, seed=args.seed, nrms_config=args.config, nrms_seeds=seeds
+    )
+    for line in report.acceptance(result):
         print(line)
+    try:
+        j, m = report.write(result, reports_dir())
+    except report.IncompleteReportError as e:
+        # Partial runs (e.g. --models nrms_lite) go to gitignored scratch, never ml/reports.
+        scratch = data_dir() / "reports-scratch"
+        print(f"{e}; writing to {scratch} instead of ml/reports")
+        j, m = (
+            scratch / f"results-mind-{args.variant}-{args.split}.{ext}" for ext in ("json", "md")
+        )
+        scratch.mkdir(parents=True, exist_ok=True)
+        j.write_text(json.dumps(result, indent=1, sort_keys=True) + "\n")
+        m.write_text(report.to_markdown(result))
     print(f"wrote {j} and {m}")
 
 
@@ -108,6 +121,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--models", default=DEFAULT_BASELINES)
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--config", type=Path, default=None, help="NRMS-lite YAML config")
+    p.add_argument("--seeds", default="0", help="NRMS-lite seeds, e.g. 0,1,2 (one model each)")
     p.set_defaults(func=_eval)
 
     p = sub.add_parser("tune", help="train on fit days, eval holdout every epoch (no dev)")

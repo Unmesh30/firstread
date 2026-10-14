@@ -75,13 +75,18 @@ def test_unknown_split_and_model(synthetic_root: Path) -> None:
 
 
 def test_report_writes_markdown_and_json(dev_report: dict, tmp_path: Path) -> None:  # type: ignore[type-arg]
-    j, m = report.write(dev_report, tmp_path, list(BASELINES))
+    j, m = report.write(dev_report, tmp_path)
     assert json.loads(j.read_text())["meta"]["variant"] == synthetic.VARIANT
     md = m.read_text()
     assert "## Cold-start candidates" in md
-    assert "Bar to beat [overall]" in md
-    lines = report.acceptance(dev_report, "mean_history", ["random", "popularity"])
-    assert lines[0].startswith("ACCEPT PASS [overall] mean_history")
+    assert "Bar to beat [overall]" in md  # no NRMS-lite in this report
+
+
+def test_report_refuses_missing_baselines(dev_report: dict, tmp_path: Path) -> None:  # type: ignore[type-arg]
+    partial = {**dev_report, "results": {"mean_history": dev_report["results"]["mean_history"]}}
+    with pytest.raises(report.IncompleteReportError, match="random"):
+        report.write(partial, tmp_path)
+    assert not list(tmp_path.iterdir())
 
 
 def test_eval_gate_passes_on_committed_expectations(tmp_path: Path) -> None:
@@ -119,12 +124,14 @@ def test_nrms_lite_trains_scores_and_reuses_checkpoint(synthetic_root: Path) -> 
         "nrms_config": REPO_ROOT / "ml" / "configs" / "nrms_lite_ci.yaml",
     }
     first = harness.run(synthetic.VARIANT, "holdout", ["mean_history", "nrms_lite"], **kwargs)
-    res = first["results"]["nrms_lite"]["overall"]
+    res = first["results"]["nrms_lite_s0"]["overall"]
     assert 0.0 <= res["auc"] <= 1.0
     ckpts = list((synthetic_root / "models" / synthetic.VARIANT / "holdout").glob("nrms_lite/*"))
     assert len(ckpts) == 1
     second = harness.run(synthetic.VARIANT, "holdout", ["nrms_lite"], **kwargs)
-    assert second["results"]["nrms_lite"] == first["results"]["nrms_lite"]  # reused
+    assert second["results"]["nrms_lite_s0"] == first["results"]["nrms_lite_s0"]  # reused
+    assert "bootstrap" in first  # mean_history + NRMS-lite present -> paired CI
+    assert set(first["bootstrap"]["slices"]) == {"overall", "cold_candidates"}
 
 
 def test_category_classifier_on_synthetic(
