@@ -12,8 +12,11 @@ from firstread_core.dbtest import MIGRATIONS, skip_or_fail_if_unreachable_async,
 from firstread_ingest.config import Feed, Settings
 from firstread_ingest.models import TopicClassifier
 from firstread_ingest.pipeline import EmbedFn, run
+from firstread_ingest.sources import gkg
+from firstread_ingest.sources.gdelt_domains import DomainCountries
 
 FIX = Path(__file__).parent / "fixtures" / "rss"
+RSS = ("rss",)
 # Fixture items are from 2026-10-14; run "shortly after" so none are stale.
 NOW = datetime(2026, 10, 14, 21, 0, tzinfo=UTC)
 FEEDS = [
@@ -48,7 +51,9 @@ async def test_dry_run_writes_nothing_and_classifies_everything(
     no_network: respx.MockRouter, classifier: TopicClassifier, fake_embed: EmbedFn
 ) -> None:
     mock_feeds(no_network)
-    s = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, dry_run=True, now=NOW)
+    s = await run(
+        settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS, dry_run=True, now=NOW
+    )
     assert s.fetched == 25
     assert s.inserted + s.duplicates + s.near_duplicates + sum(s.dropped.values()) == 25
     assert s.inserted > 0
@@ -62,7 +67,9 @@ async def test_stale_items_are_dropped(
 ) -> None:
     mock_feeds(no_network)
     later = NOW + timedelta(days=10)
-    s = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, dry_run=True, now=later)
+    s = await run(
+        settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS, dry_run=True, now=later
+    )
     assert s.inserted == 0
     assert s.dropped["stale"] == 25
 
@@ -78,11 +85,12 @@ async def test_second_run_over_the_same_items_inserts_nothing(
         try:
             await apply_migrations(conn, MIGRATIONS)
             first = await run(
-                settings(), classifier, embed=fake_embed, feeds=FEEDS, conn=conn, now=NOW
-            )
+                settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS, conn=conn,
+                now=NOW,
+            )  # fmt: skip
             assert first.inserted > 0
-            second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, conn=conn,
-                               now=NOW + timedelta(minutes=15))  # fmt: skip
+            second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS,
+                               conn=conn, now=NOW + timedelta(minutes=15))  # fmt: skip
             assert second.inserted == 0
             assert (
                 second.duplicates + second.near_duplicates
@@ -110,3 +118,81 @@ async def test_second_run_over_the_same_items_inserts_nothing(
             assert nulls == 0  # descriptions are never stored
         finally:
             await conn.close()
+
+
+GKG_FIX = next((Path(__file__).parent / "fixtures" / "gkg").glob("*.gkg.csv.zip"))
+GKG_SLOT = gkg.parse_slot(GKG_FIX.name.split(".")[0])
+
+
+def mock_gkg(router: respx.MockRouter) -> None:
+    import hashlib
+
+    blob = GKG_FIX.read_bytes()
+    md5 = hashlib.md5(blob).hexdigest()  # noqa: S324 (GDELT publishes MD5)
+    name = gkg.slot_name(GKG_SLOT)
+    router.get(gkg.LASTUPDATE).mock(
+        return_value=httpx.Response(200, text=f"{len(blob)} {md5} http://x/{name}.gkg.csv.zip\n")
+    )
+    router.get(gkg.slot_url(GKG_SLOT)).mock(return_value=httpx.Response(200, content=blob))
+    router.get(url__regex=r".*\.gkg\.csv\.zip$").mock(return_value=httpx.Response(404))
+
+
+@pytest.mark.integration
+async def test_rss_and_gdelt_together_with_cursor_and_coverage(
+    no_network: respx.MockRouter,
+    classifier: TopicClassifier,
+    fake_embed: EmbedFn,
+    places: DomainCountries,
+) -> None:
+    await skip_or_fail_if_unreachable_async()
+    mock_feeds(no_network)
+    mock_gkg(no_network)
+    now = GKG_SLOT + timedelta(minutes=20)  # also keeps the RSS fixture items fresh
+    async with temp_database() as dsn:
+        conn = await connect(dsn)
+        try:
+            await apply_migrations(conn, MIGRATIONS)
+            first = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS,
+                              places=places, conn=conn, now=now)  # fmt: skip
+            assert first.origins["gdelt"] == 8  # 11 records - 2 blocked - 1 unplaced
+            assert first.origins["rss"] > 0
+            assert first.gdelt["dropped"] == {"blocked_domain": 2, "unplaced_domain": 1}
+            assert first.gdelt["selected"] == 8
+            assert not first.gdelt["stale"]
+            cursor = await conn.fetchval(
+                "select cursor from public.source_cursor where source = 'gdelt-gkg'"
+            )
+            assert cursor == gkg.slot_name(GKG_SLOT)
+            domains = await conn.fetchval(
+                "select count(distinct source_domain) from public.story_coverage "
+                "where source_domain like '%.co.uk' or source_domain = 'wisn.com'"
+            )
+            assert domains == 3
+            geo = dict(await conn.fetch(
+                "select source_domain, geo from public.articles where origin = 'gdelt'"
+            ))  # fmt: skip
+            assert geo["wisn.com"] == "us"
+            assert geo["jpost.com"] == "intl"
+            later = now + timedelta(minutes=5)
+            second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS,
+                               places=places, conn=conn, now=later)  # fmt: skip
+            assert second.inserted == 0
+            assert second.gdelt["files"] == []  # cursor is at the newest slot
+        finally:
+            await conn.close()
+
+
+async def test_gdelt_cap_keeps_the_run_within_budget(
+    no_network: respx.MockRouter,
+    classifier: TopicClassifier,
+    fake_embed: EmbedFn,
+    places: DomainCountries,
+) -> None:
+    mock_gkg(no_network)
+    s = settings()
+    s.ingest_gkg_max_per_run = 3
+    s.ingest_gkg_topic_min = 0
+    out = await run(s, classifier, embed=fake_embed, sources=("gdelt",), places=places,
+                    dry_run=True, now=GKG_SLOT + timedelta(minutes=20))  # fmt: skip
+    assert out.inserted == 3
+    assert out.gdelt["capped"] == {"run_cap": 5}

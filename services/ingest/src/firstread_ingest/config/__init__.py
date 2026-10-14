@@ -40,6 +40,13 @@ class Settings(BaseSettings):
     ingest_fingerprint_window_hours: int = 72
     # Titles with fewer words are dropped.
     ingest_min_title_words: int = 3
+    # GDELT GKG files (ADR 0007).
+    ingest_gkg_max_files: int = 8  # catch up at most 2 h of 15-minute files per run
+    ingest_gkg_stale_minutes: int = 60  # newest file older than this -> "stale" in the summary
+    ingest_gkg_max_embed: int = 2000  # newest GKG candidates embedded per run (CPU bound)
+    ingest_gkg_max_per_run: int = 50  # GKG articles inserted per run (DB budget, ~3.2 KB each)
+    ingest_gkg_max_per_domain: int = 3  # per outlet per run
+    ingest_gkg_topic_min: int = 2  # slots reserved per topic before ranking fills the rest
 
     @field_validator("ingest_model_dir", mode="before")
     @classmethod

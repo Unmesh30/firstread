@@ -4,5 +4,6 @@ from firstread_ingest.testing import (  # noqa: F401
     classifier,
     fake_embed,
     no_network,
+    places,
     release_dir,
 )

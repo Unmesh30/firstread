@@ -15,7 +15,7 @@ from firstread_core.db import apply_migrations, connect, default_migrations_dir
 from firstread_ingest.config import Settings
 from firstread_ingest.models import PINNED, TopicClassifier, download_release, verify_release
 
-SOURCES = ("rss",)  # GDELT joins once its adapter is chosen (Phase 2 probe results)
+SOURCES = ("rss", "gdelt")
 
 
 def describe() -> str:
@@ -51,7 +51,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="apply infra/db/migrations to DATABASE_URL")
     p = sub.add_parser("run", help="run one ingestion pass")
-    p.add_argument("--sources", default=",".join(SOURCES), help="comma-separated: rss")
+    p.add_argument("--sources", default=",".join(SOURCES), help="comma-separated: rss,gdelt")
     p.add_argument("--dry-run", action="store_true", help="fetch, embed, classify; write nothing")
     args = parser.parse_args(argv)
     settings = Settings()

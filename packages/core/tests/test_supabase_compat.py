@@ -19,7 +19,14 @@ pytestmark = [
     pytest.mark.supabase,
     pytest.mark.skipif(not URL, reason="SUPABASE_TEST_URL not set (CI job `supabase`)"),
 ]
-TABLES = ("articles", "ingestion_runs", "feed_state", "story_coverage", "schema_migrations")
+TABLES = (
+    "articles",
+    "ingestion_runs",
+    "feed_state",
+    "story_coverage",
+    "source_cursor",
+    "schema_migrations",
+)
 INSERTS = {"articles": "url", "feed_state": "feed_id"}
 
 

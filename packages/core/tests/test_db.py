@@ -79,8 +79,9 @@ async def test_every_public_table_has_row_level_security(db: None) -> None:
                 "where n.nspname = 'public' and c.relkind in ('r', 'p')"
             )
             tables = {r["relname"]: r["relrowsecurity"] for r in rows}
-            assert {"articles", "ingestion_runs", "feed_state", "story_coverage",
-                    "schema_migrations"} <= set(tables)  # fmt: skip
+            expected = {"articles", "ingestion_runs", "feed_state", "story_coverage",
+                        "source_cursor", "schema_migrations"}  # fmt: skip
+            assert expected <= set(tables)
             assert [t for t, rls in tables.items() if not rls] == []
         finally:
             await conn.close()

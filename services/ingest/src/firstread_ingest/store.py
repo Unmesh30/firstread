@@ -217,3 +217,21 @@ async def finish_run(conn: Any, run_id: uuid.UUID, summary: dict[str, Any], now:
         summary["status"],
         json.dumps(summary["details"], default=str),
     )
+
+
+async def load_cursor(conn: Any, source: str) -> str | None:
+    value: str | None = await conn.fetchval(
+        "select cursor from public.source_cursor where source = $1", source
+    )
+    return value
+
+
+async def save_cursor(conn: Any, source: str, cursor: str, now: datetime) -> None:
+    await conn.execute(
+        "insert into public.source_cursor (source, cursor, updated_at) values ($1, $2, $3) "
+        "on conflict (source) do update set cursor = excluded.cursor, "
+        "updated_at = excluded.updated_at",
+        source,
+        cursor,
+        now,
+    )
