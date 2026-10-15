@@ -7,7 +7,11 @@ the best ``max_per_run`` GDELT inserts, not the first ones:
    (distinct domains among this run's items in the same story cluster, counting
    duplicates and near-duplicates too). Ties go to the most recent.
 2. **At most ``max_per_domain`` per outlet,** so one prolific site can't fill the run.
-3. **Topic floor:** each topic first gets up to ``topic_min`` of its best items, so
+3. **At most ``max_per_story`` stored articles per story**, counting ones already
+   stored in the dedupe window. The feed shows at most 2 per story, so further copies
+   only crowd out other stories (the 2b replay found 26% of inserts were a story's
+   3rd-or-later copy). Coverage, and so trending breadth, still counts every outlet.
+4. **Topic floor:** each topic first gets up to ``topic_min`` of its best items, so
    thin topics aren't starved; the remaining slots go by global rank.
 
 RSS inserts are always kept (the curated feeds are few).
@@ -45,6 +49,8 @@ def select_gdelt(
     max_per_run: int,
     max_per_domain: int,
     topic_min: int,
+    max_per_story: int | None = None,
+    stored_per_story: Counter[uuid.UUID] | None = None,
 ) -> tuple[set[int], dict[str, int]]:
     """Indices of the GDELT inserts to keep, plus counts of why others were dropped."""
     width = breadth(cands, decisions)
@@ -55,15 +61,24 @@ def select_gdelt(
 
     ranked = sorted(choices, key=rank)
     per_domain: Counter[str] = Counter()
+    per_story: Counter[uuid.UUID] = Counter(stored_per_story or {})
     kept: set[int] = set()
     dropped: Counter[str] = Counter()
+
+    def story_full(ch: Choice) -> bool:
+        return max_per_story is not None and (
+            per_story[decisions[ch.index].cluster_id] >= max_per_story
+        )
 
     def take(ch: Choice) -> bool:
         domain = cands[ch.index].raw.source_domain
         if ch.index in kept or len(kept) >= max_per_run or per_domain[domain] >= max_per_domain:
             return False
+        if story_full(ch):
+            return False
         kept.add(ch.index)
         per_domain[domain] += 1
+        per_story[decisions[ch.index].cluster_id] += 1
         return True
 
     per_topic: Counter[str] = Counter()
@@ -76,5 +91,10 @@ def select_gdelt(
         if ch.index in kept:
             continue
         domain = cands[ch.index].raw.source_domain
-        dropped["domain_cap" if per_domain[domain] >= max_per_domain else "run_cap"] += 1
+        if per_domain[domain] >= max_per_domain:
+            dropped["domain_cap"] += 1
+        elif story_full(ch):
+            dropped["story_cap"] += 1
+        else:
+            dropped["run_cap"] += 1
     return kept, dict(dropped)

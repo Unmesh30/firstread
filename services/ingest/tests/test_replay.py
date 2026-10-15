@@ -103,6 +103,7 @@ async def test_replay_steps_the_clock_and_behaves_like_production(
     lookup = tmp_path / "lookup.csv"
     lookup.write_text("domain,countrycode,cnt\n")
     settings = Settings(_env_file=None)  # type: ignore[call-arg]
+    settings.ingest_gkg_max_per_story = 100  # synthetic titles all look like one story
     async with temp_database() as dsn:
         conn = await connect(dsn)
         try:

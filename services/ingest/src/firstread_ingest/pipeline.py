@@ -379,6 +379,8 @@ async def _run(
         settings.ingest_gkg_max_per_run,
         settings.ingest_gkg_max_per_domain,
         settings.ingest_gkg_topic_min,
+        settings.ingest_gkg_max_per_story,
+        Counter(recent.clusters),
     )
     keep = [i for i in topics if cands[i].raw.origin != "gdelt" or i in kept_gdelt]
     rows = [make_row(cands[i], decisions[i], vectors[i], topics[i]) for i in sorted(keep)]

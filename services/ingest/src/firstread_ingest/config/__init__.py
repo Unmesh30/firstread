@@ -54,6 +54,7 @@ class Settings(BaseSettings):
     ingest_gkg_max_embed: int = 2000  # newest GKG candidates embedded per run (CPU bound)
     ingest_gkg_max_per_run: int = 50  # GKG articles inserted per run (DB budget, ~3.2 KB each)
     ingest_gkg_max_per_domain: int = 3  # per outlet per run
+    ingest_gkg_max_per_story: int = 3  # stored articles per story (feed shows <= 2)
     ingest_gkg_topic_min: int = 2  # slots reserved per topic before ranking fills the rest
 
     @field_validator("ingest_model_dir", mode="before")
