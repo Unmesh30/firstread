@@ -85,13 +85,13 @@ Values are only ever raised from what the data allowed, never lowered. They live
 A second sample was drawn from the candidate stream itself: every placeable GKG record in the newest 4 replayed hours (2026-10-14 22:30 → 10-15 02:15), plus the live RSS feeds.
 - At most 3 pairs per story and type (connected components ≥ 0.80), so a few big stories can't dominate.
 - `scripts/sample_pairs.py --from-replay`; aggregates in `docs/learn/data/02-thresholds-2b.json`.
-- 273 pairs, **LLM-labeled**, spot-checked by a second, independent LLM session, approved by the owner.
+- 273 pairs, **LLM-labeled**, spot-checked by a second, independent LLM session, approved by the owner. The counts below include the reviewer's two corrections (#177, #233 → `different`).
 
 | Pair type | Pairs | Duplicate | Same story | Different | Data supports (τ_dup / τ_story) |
 |---|---:|---:|---:|---:|---|
 | GDELT↔GDELT | 144 | 26 | 75 | 43 | 0.975 / **0.925** |
-| GDELT↔RSS | 87 | 0 | 76 | 11 | — / 0.775 |
-| RSS↔RSS | 42 | 0 | 20 | 22 | — / 0.80 (1–2 pairs per bin) |
+| GDELT↔RSS | 87 | 0 | 75 | 12 | — / 0.775 |
+| RSS↔RSS | 42 | 0 | 19 | 23 | — / 0.80 (1–2 pairs per bin) |
 
 **Decisions:**
 - **GDELT↔GDELT τ_story: 0.875 → 0.925 (validated: ≥ 100 pairs and ≥ 10 duplicates).** The capped sample surfaced **templated headlines** that look alike but are different stories, and they sit at 0.85–0.92:
@@ -104,5 +104,10 @@ A second sample was drawn from the candidate stream itself: every placeable GKG 
 - **RSS↔RSS stays provisional at 0.97 / 0.875.** Pooled it has 93 pairs and 0 duplicates. With 9 permitted feeds (about 55 articles a day, mostly BBC) it can't reach 100 pairs and 10 duplicates. Identical BBC items are caught earlier by URL and fingerprint anyway.
 
 **Effect in the replay:** clustered inserts fell from 4,996 to 1,357, and stories rose to 13,065 for the same 14,400 articles. The cost is that big evolving stories can split into several clusters (the Pope's surgery appeared as three trending entries on 2026-10-13). P3's 2-per-story feed rule and MMR diversity must therefore also treat near-identical *stories* as one, not only shared cluster ids.
+
+**2b review, recorded:** the 2b labels were spot-checked by a second, independent LLM session, approved by the owner:
+- **Pairs:** 28 of 30 sampled labels held. #177 and #233 should be `different` (related football stories, not the same event); both sit far below every threshold, so no threshold changes.
+- All 12 sampled pairs at or above their type's τ_story are same story or duplicate, and both pairs above the GDELT↔GDELT τ_dup are true duplicates.
+- **Topics:** all 20 sampled audit labels held (#14, #26 and #47 are borderline but defensible).
 
 **2a review, recorded:** the 2a labels (291 pairs) were LLM-labeled and spot-checked by a second, independent LLM session, approved by the owner. All 30 sampled labels held, and 14/14 sampled pairs at or above their τ_story at the time were correct.

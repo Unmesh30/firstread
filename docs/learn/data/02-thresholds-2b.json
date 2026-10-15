@@ -69,8 +69,8 @@
      "different": 5
     },
     "0.750": {
-     "same_story": 11,
-     "different": 1
+     "same_story": 10,
+     "different": 2
     },
     "0.775": {
      "same_story": 12
@@ -98,8 +98,8 @@
    "n": 42,
    "bins": {
     "0.700": {
-     "different": 8,
-     "same_story": 4
+     "different": 9,
+     "same_story": 3
     },
     "0.725": {
      "different": 10,
