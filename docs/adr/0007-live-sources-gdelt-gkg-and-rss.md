@@ -94,3 +94,9 @@ SPEC §6 named the GDELT DOC 2.0 API as the primary live source and curated publ
 **Known limitations** (not fixed in Phase 2):
 - **Corporate-milestone press releases pass the filter.** Titles like "QuickMD Surpasses 2 Million Patient Visits" have no PR-wire domain and no fiscal-results or dividend shape. They can rank like news and, when syndicated, trend. A learned press-release detector, or more patterns (e.g. "surpasses … users/visits/customers"), is a later option.
 - **Local-TV suffixes aren't stripped.** Titles like "… – NBC4 Washington" or "… – NBC 7 San Diego" don't match the outlet's domain, so the suffix stays. Syndicated copies of one story then differ in title fingerprint and cosine, and **cluster as the same story instead of dropping as duplicates**. The per-story cap (3) limits the impact: at most 3 copies are stored, and coverage still counts every outlet.
+
+## Follow-up (2026-10-15, after the first workflow run on `main`)
+
+- **Yale Climate Connections disabled** (`enabled: false`). It answers **HTTP 403 to GitHub-hosted runners** (it works from a home IP). Ingestion runs on GitHub Actions in P5 too (Cloud Run only hosts the API), so this won't clear up there, and a feed that fails every run would make every run `partial` and hide real problems. **8 RSS feeds remain enabled.** Weather stays covered by the GDELT topic floor.
+- **`indiankanoon.org` blocklisted:** a court-records database, not news. Its templated "X vs The State Of Y on <date>" titles also skewed the story-threshold sample (ADR 0009).
+- **The run summary's top-20 outlets are counted after the blocklist and country filter,** so new spam stands out instead of known blocked outlets (iheart.com used to top the list).

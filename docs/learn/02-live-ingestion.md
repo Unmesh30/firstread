@@ -11,7 +11,7 @@ FirstRead recommends news **before anyone has clicked it**. For that, every new 
 
 Every 15 minutes the ingestion job:
 
-1. **Fetches** headlines from two sources: GDELT's 15-minute GKG files (worldwide, ~1,200 English articles per file) and 9 publisher RSS feeds whose terms explicitly allow showing headlines on a website.
+1. **Fetches** headlines from two sources: GDELT's 15-minute GKG files (worldwide, ~1,200 English articles per file) and 8 publisher RSS feeds whose terms explicitly allow showing headlines on a website.
 2. **Cleans and filters:** canonical URLs, English only, junk and too-short titles, stale items, spam outlets, press releases.
 3. **Removes copies:** the same URL, the same headline on many sites, and near-identical rewrites.
 4. **Embeds** what's new with the shared `packages/core` embedder (the same one used to train the model).
@@ -119,7 +119,7 @@ RSS can't be replayed (feeds show only their current items), so its share is est
 flowchart LR
   subgraph Sources
     GKG[GDELT GKG files<br/>every 15 min, cursor ≤ 2 h]
-    RSS[9 RSS feeds<br/>explicit permission, conditional GET]
+    RSS[8 RSS feeds<br/>explicit permission, conditional GET]
   end
   GKG --> PL[place outlet: domain lookup + overrides<br/>blocklist, press wires]
   PL --> N
@@ -177,7 +177,7 @@ Two operating modes:
 
 | File | Contents |
 |---|---|
-| `feeds.yaml` | 53 feeds with terms verdicts (9 enabled) |
+| `feeds.yaml` | 53 feeds with terms verdicts (8 enabled) |
 | `gdelt_domains.yaml` | Overrides, blocklist, press wires |
 | `announcement_titles.yaml` | PR-shaped title patterns |
 | `junk_titles.yaml` | Junk and short-title rules |
@@ -298,7 +298,7 @@ All labels are LLM-labeled, **spot-checked by a second, independent LLM session,
 | GDELT↔RSS | 96, 2 dup | 87, 0 dup | 0.95 / 0.80 | **Provisional** |
 | RSS↔RSS | 51, 0 dup | 42, 0 dup | 0.97 / 0.875 | **Provisional** |
 
-GDELT↔GDELT τ_story rose because templated headlines sit at 0.85–0.92 without being the same story ("Florida / California Midterm Elections 2026: Key Races…", "X vs The State Of Bihar on 13 October"). Neither provisional type reached 100 pairs and 10 duplicates: 9 RSS feeds publish about 55 articles a day.
+GDELT↔GDELT τ_story rose because templated headlines sit at 0.85–0.92 without being the same story ("Florida / California Midterm Elections 2026: Key Races…", "X vs The State Of Bihar on 13 October"). Neither provisional type reached 100 pairs and 10 duplicates: the permitted RSS feeds publish about 55 articles a day.
 
 ---
 
@@ -306,13 +306,14 @@ GDELT↔GDELT τ_story rose because templated headlines sit at 0.85–0.92 witho
 
 - **The GDELT DOC API was unusable:** a 15-minute window answers "Timespan is too short." with HTTP 200, and every other request was throttled. Hence the static GKG files.
 - **`lastupdate.txt` runs ahead of the files.** Four listed slots 404'd for 40+ minutes, then appeared. A 404 is "pending" until it's older than the catch-up horizon.
-- **Most RSS terms don't allow a public app.** Personal, non-commercial use only (NYT, Guardian, NPR, NBC, PBS, Al Jazeera); RNZ and CBS forbid website use outright. 9 of 53 feeds remain.
+- **Most RSS terms don't allow a public app.** Personal, non-commercial use only (NYT, Guardian, NPR, NBC, PBS, Al Jazeera); RNZ and CBS forbid website use outright. 9 of 53 feeds qualified; Yale Climate Connections was then disabled because it answers HTTP 403 to GitHub-hosted runners, leaving 8.
 - **The same BBC article on two hosts** (bbc.co.uk from RSS, bbc.com from GDELT) and BBC's `at_*` tracking parameters defeated URL dedupe until we added a host alias and the prefix.
 - **A Spanish article from a feed declared English** got in. Items are now checked one by one (a function-word ratio).
 - **pgvector lives in `extensions`,** which isn't on the local `search_path`: write `OPERATOR(extensions.<#>)` and `extensions.halfvec(384)` (CLAUDE.md gotcha).
 - **The domain lookup's "mentions most" rule** places international outlets that cover the US heavily in the US. That's what the overrides table is for.
 - **Breadth ranking without a per-story cap** spent 26% of the budget on copies of a few stories; found only by replaying.
 - **Templated headlines** fooled a 0.875 story threshold; found only with a per-story-capped sample.
+- **A permitted feed can still be unreachable from CI:** Yale Climate Connections answers HTTP 403 to GitHub-hosted runners (it works from a home IP). A feed that fails every run makes every run `partial` and hides real problems, so it's disabled; weather stays covered by the GDELT topic floor.
 - **Section pages stored as articles** ("Health - Carroll Broadcasting Inc."), found during the 2b spot-check, are now dropped as `section_page`.
 - **Known limitations:** corporate-milestone press releases ("QuickMD Surpasses 2 Million Patient Visits") pass the filter, and local-TV suffixes ("– NBC4 Washington") aren't stripped, so syndicated copies cluster as the same story instead of dropping as duplicates. The per-story cap limits the impact (ADR 0007).
 - **Tighter story thresholds fragment big evolving stories** (the Pope's surgery appeared as three trending entries on 10-13). P3's 2-per-story feed rule and MMR must treat near-identical stories as one.

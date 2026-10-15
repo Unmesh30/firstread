@@ -109,7 +109,7 @@ flowchart LR
 ```mermaid
 flowchart LR
   subgraph Sources
-    RSS[9 RSS feeds<br/>explicit permission only<br/>conditional GET]
+    RSS[8 RSS feeds<br/>explicit permission only<br/>conditional GET]
     GKG[GDELT GKG 15-min files<br/>catch-up cursor ≤ 2 h]
   end
   GKG --> PL[place outlet: GDELT domain lookup<br/>+ overrides, blocklist]
