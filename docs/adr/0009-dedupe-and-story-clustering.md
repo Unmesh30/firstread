@@ -79,3 +79,30 @@ Values are only ever raised from what the data allowed, never lowered. They live
   - every sampled pair at or above its type's τ_story was same story or duplicate (14/14), and both pairs above the GDELT↔GDELT τ_dup were true duplicates.
 - The thresholds should be re-validated when sources change; the scripts make that a one-hour job.
 - Only nearest-neighbour clustering: a story's cluster is set by its first close neighbour and never re-merged later.
+
+## Amendment (2026-10-15, Phase 2b): re-check on replayed data
+
+A second sample was drawn from the candidate stream itself: every placeable GKG record in the newest 4 replayed hours (2026-10-14 22:30 → 10-15 02:15), plus the live RSS feeds.
+- At most 3 pairs per story and type (connected components ≥ 0.80), so a few big stories can't dominate.
+- `scripts/sample_pairs.py --from-replay`; aggregates in `docs/learn/data/02-thresholds-2b.json`.
+- 273 pairs, **LLM-labeled**, spot-checked by a second, independent LLM session, approved by the owner.
+
+| Pair type | Pairs | Duplicate | Same story | Different | Data supports (τ_dup / τ_story) |
+|---|---:|---:|---:|---:|---|
+| GDELT↔GDELT | 144 | 26 | 75 | 43 | 0.975 / **0.925** |
+| GDELT↔RSS | 87 | 0 | 76 | 11 | — / 0.775 |
+| RSS↔RSS | 42 | 0 | 20 | 22 | — / 0.80 (1–2 pairs per bin) |
+
+**Decisions:**
+- **GDELT↔GDELT τ_story: 0.875 → 0.925 (validated: ≥ 100 pairs and ≥ 10 duplicates).** The capped sample surfaced **templated headlines** that look alike but are different stories, and they sit at 0.85–0.92:
+  - "Florida Midterm Elections 2026: Key Races…" vs the same for California, 0.881;
+  - court listings "X vs The State Of Bihar on 13 October", 0.920;
+  - "Tutukaka / Tauranga Fishing Report", 0.872.
+
+  The 0.875 bin was 83% and the 0.900 bin 92% precise, both below the 95% bar. τ_dup 0.975 is confirmed: the 0.950 bin was only 67% duplicates.
+- **GDELT↔RSS stays provisional at 0.95 / 0.80.** Pooled over 2a + 2b it has 183 pairs but only 2 duplicates. The story threshold is supported (every bin ≥ 0.775 was 100% same story in 2b, ≥ 0.75 pooled), but the duplicate threshold has no evidence.
+- **RSS↔RSS stays provisional at 0.97 / 0.875.** Pooled it has 93 pairs and 0 duplicates. With 9 permitted feeds (about 55 articles a day, mostly BBC) it can't reach 100 pairs and 10 duplicates. Identical BBC items are caught earlier by URL and fingerprint anyway.
+
+**Effect in the replay:** clustered inserts fell from 4,996 to 1,357, and stories rose to 13,065 for the same 14,400 articles. The cost is that big evolving stories can split into several clusters (the Pope's surgery appeared as three trending entries on 2026-10-13). P3's 2-per-story feed rule and MMR diversity must therefore also treat near-identical *stories* as one, not only shared cluster ids.
+
+**2a review, recorded:** the 2a labels (291 pairs) were LLM-labeled and spot-checked by a second, independent LLM session, approved by the owner. All 30 sampled labels held, and 14/14 sampled pairs at or above their τ_story at the time were correct.

@@ -49,9 +49,16 @@ Credit: GDELT data comes from **the GDELT Project, https://www.gdeltproject.org*
 - **The domain lookup is 2015–2021** and estimates an outlet's country from what it mentions most. It misplaces international outlets (overrides fix the known ones) and doesn't know newer outlets.
 - **Titles only for GDELT.** Embeddings from titles cost the ranking model about 2% nDCG@10 relative (ADR 0007).
 
-**Retention**
+**Steady state** (3-day replay, 2026-10-12 → 10-15; `docs/learn/data/02-replay.json`)
+- About 4,800 GDELT articles a day (the per-run cap of 50 always binds) and about 55 from RSS: **GDELT is ~99% of volume**.
+- Stored outlets are 49% US / 51% non-US.
+- Topics: world 20%, business 14%, us 10%, sports 8%, entertainment 8%, the rest 4–6% each.
+- Press releases removed before ranking: 1.1% of GDELT records (press-wire domains and PR-shaped titles).
+- Live topic accuracy: 0.79 (95% CI 0.70–0.88), from LLM-labeled samples spot-checked by a second, independent LLM session and approved by the owner (`docs/learn/data/02-topic-audit-2b.json`).
+
+**Retention** (runs at the end of every ingestion run)
 - Articles: 14 days.
 - `story_coverage`: 48 h (trending looks at 24 h).
 - `ingestion_runs`: 30 days.
 
-Retention runs in Phase 2b.
+This comes to about 227 MB at steady state, within the 400 MB budget.

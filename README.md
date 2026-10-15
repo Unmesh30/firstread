@@ -64,7 +64,7 @@ Results and the evaluation protocol: [ml/reports/](ml/reports/), [ADR 0003](docs
 The trained models are released as ONNX at **[Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models)**. Current release: [`v0.2.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.2.0) (adds the 13-topic classifier; the user encoder is byte-identical to [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0)).
 
 - **What's in it:** the NRMS-lite user encoder and the topic classifier ([ADR 0006](docs/adr/0006-topic-taxonomy-and-classifier.md)), plus a SHA256 `manifest.json` and a [model card](docs/model-card.md).
-- **Headlines without summaries:** the topic classifier scores accuracy 0.7184 from titles alone (0.7346 with abstracts), and title-only ranking costs the user encoder 2.1% relative nDCG@10.
+- **Headlines without summaries:** title-only ranking costs the user encoder 2.1% relative nDCG@10 (MIND-small dev). On live news at steady state the topic classifier is **0.79 accurate** (95% CI 0.70–0.88; LLM-labeled samples spot-checked by a second, independent LLM session, approved by the owner; [learn chapter 02](docs/learn/02-live-ingestion.md)).
 - **License:** the weights are MIND-derived and **non-commercial**, under the [MSR License Terms](https://github.com/msnews/MIND/blob/master/MSR%20License_Data.pdf), not MIT.
 - **Latency:** ONNX Runtime on one CPU thread (Apple M4) encodes a 50-click history in 0.17 ms p50.
 

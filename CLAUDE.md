@@ -44,6 +44,7 @@ Also:
 
 ## Gotchas
 - Supabase pooler in transaction mode (port 6543) breaks prepared statements: use asyncpg with `statement_cache_size=0`.
+- Run migrations over the direct/session connection (port 5432), never the 6543 transaction pooler: the runner's session advisory lock can't be released reliably through it (the runner refuses 6543).
 - Expo web on GitHub Pages needs `experiments.baseUrl` = `/firstread` and a `.nojekyll` file.
 - Expo `web.output: "static"` pre-renders routes in Node at build time, so never touch `window`/`localStorage`/`AsyncStorage` at module import time; access them only inside effects or behind platform checks.
 - GitHub scheduled workflows can run late, and are disabled after 60 days without repo activity.

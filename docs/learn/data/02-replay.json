@@ -1,0 +1,744 @@
+{
+ "window": {
+  "first": "20261012023000",
+  "last": "20261015021500",
+  "slots": 288,
+  "days": 4
+ },
+ "downloads": {
+  "missing": [],
+  "failed": []
+ },
+ "totals": {
+  "inserted": 14400,
+  "duplicates": 80092,
+  "near_duplicates": 4293,
+  "clustered": 1357,
+  "errors": 0,
+  "redis_commands": 8640
+ },
+ "redis_commands_per_run": {
+  "max": 30,
+  "mean": 30.0
+ },
+ "statuses": {
+  "ok": 288
+ },
+ "missing_or_pending_files": 28,
+ "press_releases": {
+  "press_wire_domain": 3444,
+  "announcement_titles": 366,
+  "by_pattern": {
+   "results_period_year": 175,
+   "company_prefix": 92,
+   "call_announced": 60,
+   "dividend_declared": 16,
+   "financial_results": 15,
+   "dividend_change": 4,
+   "call_and_webcast": 4
+  },
+  "gdelt_records": 344711,
+  "share_of_gdelt_records": 0.0111
+ },
+ "trending_days": {
+  "2026-10-12": [
+   {
+    "topic": "entertainment",
+    "domains": 212,
+    "score": 178.784,
+    "top_domains": [
+     "variety.com",
+     "deadline.com",
+     "bnonews.com",
+     "pagesix.com",
+     "smh.com.au"
+    ]
+   },
+   {
+    "topic": "us",
+    "domains": 162,
+    "score": 125.821,
+    "top_domains": [
+     "times-standard.com",
+     "mcall.com",
+     "standardspeaker.com",
+     "greeleytribune.com",
+     "wdtimes.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 249,
+    "score": 93.315,
+    "top_domains": [
+     "worcesternews.co.uk",
+     "southwalesargus.co.uk",
+     "wiltsglosstandard.co.uk",
+     "wdtimes.com",
+     "dunmowbroadcast.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 150,
+    "score": 92.621,
+    "top_domains": [
+     "surreycomet.co.uk",
+     "leaderlive.co.uk",
+     "freepressseries.co.uk",
+     "penarthtimes.co.uk",
+     "basingstokegazette.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 148,
+    "score": 87.368,
+    "top_domains": [
+     "somersetcountygazette.co.uk",
+     "thisiswiltshire.co.uk",
+     "halesowennews.co.uk",
+     "surreycomet.co.uk",
+     "islingtongazette.co.uk"
+    ]
+   },
+   {
+    "topic": "lifestyle",
+    "domains": 104,
+    "score": 86.363,
+    "top_domains": [
+     "sthelensstar.co.uk",
+     "harrowtimes.co.uk",
+     "falmouthpacket.co.uk",
+     "penarthtimes.co.uk",
+     "peeblesshirenews.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 138,
+    "score": 83.122,
+    "top_domains": [
+     "wsls.com",
+     "aawsat.com",
+     "kdhnews.com",
+     "sitkasentinel.com",
+     "thepeterboroughexaminer.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 143,
+    "score": 79.039,
+    "top_domains": [
+     "clactonandfrintongazette.co.uk",
+     "yourlocalguardian.co.uk",
+     "watfordobserver.co.uk",
+     "keighleynews.co.uk",
+     "newhamrecorder.co.uk"
+    ]
+   },
+   {
+    "topic": "us",
+    "domains": 86,
+    "score": 75.377,
+    "top_domains": [
+     "toronto.citynews.ca",
+     "wsls.com",
+     "medicinehatnews.com",
+     "manilatimes.net",
+     "mymotherlode.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 143,
+    "score": 72.209,
+    "top_domains": [
+     "eastlothiancourier.com",
+     "sloughobserver.co.uk",
+     "northwaleschronicle.co.uk",
+     "whtimes.co.uk",
+     "readingchronicle.co.uk"
+    ]
+   }
+  ],
+  "2026-10-13": [
+   {
+    "topic": "world",
+    "domains": 208,
+    "score": 151.377,
+    "top_domains": [
+     "whtimes.co.uk",
+     "halsteadgazette.co.uk",
+     "wiltsglosstandard.co.uk",
+     "hngnews.com",
+     "leaderlive.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 137,
+    "score": 117.15,
+    "top_domains": [
+     "fox32chicago.com",
+     "nebraska.tv",
+     "newschannel9.com",
+     "actionnewsjax.com",
+     "ktul.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 170,
+    "score": 105.804,
+    "top_domains": [
+     "tivysideadvertiser.co.uk",
+     "reflector.com",
+     "heraldseries.co.uk",
+     "rockymounttelegram.com",
+     "cotswoldjournal.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 136,
+    "score": 103.228,
+    "top_domains": [
+     "hampshirechronicle.co.uk",
+     "somersetcountygazette.co.uk",
+     "sthelensstar.co.uk",
+     "wirralglobe.co.uk",
+     "goskagit.com"
+    ]
+   },
+   {
+    "topic": "entertainment",
+    "domains": 89,
+    "score": 76.433,
+    "top_domains": [
+     "northwichguardian.co.uk",
+     "newarkadvertiser.co.uk",
+     "chesterstandard.co.uk",
+     "oxfordmail.co.uk",
+     "standard.co.uk"
+    ]
+   },
+   {
+    "topic": "business",
+    "domains": 89,
+    "score": 72.242,
+    "top_domains": [
+     "goskagit.com",
+     "wsls.com",
+     "orovillemr.com",
+     "news4jax.com",
+     "dailylocal.com"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 72,
+    "score": 63.416,
+    "top_domains": [
+     "keighleynews.co.uk",
+     "ealingtimes.co.uk",
+     "hertsad.co.uk",
+     "surreycomet.co.uk",
+     "thenorthernecho.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 113,
+    "score": 63.226,
+    "top_domains": [
+     "standard.co.uk",
+     "aol.co.uk",
+     "newarkadvertiser.co.uk",
+     "darlingtonandstocktontimes.co.uk",
+     "watfordobserver.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 68,
+    "score": 60.976,
+    "top_domains": [
+     "readingchronicle.co.uk",
+     "oxfordmail.co.uk",
+     "wandsworthguardian.co.uk",
+     "aol.co.uk",
+     "surreycomet.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 65,
+    "score": 59.219,
+    "top_domains": [
+     "burytimes.co.uk",
+     "yourlocalguardian.co.uk",
+     "dunfermlinepress.com",
+     "midweekherald.co.uk",
+     "braintreeandwithamtimes.co.uk"
+    ]
+   }
+  ],
+  "2026-10-14": [
+   {
+    "topic": "world",
+    "domains": 134,
+    "score": 100.858,
+    "top_domains": [
+     "chesterstandard.co.uk",
+     "newsandstar.co.uk",
+     "salisburyjournal.co.uk",
+     "thetottenhamindependent.co.uk",
+     "heraldseries.co.uk"
+    ]
+   },
+   {
+    "topic": "entertainment",
+    "domains": 116,
+    "score": 92.001,
+    "top_domains": [
+     "hamhigh.co.uk",
+     "stourbridgenews.co.uk",
+     "wirralglobe.co.uk",
+     "oxfordmail.co.uk",
+     "sthelensstar.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 169,
+    "score": 89.978,
+    "top_domains": [
+     "milfordmercury.co.uk",
+     "rhyljournal.co.uk",
+     "ludlowadvertiser.co.uk",
+     "herefordtimes.com",
+     "burytimes.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 153,
+    "score": 81.808,
+    "top_domains": [
+     "newarkadvertiser.co.uk",
+     "freepressseries.co.uk",
+     "wirralglobe.co.uk",
+     "redditchadvertiser.co.uk",
+     "thisisoxfordshire.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 147,
+    "score": 73.26,
+    "top_domains": [
+     "basingstokegazette.co.uk",
+     "standard.co.uk",
+     "thisiswiltshire.co.uk",
+     "oxfordmail.co.uk",
+     "eastlothiancourier.com"
+    ]
+   },
+   {
+    "topic": "sports",
+    "domains": 138,
+    "score": 69.03,
+    "top_domains": [
+     "basingstokegazette.co.uk",
+     "yorkpress.co.uk",
+     "oxfordmail.co.uk",
+     "huntspost.co.uk",
+     "standard.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 146,
+    "score": 68.044,
+    "top_domains": [
+     "tivysideadvertiser.co.uk",
+     "thenorthernecho.co.uk",
+     "thewestonmercury.co.uk",
+     "penarthtimes.co.uk",
+     "gazetteseries.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 70,
+    "score": 61.648,
+    "top_domains": [
+     "oxfordmail.co.uk",
+     "southwalesargus.co.uk",
+     "yourlocalguardian.co.uk",
+     "rutland-times.co.uk",
+     "dailyecho.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 128,
+    "score": 59.763,
+    "top_domains": [
+     "warringtonguardian.co.uk",
+     "wimbledonguardian.co.uk",
+     "whtimes.co.uk",
+     "stroudnewsandjournal.co.uk",
+     "thetelegraphandargus.co.uk"
+    ]
+   },
+   {
+    "topic": "business",
+    "domains": 124,
+    "score": 59.085,
+    "top_domains": [
+     "brandonsun.com",
+     "wokv.com",
+     "winnipegfreepress.com",
+     "timescall.com",
+     "telegraphherald.com"
+    ]
+   }
+  ],
+  "2026-10-15": [
+   {
+    "topic": "world",
+    "domains": 143,
+    "score": 106.509,
+    "top_domains": [
+     "oxfordmail.co.uk",
+     "southwalesargus.co.uk",
+     "yourlocalguardian.co.uk",
+     "rutland-times.co.uk",
+     "dailyecho.co.uk"
+    ]
+   },
+   {
+    "topic": "entertainment",
+    "domains": 151,
+    "score": 96.419,
+    "top_domains": [
+     "sthelensstar.co.uk",
+     "hamhigh.co.uk",
+     "stourbridgenews.co.uk",
+     "wirralglobe.co.uk",
+     "oxfordmail.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 148,
+    "score": 86.211,
+    "top_domains": [
+     "heraldseries.co.uk",
+     "chesterstandard.co.uk",
+     "newsandstar.co.uk",
+     "salisburyjournal.co.uk",
+     "thetottenhamindependent.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 143,
+    "score": 72.618,
+    "top_domains": [
+     "surreycomet.co.uk",
+     "redditchadvertiser.co.uk",
+     "peeblesshirenews.com",
+     "barryanddistrictnews.co.uk",
+     "eadt.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 171,
+    "score": 69.148,
+    "top_domains": [
+     "milfordmercury.co.uk",
+     "rhyljournal.co.uk",
+     "ludlowadvertiser.co.uk",
+     "herefordtimes.com",
+     "burytimes.co.uk"
+    ]
+   },
+   {
+    "topic": "travel",
+    "domains": 95,
+    "score": 65.406,
+    "top_domains": [
+     "mynspr.org",
+     "kazu.org",
+     "kwbu.org",
+     "wxxinews.org",
+     "ksmu.org"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 153,
+    "score": 61.287,
+    "top_domains": [
+     "newarkadvertiser.co.uk",
+     "freepressseries.co.uk",
+     "wirralglobe.co.uk",
+     "redditchadvertiser.co.uk",
+     "thisisoxfordshire.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 147,
+    "score": 54.883,
+    "top_domains": [
+     "basingstokegazette.co.uk",
+     "standard.co.uk",
+     "thisiswiltshire.co.uk",
+     "oxfordmail.co.uk",
+     "eastlothiancourier.com"
+    ]
+   },
+   {
+    "topic": "sports",
+    "domains": 138,
+    "score": 51.714,
+    "top_domains": [
+     "basingstokegazette.co.uk",
+     "yorkpress.co.uk",
+     "oxfordmail.co.uk",
+     "huntspost.co.uk",
+     "standard.co.uk"
+    ]
+   },
+   {
+    "topic": "world",
+    "domains": 146,
+    "score": 50.975,
+    "top_domains": [
+     "tivysideadvertiser.co.uk",
+     "thenorthernecho.co.uk",
+     "thewestonmercury.co.uk",
+     "penarthtimes.co.uk",
+     "gazetteseries.co.uk"
+    ]
+   }
+  ]
+ },
+ "final": {
+  "zcard": {
+   "pool:fresh": 500,
+   "pool:trending": 200,
+   "pool:topic:us": 300,
+   "pool:topic:world": 300,
+   "pool:topic:politics": 300,
+   "pool:topic:business": 300,
+   "pool:topic:tech_science": 300,
+   "pool:topic:health": 300,
+   "pool:topic:sports": 300,
+   "pool:topic:entertainment": 300,
+   "pool:topic:lifestyle": 300,
+   "pool:topic:food_drink": 300,
+   "pool:topic:travel": 300,
+   "pool:topic:autos": 300,
+   "pool:topic:weather": 300
+  },
+  "sizes": {
+   "articles": 14400,
+   "heap": 22609920,
+   "indexes": 22749184,
+   "hnsw": 16867328,
+   "total": 45400064,
+   "coverage": 13033472,
+   "coverage_rows": 63782,
+   "database": 67573427
+  },
+  "mix": [
+   {
+    "category": "world",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 2574
+   },
+   {
+    "category": "health",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 353
+   },
+   {
+    "category": "tech_science",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 562
+   },
+   {
+    "category": "lifestyle",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 311
+   },
+   {
+    "category": "autos",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 356
+   },
+   {
+    "category": "weather",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 241
+   },
+   {
+    "category": "travel",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 388
+   },
+   {
+    "category": "entertainment",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 628
+   },
+   {
+    "category": "autos",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 241
+   },
+   {
+    "category": "food_drink",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 323
+   },
+   {
+    "category": "travel",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 383
+   },
+   {
+    "category": "politics",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 763
+   },
+   {
+    "category": "sports",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 744
+   },
+   {
+    "category": "business",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 798
+   },
+   {
+    "category": "weather",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 367
+   },
+   {
+    "category": "sports",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 449
+   },
+   {
+    "category": "lifestyle",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 419
+   },
+   {
+    "category": "us",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 1445
+   },
+   {
+    "category": "business",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 1240
+   },
+   {
+    "category": "tech_science",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 345
+   },
+   {
+    "category": "health",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 319
+   },
+   {
+    "category": "world",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 357
+   },
+   {
+    "category": "entertainment",
+    "origin": "gdelt",
+    "geo": "intl",
+    "n": 463
+   },
+   {
+    "category": "food_drink",
+    "origin": "gdelt",
+    "geo": "us",
+    "n": 331
+   }
+  ]
+ },
+ "rss_estimate": {
+  "measured_at": "2026-10-15T04:03:52+00:00",
+  "items_72h_after_dedupe": 166,
+  "per_day": 55.3,
+  "topics": {
+   "tech_science": 41,
+   "business": 10,
+   "us": 2,
+   "health": 19,
+   "world": 29,
+   "entertainment": 12,
+   "food_drink": 1,
+   "sports": 49,
+   "lifestyle": 2,
+   "weather": 1
+  },
+  "note": "RSS feeds expose only their current items, so this is an estimate from one fetch: items published in the last 72 h, deduped, divided by 3."
+ },
+ "size_estimate": {
+  "bytes_per_article": 3153,
+  "heap_per_article": 1570,
+  "indexes_per_article": 1580,
+  "hnsw_per_article": 1171,
+  "coverage_bytes_48h": 13033472,
+  "budget_mb": 400,
+  "gdelt_only": {
+   "articles_per_day": 4800,
+   "mb_14_days": 224.9,
+   "within_budget": true
+  },
+  "with_rss": {
+   "articles_per_day": 4855,
+   "mb_14_days": 227.3,
+   "within_budget": true
+  }
+ }
+}

@@ -193,7 +193,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor.
 - **`demo_personas`**, **`persona_articles`**: persona definitions built from live articles.
 - **RLS on every table** (ADR 0008): articles are public-read; profiles and events are owner-only; all service tables have no policy. Services use a dedicated DB role (P5).
-- **Retention:** articles 14 days, events 30 days. Target DB size < 400 MB.
+- **Retention:** articles 14 days, `story_coverage` 48 h, `ingestion_runs` 30 days, events 30 days (P3). Target DB size < 400 MB; measured steady state ≈ 227 MB (3-day replay, ADR 0008). P3 must keep clicked articles' vectors beyond 14 days for user histories.
 
 ### Redis keys
 
@@ -224,7 +224,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 |---|---|
 | Feed latency, local Docker stack | p95 ≤ 150 ms server time at 100 RPS |
 | Feed latency, Cloud Run | warm p95 ≤ 300 ms end-to-end; cold start ≤ 5 s |
-| Freshness | median ≤ 30 min from GDELT "seen" to recommendable |
+| Freshness | median ≤ 30 min from GDELT "seen" to recommendable (GKG files land ~15 min after their slot and runs are every 15 min, so this is tight; measured in P5) |
 | Ingestion | ≥ 2,000 new English articles/day; ≥ 99% successful runs |
 | Errors | < 1% 5xx |
 | Quality | beat the best baseline on nDCG@10 overall **and** on the cold-start slice |
@@ -261,7 +261,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - `ci.yml` — PRs and main: lint, typecheck, tests, docker build.
 - `deploy-api.yml` — main: build → Artifact Registry → Cloud Run; keyless auth via Workload Identity Federation; smoke test.
 - `deploy-web.yml` — main: `expo export -p web` → GitHub Pages.
-- `ingest.yml` — cron `*/15 * * * *` + manual dispatch; concurrency group so runs never overlap.
+- `ingest.yml` — manual dispatch now (`dry_run` defaults to true); the `*/15 * * * *` schedule is enabled in P5 together with the database and Redis secrets; concurrency group so runs never overlap; caches the models and the pinned GDELT domain lookup.
 - `codeql.yml`, plus Dependabot.
 
 **Conventions:** protected `main`; branch per phase (`phase-N-name`); PRs; Conventional Commits; release tags `v0.x`.
