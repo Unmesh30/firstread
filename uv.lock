@@ -604,6 +604,7 @@ dependencies = [
     { name = "pgvector" },
     { name = "pydantic-settings" },
     { name = "pyyaml" },
+    { name = "redis" },
     { name = "structlog" },
 ]
 
@@ -617,6 +618,7 @@ requires-dist = [
     { name = "pgvector", specifier = "==0.5.1" },
     { name = "pydantic-settings", specifier = ">=2.15.0" },
     { name = "pyyaml", specifier = ">=6.0.3" },
+    { name = "redis", specifier = "==8.1.0" },
     { name = "structlog", specifier = ">=26.1.0" },
 ]
 

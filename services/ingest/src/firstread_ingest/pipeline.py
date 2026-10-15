@@ -23,7 +23,7 @@ from numpy.typing import NDArray
 
 from firstread_core.embedding import EMBED_MODEL, Embedder, embedding_cache_key
 from firstread_core.topics import TopicDecision, resolve_topic
-from firstread_ingest import store
+from firstread_ingest import pools, store
 from firstread_ingest.config import Feed, Settings, load_feeds
 from firstread_ingest.dedupe import VALIDATED_BY_PAIR, Decision, Item, Recent, Thresholds, decide
 from firstread_ingest.http import make_client
@@ -62,6 +62,8 @@ class RunSummary:
     origins: Counter[str] = field(default_factory=Counter)
     text_sources: Counter[str] = field(default_factory=Counter)
     gdelt: dict[str, Any] = field(default_factory=dict)
+    redis_commands: int = 0
+    pools: dict[str, int] = field(default_factory=dict)
     retention: dict[str, int] = field(default_factory=dict)
     size: dict[str, int] = field(default_factory=dict)
     size_warning: bool = False
@@ -80,6 +82,7 @@ class RunSummary:
             "clustered": self.clustered,
             "errors": self.errors,
             "gdelt_calls": self.gdelt_calls,
+            "redis_commands": self.redis_commands,
             "status": self.status,
             "window_start": self.window_start,
             "window_end": self.window_end,
@@ -93,6 +96,7 @@ class RunSummary:
                 "origins": dict(self.origins),
                 "text_sources": dict(self.text_sources),
                 "gdelt": self.gdelt,
+                "pools": self.pools,
                 "retention": self.retention,
                 "size": self.size,
                 "size_warning": self.size_warning,
@@ -199,6 +203,7 @@ async def run(
     now: datetime | None = None,
     client: Any = None,
     conn: Any = None,
+    redis: Any = None,
 ) -> RunSummary:
     now = now or datetime.now(UTC)
     summary = RunSummary(started_at=now, model_version=classifier.version)
@@ -216,6 +221,8 @@ async def run(
         summary = await _run(
             settings, classifier, embed, sources, feeds, places, conn, now, client, summary
         )
+        if conn is not None:
+            await _update_pools(settings, conn, redis, now, summary)
     except Exception as exc:
         summary.status = "failed"
         summary.feed_errors["_run"] = f"{type(exc).__name__}: {exc}"[:300]
@@ -227,6 +234,29 @@ async def run(
         if owns_conn and conn is not None:
             await conn.close()
     return summary
+
+
+async def _update_pools(
+    settings: Settings, conn: Any, redis: Any, now: datetime, summary: RunSummary
+) -> None:
+    """Rebuild the Redis pools from Postgres. A Redis failure makes the run partial;
+    Postgres stays the source of truth and the next run rebuilds everything."""
+    owns = redis is None
+    try:
+        if owns:
+            from redis.asyncio import Redis
+
+            redis = Redis.from_url(settings.redis_url.get_secret_value())
+        result = await pools.rebuild(redis, conn, now, summary.topics.keys())
+        summary.redis_commands = result.commands
+        summary.pools = result.sizes
+    except Exception as exc:
+        summary.feed_errors["_redis"] = f"{type(exc).__name__}: {exc}"[:300]
+        summary.errors += 1
+        summary.status = "partial"
+    finally:
+        if owns and redis is not None:
+            await redis.aclose()
 
 
 async def _fetch(
@@ -246,7 +276,7 @@ async def _fetch(
         old_states = await store.load_feed_states(conn) if conn is not None else {}
         feed_list = list(feeds) if feeds is not None else load_feeds()
         results = await rss.fetch_all(
-            client, feed_list, old_states, settings.ingest_rss_concurrency
+            client, feed_list, old_states, settings.ingest_rss_concurrency, now
         )
         for r in results:
             states[r.feed.id] = r.state

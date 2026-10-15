@@ -137,6 +137,7 @@ async def fetch_all(
     feeds: Sequence[Feed],
     states: dict[str, FeedState],
     concurrency: int = 8,
+    now: datetime | None = None,
 ) -> list[FeedResult]:
     """Fetch every feed; same-host feeds run sequentially, at most ``concurrency`` hosts at once."""
     by_host: dict[str, list[Feed]] = defaultdict(list)
@@ -148,7 +149,7 @@ async def fetch_all(
         out = []
         async with sem:
             for f in group:
-                out.append(await fetch_feed(client, f, states.get(f.id, FeedState())))
+                out.append(await fetch_feed(client, f, states.get(f.id, FeedState()), now))
         return out
 
     groups = await asyncio.gather(*(host_worker(g) for g in by_host.values()))

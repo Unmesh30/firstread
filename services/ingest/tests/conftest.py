@@ -5,5 +5,6 @@ from firstread_ingest.testing import (  # noqa: F401
     fake_embed,
     no_network,
     places,
+    redis_test,
     release_dir,
 )

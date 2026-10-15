@@ -2,6 +2,7 @@
 
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from typing import Any
 
 import httpx
 import pytest
@@ -76,7 +77,10 @@ async def test_stale_items_are_dropped(
 
 @pytest.mark.integration
 async def test_second_run_over_the_same_items_inserts_nothing(
-    no_network: respx.MockRouter, classifier: TopicClassifier, fake_embed: EmbedFn
+    no_network: respx.MockRouter,
+    classifier: TopicClassifier,
+    fake_embed: EmbedFn,
+    redis_test: Any,
 ) -> None:
     await skip_or_fail_if_unreachable_async()
     mock_feeds(no_network)
@@ -86,11 +90,13 @@ async def test_second_run_over_the_same_items_inserts_nothing(
             await apply_migrations(conn, MIGRATIONS)
             first = await run(
                 settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS, conn=conn,
+                redis=redis_test,
                 now=NOW,
             )  # fmt: skip
             assert first.inserted > 0
+            later = NOW + timedelta(minutes=15)
             second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS,
-                               conn=conn, now=NOW + timedelta(minutes=15))  # fmt: skip
+                               conn=conn, redis=redis_test, now=later)  # fmt: skip
             assert second.inserted == 0
             assert (
                 second.duplicates + second.near_duplicates
@@ -143,6 +149,7 @@ async def test_rss_and_gdelt_together_with_cursor_and_coverage(
     classifier: TopicClassifier,
     fake_embed: EmbedFn,
     places: DomainCountries,
+    redis_test: Any,
 ) -> None:
     await skip_or_fail_if_unreachable_async()
     mock_feeds(no_network)
@@ -153,11 +160,14 @@ async def test_rss_and_gdelt_together_with_cursor_and_coverage(
         try:
             await apply_migrations(conn, MIGRATIONS)
             first = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS,
-                              places=places, conn=conn, now=now)  # fmt: skip
+                              places=places, conn=conn, redis=redis_test, now=now)  # fmt: skip
             assert first.origins["gdelt"] == 8  # 11 records - 2 blocked - 1 unplaced
             assert first.origins["rss"] > 0
             assert first.gdelt["dropped"] == {"blocked_domain": 2, "unplaced_domain": 1}
             assert first.gdelt["selected"] == 8
+            assert 0 < first.redis_commands <= 30
+            assert first.pools["pool:fresh"] == first.inserted
+            assert await redis_test.zcard("pool:fresh") == first.inserted
             assert not first.gdelt["stale"]
             cursor = await conn.fetchval(
                 "select cursor from public.source_cursor where source = 'gdelt-gkg'"
@@ -177,7 +187,7 @@ async def test_rss_and_gdelt_together_with_cursor_and_coverage(
             assert geo["jpost.com"] == "intl"
             later = now + timedelta(minutes=5)
             second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS,
-                               places=places, conn=conn, now=later)  # fmt: skip
+                               places=places, conn=conn, redis=redis_test, now=later)  # fmt: skip
             assert second.inserted == 0  # the retried slots only hold duplicates now
             assert second.gdelt["files"][0]["slot"] == gkg.slot_name(
                 GKG_SLOT - timedelta(minutes=90)
