@@ -99,7 +99,11 @@ async def test_fetch_filters_places_and_requests_fresh_lastupdate(
     # 404s beyond the 2 h catch-up horizon count as skipped; younger ones are pending,
     # so the cursor holds at 17:00 and the next run retries 17:15 onwards.
     assert r.cursor == LATEST - timedelta(minutes=105)
-    assert r.summary()["top_domains"]["iheart.com"] == 1
+    top = r.summary()["top_domains"]
+    assert "iheart.com" not in top  # blocked outlets don't crowd the list
+    assert "no-such-outlet-firstread.example" not in top  # nor unplaceable ones
+    assert top["wisn.com"] == 1
+    assert sum(top.values()) == len(r.items)
 
 
 async def test_catch_up_from_cursor_and_staleness(
@@ -196,3 +200,10 @@ def test_repo_press_wire_list_includes_the_spot_check_domains() -> None:
 
     wires = load_press_wires()
     assert {"finanznachrichten.de", "equitybulls.com", "prnewswire.com"} <= wires
+
+
+def test_court_records_database_is_blocked() -> None:
+    from firstread_ingest.sources.gdelt_domains import load_config
+
+    _, blocklist = load_config()
+    assert "indiankanoon.org" in blocklist

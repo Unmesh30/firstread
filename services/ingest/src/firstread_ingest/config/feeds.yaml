@@ -597,7 +597,11 @@ feeds:
     region: US
     geo: us
     topic_hint: weather
-    enabled: true
+    # Permission is fine, but the site answers HTTP 403 to GitHub-hosted runners (works
+    # from a home IP). Ingestion runs on GitHub Actions in P5 too, and a feed that fails
+    # every run would make every run partial and hide real problems. Weather stays
+    # covered by the GDELT topic floor.
+    enabled: false  # HTTP 403 from GitHub-hosted runners; works from a home IP
     allow_images: false  # CC BY-NC-ND covers text only; images are licensed
     terms_checked: true
     terms: website_with_attribution

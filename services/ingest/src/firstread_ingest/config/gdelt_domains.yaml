@@ -34,6 +34,8 @@ blocklist:
   - marketbeat.com
   # Syndicated copies of wire and local stories across radio-station sites (9% of a file).
   - iheart.com
+  # A court-records database, not news (templated "X vs The State Of Y on <date>" titles).
+  - indiankanoon.org
 press_wires:
   - prnewswire.com          # PR Newswire
   - globenewswire.com       # GlobeNewswire
