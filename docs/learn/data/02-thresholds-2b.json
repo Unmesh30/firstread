@@ -1,0 +1,139 @@
+{
+ "target_precision": 0.95,
+ "min_bin": 3,
+ "types": {
+  "title-title": {
+   "n": 144,
+   "bins": {
+    "0.700": {
+     "different": 11,
+     "same_story": 1
+    },
+    "0.725": {
+     "same_story": 3,
+     "different": 9
+    },
+    "0.750": {
+     "different": 8,
+     "same_story": 4
+    },
+    "0.775": {
+     "same_story": 7,
+     "different": 5
+    },
+    "0.800": {
+     "same_story": 9,
+     "different": 3
+    },
+    "0.825": {
+     "different": 3,
+     "same_story": 9
+    },
+    "0.850": {
+     "same_story": 11,
+     "different": 1
+    },
+    "0.875": {
+     "same_story": 10,
+     "different": 2
+    },
+    "0.900": {
+     "different": 1,
+     "same_story": 10,
+     "duplicate": 1
+    },
+    "0.925": {
+     "same_story": 7,
+     "duplicate": 5
+    },
+    "0.950": {
+     "duplicate": 8,
+     "same_story": 4
+    },
+    "0.975": {
+     "duplicate": 12
+    }
+   },
+   "tau_story": 0.925,
+   "tau_dup": 0.975
+  },
+  "title-title_summary": {
+   "n": 87,
+   "bins": {
+    "0.700": {
+     "same_story": 7,
+     "different": 5
+    },
+    "0.725": {
+     "same_story": 7,
+     "different": 5
+    },
+    "0.750": {
+     "same_story": 11,
+     "different": 1
+    },
+    "0.775": {
+     "same_story": 12
+    },
+    "0.800": {
+     "same_story": 12
+    },
+    "0.825": {
+     "same_story": 12
+    },
+    "0.850": {
+     "same_story": 7
+    },
+    "0.875": {
+     "same_story": 5
+    },
+    "0.900": {
+     "same_story": 3
+    }
+   },
+   "tau_story": 0.775,
+   "tau_dup": null
+  },
+  "title_summary-title_summary": {
+   "n": 42,
+   "bins": {
+    "0.700": {
+     "different": 8,
+     "same_story": 4
+    },
+    "0.725": {
+     "different": 10,
+     "same_story": 2
+    },
+    "0.750": {
+     "same_story": 2,
+     "different": 3
+    },
+    "0.775": {
+     "same_story": 5,
+     "different": 1
+    },
+    "0.800": {
+     "same_story": 1
+    },
+    "0.825": {
+     "same_story": 2
+    },
+    "0.850": {
+     "same_story": 1
+    },
+    "0.875": {
+     "same_story": 1
+    },
+    "0.900": {
+     "same_story": 1
+    },
+    "0.950": {
+     "same_story": 1
+    }
+   },
+   "tau_story": 0.8,
+   "tau_dup": 0.8
+  }
+ }
+}

@@ -39,23 +39,26 @@ def pair_type(a: TextSource, b: TextSource) -> PairType:
     return (a, b) if a <= b else (b, a)  # order-free
 
 
-# Validated on 291 hand-labelled live pairs, 2026-10-14 (score_pairs.py, ADR 0009).
-# Per pair type: (tau_dup, tau_story). Every cosine bin at or above a threshold had
-# >= 95% precision; where the sample was thin or dominated by a few big stories, the
-# value was raised (never lowered) from what the data allowed.
+# Per pair type: (tau_dup, tau_story). A threshold is accepted when every cosine bin at or
+# above it has >= 95% precision (score_pairs.py, ADR 0009). Values are only ever raised.
+#  - GDELT-GDELT: validated on the 2b re-check (144 LLM-labeled pairs, 26 duplicates,
+#    per-story-capped sample from 3 replayed days). tau_story rose 0.875 -> 0.925:
+#    templated headlines ("<State> Midterm Elections 2026: Key Races...", court case
+#    listings) sit at 0.85-0.92 without being the same story.
+#  - GDELT-RSS and RSS-RSS: PROVISIONAL. Neither sample reached 100 pairs and 10
+#    duplicates (183 and 93 pairs over 2a+2b, 2 and 0 duplicates); kept stricter than
+#    the data allowed.
 VALIDATED_BY_PAIR: dict[PairType, tuple[float, float]] = {
-    ("title", "title"): (0.975, 0.875),  # GDELT-GDELT: data said 0.975 / 0.875
-    # PROVISIONAL (re-check in 2b): 96 pairs from ~6 big stories, only 2 duplicates.
-    ("title", "title_summary"): (0.95, 0.80),  # GDELT-RSS: data said 0.925 / 0.725
-    # PROVISIONAL (re-check in 2b): 51 pairs, mostly BBC, no duplicates labelled.
-    ("title_summary", "title_summary"): (0.97, 0.875),  # RSS-RSS: data said - / 0.775
+    ("title", "title"): (0.975, 0.925),
+    ("title", "title_summary"): (0.95, 0.80),  # provisional
+    ("title_summary", "title_summary"): (0.97, 0.875),  # provisional
 }
 
 
 @dataclass(frozen=True)
 class Thresholds:
     tau_dup: float = 0.975
-    tau_story: float = 0.875
+    tau_story: float = 0.925
     # Per-pair-type values: {("title", "title_summary"): (tau_dup, tau_story)}.
     by_pair: Mapping[PairType, tuple[float, float]] = field(default_factory=dict)
 
