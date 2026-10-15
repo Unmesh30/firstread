@@ -70,5 +70,11 @@ def test_a_feed_without_explicit_permission_cannot_be_enabled() -> None:
 
 
 def test_text_only_permission_drops_images() -> None:
-    ycc = next(f for f in load_feeds() if f.id == "yale-climate-connections")
+    ycc = next(f for f in load_feeds(enabled_only=False) if f.id == "yale-climate-connections")
     assert not ycc.allow_images
+
+
+def test_feeds_blocked_from_github_runners_are_disabled() -> None:
+    ycc = next(f for f in load_feeds(enabled_only=False) if f.id == "yale-climate-connections")
+    assert not ycc.enabled
+    assert ycc.terms == "website_with_attribution"  # permission is fine; access isn't
