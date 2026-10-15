@@ -214,7 +214,7 @@
   }
  },
  "notes": [
-  "Labels by Claude; owner spot-check pending (20 items).",
+  "LLM-labeled; spot-checked by a second, independent LLM session, approved by the owner (all 20 sampled labels held). Superseded by the steady-state audit (02-topic-audit-2b.json).",
   "One non-English (Spanish) item reached the sample (#35, yaleclimateconnections.org); fixed by a per-item English check."
  ]
 }
