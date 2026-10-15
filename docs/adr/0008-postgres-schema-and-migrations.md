@@ -47,3 +47,28 @@ We also want article embeddings stored compactly: 384 floats per article.
 - P3 queries must qualify pgvector operators with `extensions`.
 - Editing a shipped migration is a hard error. Schema changes are always a new numbered file.
 - P5 adds a service role and grants in a migration that reads no secrets (passwords are set outside SQL).
+
+## Amendment (2026-10-15, Phase 2b): migrations connection, retention, a note for P3
+
+**Migrations use the direct/session connection (port 5432), never the transaction pooler (6543).**
+- The runner holds a **session** advisory lock while it applies files, so two runners can't race.
+- Supabase's transaction-mode pooler hands each transaction to whatever server connection is free. A session lock taken on one backend may not be released by the `pg_advisory_unlock` that runs later on another, so the lock can't be released reliably.
+- `firstread_core.db.check_migration_dsn` refuses port 6543 with a clear error (tested). `firstread-ingest migrate` calls it.
+- Ingestion and the API keep using the pooler for their normal queries, with `statement_cache_size=0`.
+
+**Retention** runs at the end of every ingestion run, in its own transaction, in batches of 5,000 (`store.apply_retention`):
+
+| Table | Kept | Why |
+|---|---|---|
+| `articles` | 14 days | Feed windows are ≤ 72 h; 14 days leaves room for "Why this?" and history, within the 400 MB budget |
+| `story_coverage` | 48 h | Trending looks at 24 h |
+| `ingestion_runs` | 30 days | Operations history |
+| `feed_state` | Feeds still in `feeds.yaml` | Removed feeds' conditional-GET state is dropped |
+
+Each run also records `pg_database_size` and warns above 350 MB (`INGEST_SIZE_WARN_MB`).
+
+**Note for P3:** 14-day retention will delete articles that readers clicked. User histories (`u:{uid}:hist`, NRMS-lite input) need those articles' **vectors** long after the article rows are gone. P3 must keep them, for example by:
+- copying the clicked article's vector (plus id, title and topic for "Why this?") into the user's history store at click time; or
+- exempting clicked articles from retention.
+
+Otherwise a returning reader's history silently shrinks to the last 14 days.
