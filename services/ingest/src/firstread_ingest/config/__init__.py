@@ -43,6 +43,11 @@ class Settings(BaseSettings):
     ingest_fingerprint_window_hours: int = 72
     # Titles with fewer words are dropped.
     ingest_min_title_words: int = 3
+    # Retention (ADR 0008): articles 14 d; story coverage 48 h (trending uses 24 h).
+    ingest_retention_article_days: int = 14
+    ingest_retention_coverage_hours: int = 48
+    ingest_retention_runs_days: int = 30
+    ingest_size_warn_mb: int = 350
     # GDELT GKG files (ADR 0007).
     ingest_gkg_max_files: int = 8  # catch up at most 2 h of 15-minute files per run
     ingest_gkg_stale_minutes: int = 60  # newest file older than this -> "stale" in the summary
