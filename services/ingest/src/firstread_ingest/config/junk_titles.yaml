@@ -30,3 +30,60 @@ media_prefixes:
   - "photos:"
   - "podcast:"
   - "quiz:"
+# Section pages stored as if they were articles: "Health - Carroll Broadcasting Inc.".
+# A title is a section page when one side of a " - " / " | " / " – " split is one of
+# these section names and the other side names an outlet or company (the article's own
+# source, or a short name ending in a company/media word). "Health - New study links
+# sleep to memory" is kept: its other side is a headline, not a name.
+sections:
+  - news
+  - local news
+  - health
+  - business
+  - sports
+  - sport
+  - entertainment
+  - world
+  - world news
+  - us news
+  - politics
+  - opinion
+  - technology
+  - tech
+  - science
+  - lifestyle
+  - weather
+  - travel
+  - food
+  - arts
+  - culture
+  - education
+  - money
+  - obituaries
+  - home
+outlet_words:
+  - inc
+  - llc
+  - ltd
+  - corp
+  - corporation
+  - company
+  - co
+  - group
+  - media
+  - broadcasting
+  - broadcast
+  - network
+  - networks
+  - radio
+  - tv
+  - television
+  - news
+  - newspaper
+  - times
+  - post
+  - herald
+  - journal
+  - gazette
+  - tribune
+  - daily

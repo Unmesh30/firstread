@@ -145,3 +145,25 @@ def test_corporate_announcements_are_dropped(title: str, rule: str) -> None:
 def test_news_about_results_and_calls_is_kept(title: str) -> None:
     out = normalize(replace(BASE, title=title, description=None), NOW)
     assert isinstance(out, Candidate), out
+
+
+@pytest.mark.parametrize(
+    ("title", "source", "domain", "section_page"),
+    [
+        ("Health - Carroll Broadcasting Inc.", "kcim.com", "kcim.com", True),
+        ("Business - Carroll Broadcasting Inc.", "kcim.com", "kcim.com", True),
+        ("Sports | The Daily Herald", "dailyherald.com", "dailyherald.com", True),
+        ("Local News - WISN", "wisn.com", "wisn.com", True),
+        ("Health - New study links sleep to memory", "kcim.com", "kcim.com", False),
+        ("Business - Netflix cuts 1,000 jobs", "x.com", "x.com", False),
+        ("Politics: Senate passes the farm bill", "x.com", "x.com", False),
+    ],
+)
+def test_section_pages_are_dropped(
+    title: str, source: str, domain: str, section_page: bool
+) -> None:
+    out = normalize(
+        replace(BASE, title=title, description=None, source_name=source, source_domain=domain),
+        NOW,
+    )
+    assert (out == "section_page") is section_page, out

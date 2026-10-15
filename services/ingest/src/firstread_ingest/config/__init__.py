@@ -100,6 +100,8 @@ class Feed(BaseModel):
 class JunkTitles(BaseModel):
     whole: frozenset[str]
     media_prefixes: tuple[str, ...]
+    sections: frozenset[str] = frozenset()
+    outlet_words: frozenset[str] = frozenset()
 
 
 def _yaml(path: Path) -> dict[str, Any]:
@@ -134,4 +136,6 @@ def load_junk_titles(path: Path = CONFIG_DIR / "junk_titles.yaml") -> JunkTitles
     return JunkTitles(
         whole=frozenset(data["whole"]),
         media_prefixes=tuple(p.casefold() for p in data["media_prefixes"]),
+        sections=frozenset(data.get("sections") or []),
+        outlet_words=frozenset(data.get("outlet_words") or []),
     )
