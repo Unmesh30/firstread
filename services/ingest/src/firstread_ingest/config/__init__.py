@@ -37,7 +37,7 @@ class Settings(BaseSettings):
     # Dedupe / clustering (ADR 0009): fallback thresholds, plus validated per-pair-type
     # values in dedupe.VALIDATED_BY_PAIR (on unless INGEST_PER_PAIR_THRESHOLDS=false).
     ingest_tau_dup: float = 0.975
-    ingest_tau_story: float = 0.875
+    ingest_tau_story: float = 0.925
     ingest_per_pair_thresholds: bool = True
     ingest_dedupe_window_hours: int = 48
     ingest_fingerprint_window_hours: int = 72

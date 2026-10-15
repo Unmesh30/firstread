@@ -38,8 +38,8 @@ def recent_with(vec: np.ndarray, src: str = "title_summary") -> tuple[Recent, uu
         (0.98, "near_duplicate", "cosine"),
         (0.9751, "near_duplicate", "cosine"),  # float32: exactly 0.975 can round below
         (0.9749, "insert", "same_story"),
-        (0.8751, "insert", "same_story"),
-        (0.8749, "insert", "new_story"),
+        (0.9251, "insert", "same_story"),
+        (0.9249, "insert", "new_story"),
     ],
 )
 def test_threshold_boundaries(cos: float, action: str, reason: str) -> None:
@@ -76,7 +76,7 @@ def test_cluster_continues_across_runs() -> None:
     recent = Recent(
         [first.article_id], [first.cluster_id], ["title_summary"], unit(0)[None, :], {}, {}
     )
-    second = decide([item(2)], at_cos(unit(0), 3, 0.92)[None, :], recent, Thresholds())[0]
+    second = decide([item(2)], at_cos(unit(0), 3, 0.95)[None, :], recent, Thresholds())[0]
     assert second.action == "insert"
     assert second.cluster_id == first.cluster_id
 
@@ -97,6 +97,6 @@ def test_validated_thresholds_are_stricter_where_the_sample_was_thin() -> None:
     gdelt = VALIDATED_BY_PAIR[("title", "title")]
     cross = VALIDATED_BY_PAIR[("title", "title_summary")]
     rss = VALIDATED_BY_PAIR[("title_summary", "title_summary")]
-    assert gdelt == (0.975, 0.875)
+    assert gdelt == (0.975, 0.925)
     assert cross[1] < gdelt[1]  # title-only vs title+summary vectors sit further apart
     assert all(dup > story for dup, story in (gdelt, cross, rss))
