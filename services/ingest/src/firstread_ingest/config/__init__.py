@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Literal
@@ -100,6 +101,17 @@ def _yaml(path: Path) -> dict[str, Any]:
     if not isinstance(data, dict) or data.get("version") != 1:
         raise ValueError(f"{path}: expected a mapping with version: 1")
     return data
+
+
+@lru_cache
+def load_announcement_patterns(
+    path: Path = CONFIG_DIR / "announcement_titles.yaml",
+) -> tuple[tuple[str, re.Pattern[str]], ...]:
+    """(name, compiled regex) for corporate-announcement titles, in file order."""
+    return tuple(
+        (name, re.compile(pattern, re.IGNORECASE))
+        for name, pattern in _yaml(path)["patterns"].items()
+    )
 
 
 def load_feeds(path: Path = CONFIG_DIR / "feeds.yaml", enabled_only: bool = True) -> list[Feed]:

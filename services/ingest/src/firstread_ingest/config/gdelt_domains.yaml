@@ -6,6 +6,10 @@
 #
 # blocklist: domains whose GKG records are auto-generated or syndicated copies, not
 # original reporting. A blocked domain's records are dropped before ranking.
+#
+# press_wires: press-release distribution and republishing sites. Syndicated releases
+# appear on many outlets at once, so they look like broad coverage and would win the
+# breadth ranking and trending. Dropped before ranking, counted as press_wire_domain.
 version: 1
 overrides:
   aljazeera.com: QA        # lookup US (0.36)
@@ -30,3 +34,16 @@ blocklist:
   - marketbeat.com
   # Syndicated copies of wire and local stories across radio-station sites (9% of a file).
   - iheart.com
+press_wires:
+  - prnewswire.com          # PR Newswire
+  - globenewswire.com       # GlobeNewswire
+  - businesswire.com        # Business Wire
+  - accesswire.com          # ACCESSWIRE
+  - einpresswire.com        # EIN Presswire
+  - newsfilecorp.com        # Newsfile
+  - pr-inside.com           # PR-inside (seen in the 2a top-domains log)
+  - finanznachrichten.de    # republishes wire releases (owner spot-check note)
+  - equitybulls.com         # templated corporate results (2a top-domains log)
+  - prweb.com               # PRWeb
+  - newswire.ca             # Cision Canada
+  - openpr.com              # openPR

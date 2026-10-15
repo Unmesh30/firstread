@@ -1,7 +1,7 @@
 """RawItem -> Candidate: clean, filter and prepare the embedding text.
 
 Every drop has a reason, counted in the run summary: ``no_url``, ``non_english``,
-``short_title``, ``junk_title``, ``stale``.
+``short_title``, ``junk_title``, ``press_release:<pattern>``, ``stale``.
 """
 
 from __future__ import annotations
@@ -15,7 +15,7 @@ from datetime import datetime, timedelta
 
 from firstread_core.text import article_text, clean_text, strip_source_suffix, title_fingerprint
 from firstread_core.urls import InvalidURLError, canonicalize_url
-from firstread_ingest.config import JunkTitles, load_junk_titles
+from firstread_ingest.config import JunkTitles, load_announcement_patterns, load_junk_titles
 from firstread_ingest.items import Candidate, RawItem
 
 _WORDS = re.compile(r"[0-9a-z]+")
@@ -49,6 +49,14 @@ def looks_english(text: str) -> bool:
     return not (foreign >= 2 and foreign > en)
 
 
+def announcement(title: str) -> str | None:
+    """The name of the first corporate-announcement pattern the title matches, if any."""
+    for name, pattern in load_announcement_patterns():
+        if pattern.search(title):
+            return name
+    return None
+
+
 def is_junk(title: str, junk: JunkTitles) -> bool:
     """Whole-title matches and media-only prefixes; "Live updates: ..." is kept."""
     if _squash(title) in junk.whole:
@@ -79,6 +87,8 @@ def normalize(
         return "short_title"
     if is_junk(title, junk):
         return "junk_title"
+    if (rule := announcement(title)) is not None:
+        return f"press_release:{rule}"
     published = item.published_at
     if published is not None and published > now + MAX_FUTURE:
         published = None  # a bogus future date says nothing about age

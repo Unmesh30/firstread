@@ -249,6 +249,9 @@ async def fetch_gkg(
             if places.blocked(rec.domain):
                 result.dropped["blocked_domain"] += 1
                 continue
+            if places.press_wire(rec.domain):
+                result.dropped["press_wire_domain"] += 1
+                continue
             fips = places.fips(rec.domain)
             if fips is None:
                 result.dropped["unplaced_domain"] += 1

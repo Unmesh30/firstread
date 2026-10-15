@@ -178,3 +178,21 @@ async def test_old_404s_are_skipped_slots(
         r = await gkg.fetch_gkg(c, cursor, LATEST + timedelta(hours=3), places)
     assert r.files[0].get("missing")
     assert r.cursor == LATEST
+
+
+def test_press_wire_domains_are_dropped_and_counted() -> None:
+    places = DomainCountries(
+        parse_lookup("domain,countrycode,cnt\nprnewswire.com,US,9\nwisn.com,US,9\n"),
+        {},
+        frozenset(),
+        frozenset({"prnewswire.com"}),
+    )
+    assert places.press_wire("www.prnewswire.com")
+    assert not places.press_wire("wisn.com")
+
+
+def test_repo_press_wire_list_includes_the_spot_check_domains() -> None:
+    from firstread_ingest.sources.gdelt_domains import load_press_wires
+
+    wires = load_press_wires()
+    assert {"finanznachrichten.de", "equitybulls.com", "prnewswire.com"} <= wires
