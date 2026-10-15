@@ -11,6 +11,7 @@ import hashlib
 import json
 from collections.abc import Callable, Iterator, Sequence
 from pathlib import Path
+from typing import Any
 
 import numpy as np
 import pytest
@@ -136,3 +137,26 @@ def places() -> DomainCountries:
     """GDELT placement from a tiny lookup plus the real overrides/blocklist."""
     overrides, blocklist = load_config()
     return DomainCountries(parse_lookup(LOOKUP), overrides, blocklist)
+
+
+@pytest.fixture
+async def redis_test() -> Any:
+    """A flushed Redis db 15 (never the dev db 0). Skips if Redis is down, unless
+    REQUIRE_INTEGRATION=1 (CI), where that is a failure."""
+    import os
+
+    from redis.asyncio import Redis
+
+    url = os.environ.get("REDIS_URL", "redis://localhost:6379/0").rsplit("/", 1)[0] + "/15"
+    client = Redis.from_url(url)
+    try:
+        await client.ping()
+    except Exception:
+        await client.aclose()
+        if os.environ.get("REQUIRE_INTEGRATION") == "1":
+            pytest.fail("Redis unreachable but REQUIRE_INTEGRATION=1")
+        pytest.skip("Redis not reachable; run `make up` to enable")
+    await client.flushdb()
+    yield client
+    await client.flushdb()
+    await client.aclose()

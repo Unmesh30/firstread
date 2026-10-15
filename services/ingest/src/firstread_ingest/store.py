@@ -202,7 +202,8 @@ async def finish_run(conn: Any, run_id: uuid.UUID, summary: dict[str, Any], now:
     await conn.execute(
         "update public.ingestion_runs set finished_at = $2, window_start = $3, window_end = $4, "
         "fetched = $5, inserted = $6, duplicates = $7, near_duplicates = $8, clustered = $9, "
-        "errors = $10, gdelt_calls = $11, status = $12, details = $13::jsonb where id = $1",
+        "errors = $10, gdelt_calls = $11, status = $12, details = $13::jsonb, "
+        "redis_commands = $14 where id = $1",
         run_id,
         now,
         summary.get("window_start"),
@@ -216,6 +217,7 @@ async def finish_run(conn: Any, run_id: uuid.UUID, summary: dict[str, Any], now:
         summary.get("gdelt_calls", 0),
         summary["status"],
         json.dumps(summary["details"], default=str),
+        summary.get("redis_commands", 0),
     )
 
 
