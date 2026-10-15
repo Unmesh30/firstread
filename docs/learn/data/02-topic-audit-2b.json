@@ -1,0 +1,321 @@
+{
+ "groups": {
+  "gdelt-us": {
+   "n": 45,
+   "population": 6954,
+   "population_covered": 6954,
+   "accuracy": 0.79,
+   "ci95": [
+    0.653,
+    0.926
+   ],
+   "unweighted": 0.778
+  },
+  "gdelt-intl": {
+   "n": 45,
+   "population": 7446,
+   "population_covered": 7446,
+   "accuracy": 0.783,
+   "ci95": [
+    0.656,
+    0.91
+   ],
+   "unweighted": 0.778
+  },
+  "rss": {
+   "n": 30,
+   "population": 176,
+   "population_covered": 176,
+   "accuracy": 0.91,
+   "ci95": [
+    0.75,
+    1.0
+   ],
+   "unweighted": 0.9
+  }
+ },
+ "gdelt": {
+  "accuracy": 0.786,
+  "ci95": [
+   0.693,
+   0.88
+  ],
+  "share_us": 0.483
+ },
+ "combined": {
+  "accuracy": 0.788,
+  "ci95": [
+   0.696,
+   0.88
+  ],
+  "share_gdelt": 0.989
+ },
+ "per_topic": {
+  "gdelt-intl:autos": {
+   "n": 2,
+   "correct": 1
+  },
+  "gdelt-intl:business": {
+   "n": 7,
+   "correct": 6
+  },
+  "gdelt-intl:entertainment": {
+   "n": 3,
+   "correct": 3
+  },
+  "gdelt-intl:food_drink": {
+   "n": 2,
+   "correct": 2
+  },
+  "gdelt-intl:health": {
+   "n": 2,
+   "correct": 2
+  },
+  "gdelt-intl:lifestyle": {
+   "n": 3,
+   "correct": 3
+  },
+  "gdelt-intl:sports": {
+   "n": 3,
+   "correct": 0
+  },
+  "gdelt-intl:tech_science": {
+   "n": 3,
+   "correct": 1
+  },
+  "gdelt-intl:travel": {
+   "n": 3,
+   "correct": 2
+  },
+  "gdelt-intl:weather": {
+   "n": 2,
+   "correct": 1
+  },
+  "gdelt-intl:world": {
+   "n": 15,
+   "correct": 14
+  },
+  "gdelt-us:autos": {
+   "n": 2,
+   "correct": 1
+  },
+  "gdelt-us:business": {
+   "n": 5,
+   "correct": 5
+  },
+  "gdelt-us:entertainment": {
+   "n": 4,
+   "correct": 4
+  },
+  "gdelt-us:food_drink": {
+   "n": 2,
+   "correct": 1
+  },
+  "gdelt-us:health": {
+   "n": 2,
+   "correct": 2
+  },
+  "gdelt-us:lifestyle": {
+   "n": 2,
+   "correct": 1
+  },
+  "gdelt-us:politics": {
+   "n": 5,
+   "correct": 5
+  },
+  "gdelt-us:sports": {
+   "n": 5,
+   "correct": 3
+  },
+  "gdelt-us:tech_science": {
+   "n": 2,
+   "correct": 2
+  },
+  "gdelt-us:travel": {
+   "n": 3,
+   "correct": 1
+  },
+  "gdelt-us:us": {
+   "n": 8,
+   "correct": 6
+  },
+  "gdelt-us:weather": {
+   "n": 3,
+   "correct": 2
+  },
+  "gdelt-us:world": {
+   "n": 2,
+   "correct": 2
+  },
+  "rss:business": {
+   "n": 2,
+   "correct": 2
+  },
+  "rss:entertainment": {
+   "n": 2,
+   "correct": 2
+  },
+  "rss:food_drink": {
+   "n": 1,
+   "correct": 1
+  },
+  "rss:health": {
+   "n": 3,
+   "correct": 2
+  },
+  "rss:lifestyle": {
+   "n": 1,
+   "correct": 1
+  },
+  "rss:sports": {
+   "n": 8,
+   "correct": 8
+  },
+  "rss:tech_science": {
+   "n": 7,
+   "correct": 7
+  },
+  "rss:us": {
+   "n": 1,
+   "correct": 0
+  },
+  "rss:weather": {
+   "n": 1,
+   "correct": 1
+  },
+  "rss:world": {
+   "n": 4,
+   "correct": 3
+  }
+ },
+ "confusions": [
+  {
+   "group": "gdelt-us",
+   "predicted": "sports",
+   "true": "lifestyle",
+   "n": 2
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "sports",
+   "true": "business",
+   "n": 2
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "tech_science",
+   "true": "business",
+   "n": 2
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "weather",
+   "true": "us",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "travel",
+   "true": "food_drink",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "travel",
+   "true": "us",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "us",
+   "true": "politics",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "us",
+   "true": "lifestyle",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "lifestyle",
+   "true": "world",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "food_drink",
+   "true": "tech_science",
+   "n": 1
+  },
+  {
+   "group": "gdelt-us",
+   "predicted": "autos",
+   "true": "us",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "sports",
+   "true": "lifestyle",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "world",
+   "true": "business",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "business",
+   "true": "world",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "autos",
+   "true": "world",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "travel",
+   "true": "world",
+   "n": 1
+  },
+  {
+   "group": "gdelt-intl",
+   "predicted": "weather",
+   "true": "world",
+   "n": 1
+  },
+  {
+   "group": "rss",
+   "predicted": "us",
+   "true": "tech_science",
+   "n": 1
+  },
+  {
+   "group": "rss",
+   "predicted": "health",
+   "true": "tech_science",
+   "n": 1
+  },
+  {
+   "group": "rss",
+   "predicted": "world",
+   "true": "us",
+   "n": 1
+  }
+ ],
+ "geo_rule": {
+  "fired": 5,
+  "correct": 3
+ },
+ "notes": [
+  "LLM-labeled; spot-checked by a second, independent LLM session, approved by the owner, before any number is published.",
+  "GDELT from a 3-day replay of archived GKG files; RSS from a live run (RSS can't be replayed)."
+ ]
+}

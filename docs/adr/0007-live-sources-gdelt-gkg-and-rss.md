@@ -62,3 +62,30 @@ SPEC §6 named the GDELT DOC 2.0 API as the primary live source and curated publ
 - GDELT's domain lookup is from 2015–2021; new outlets are "unplaceable" until added to the overrides (117 of 6,529 records in the probe run).
 - The blocklist and overrides need occasional review, using the per-run top-domains log.
 - GDELT must be credited, with a link to gdeltproject.org, wherever its data appears (data card, app About page).
+
+## Amendment (2026-10-15, Phase 2b): press releases, a per-story cap, the pending horizon, replay findings
+
+**Press releases are dropped before dedupe, ranking and trending.** Syndicated releases appear on many outlets at once and would otherwise win the breadth ranking and trending. Two filters:
+- **Press-wire domains** (`gdelt_domains.yaml` → `press_wires`): prnewswire.com, globenewswire.com, businesswire.com, accesswire.com, einpresswire.com, newsfilecorp.com, pr-inside.com, finanznachrichten.de, equitybulls.com, prweb.com, newswire.ca, openpr.com.
+- **PR-shaped titles** (`announcement_titles.yaml`): a fiscal period plus a year before "results"; "financial results"; *announced* conference/earnings calls; declared dividends; filings; the "Company Inc.: Company Announces…" prefix. News *about* results or calls stays, and is tested both ways.
+- In the 3-day replay they removed **3,444 + 366 = 3,810 of 344,711 GDELT records (1.1%)**:
+
+| Rule | Records |
+|---|---:|
+| `results_period_year` | 175 |
+| `company_prefix` | 92 |
+| `call_announced` | 60 |
+| `dividend_declared` | 16 |
+| `financial_results` | 15 |
+| `dividend_change` | 4 |
+| `call_and_webcast` | 4 |
+
+**At most 3 stored articles per story** (`INGEST_GKG_MAX_PER_STORY`), counting ones already stored in the 48 h window. The first replay showed breadth ranking spent **26%** of inserts on a story's 3rd-or-later copy, which the feed never shows. With the cap it is 2.4%, and stories stored rose from 9,444 to 13,065 for the same 14,400 articles. Coverage still records every outlet, so trending breadth is unaffected.
+
+**Pending horizon = the catch-up window (2 h).** The four slots that 404'd on 2026-10-14 were all present hours later, so they were delays, not gaps. Slots older than 2 h can't be retried anyway, because catch-up starts at most 8 slots back.
+
+**Replay findings** (2026-10-12 02:30 → 10-15 02:15, 288 slots; `docs/learn/data/02-replay.json`):
+- **Volume:** 50 GDELT inserts on every run (the cap always binds), out of ~750 candidates per run after dedupe. RSS adds ~55 a day, measured from one live fetch (RSS can't be replayed), so **GDELT is ~99% of volume**, more than the ~90% assumed.
+- **Size:** 3,153 B per article; ~227 MB for 14 days, within the 400 MB budget.
+- **Top domains** are dominated by blocklisted syndication (iheart.com) and US local TV/radio. The blocklist removed 27,538 records, and 6,020 were unplaceable.
+- **Trending breadth favours UK local-news networks:** one PA wire story republished across dozens of UK local sites counts as dozens of outlets. An ownership-group weighting is a P3/P6 candidate.
