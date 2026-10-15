@@ -45,8 +45,10 @@ def pair_type(a: TextSource, b: TextSource) -> PairType:
 # value was raised (never lowered) from what the data allowed.
 VALIDATED_BY_PAIR: dict[PairType, tuple[float, float]] = {
     ("title", "title"): (0.975, 0.875),  # GDELT-GDELT: data said 0.975 / 0.875
-    ("title", "title_summary"): (0.95, 0.80),  # GDELT-RSS: data said 0.925* / 0.725
-    ("title_summary", "title_summary"): (0.97, 0.875),  # RSS-RSS: no dups labelled; 0.775*
+    # PROVISIONAL (re-check in 2b): 96 pairs from ~6 big stories, only 2 duplicates.
+    ("title", "title_summary"): (0.95, 0.80),  # GDELT-RSS: data said 0.925 / 0.725
+    # PROVISIONAL (re-check in 2b): 51 pairs, mostly BBC, no duplicates labelled.
+    ("title_summary", "title_summary"): (0.97, 0.875),  # RSS-RSS: data said - / 0.775
 }
 
 
