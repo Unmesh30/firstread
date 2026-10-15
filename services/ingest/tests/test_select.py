@@ -58,3 +58,18 @@ def test_topic_floor_keeps_thin_topics() -> None:
     kept, _ = select_gdelt(cands, decs, choices, max_per_run=3, max_per_domain=3, topic_min=1)
     assert 6 in kept  # weather got its floor slot despite ranking last
     assert len(kept) == 3
+
+
+def test_per_story_cap_counts_already_stored_articles() -> None:
+    from collections import Counter
+
+    big, other = uuid.uuid4(), uuid.uuid4()
+    cands = [cand(f"s{i}.com") for i in range(5)] + [cand("o.com", 30)]
+    decs = [insert(big) for _ in range(5)] + [insert(other)]
+    choices = [Choice(i, "us") for i in range(6)]
+    kept, dropped = select_gdelt(cands, decs, choices, max_per_run=10, max_per_domain=3,
+                                 topic_min=0, max_per_story=3,
+                                 stored_per_story=Counter({big: 2}))  # fmt: skip
+    assert sum(1 for i in kept if decs[i].cluster_id == big) == 1  # 2 stored + 1 new = 3
+    assert 5 in kept  # the smaller story gets in
+    assert dropped == {"story_cap": 4}

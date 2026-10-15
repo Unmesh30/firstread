@@ -45,7 +45,11 @@ def mock_feeds(router: respx.MockRouter) -> None:
 
 
 def settings() -> Settings:
-    return Settings(_env_file=None)  # type: ignore[call-arg]
+    s = Settings(_env_file=None)  # type: ignore[call-arg]
+    # The synthetic fixtures' titles are near-identical by construction (one "story");
+    # the per-story cap has its own tests in test_select.py.
+    s.ingest_gkg_max_per_story = 100
+    return s
 
 
 async def test_dry_run_writes_nothing_and_classifies_everything(
