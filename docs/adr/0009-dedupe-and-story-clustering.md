@@ -73,7 +73,7 @@ Values are only ever raised from what the data allowed, never lowered. They live
 
 - About 1,000 of 6,000 items in a typical first run are exact duplicates, mostly the same GDELT URL across files and wire copies.
 - Publisher suffixes that don't match the outlet's domain ("| Namoi Valley Independent", "– NBC4 Washington") defeat the fingerprint, and such pairs fall to cosine (≥ 0.97 in the labels, so they are still caught as near-duplicates).
-- The labels are Claude's judgement on one day's news. They were **spot-checked by an independent reviewer (separate Claude session), approved by the owner**:
+- The labels are **LLM-labeled**, on one day's news. They were **spot-checked by a second, independent LLM session, approved by the owner**:
   - all 30 sampled pair labels held;
   - pairs #16 (Pakistan–Oman) and #71 (Holiday Train MN vs Ontario) are ambiguous, but both sit below every threshold;
   - every sampled pair at or above its type's τ_story was same story or duplicate (14/14), and both pairs above the GDELT↔GDELT τ_dup were true duplicates.

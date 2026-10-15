@@ -161,8 +161,8 @@ def score() -> None:
         "correct": sum(row["true"] == row["category"] for row in geo),
     }
     out["notes"] = [
-        "Labels by Claude; spot-checked by an independent reviewer (separate Claude session), "
-        "approved by the owner, before any number is published.",
+        "LLM-labeled; spot-checked by a second, independent LLM session, approved by the "
+        "owner, before any number is published.",
         "GDELT from a 3-day replay of archived GKG files; RSS from a live run "
         "(RSS can't be replayed).",
     ]
