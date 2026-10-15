@@ -53,7 +53,20 @@ def main(argv: Sequence[str] | None = None) -> None:
     p = sub.add_parser("run", help="run one ingestion pass")
     p.add_argument("--sources", default=",".join(SOURCES), help="comma-separated: rss,gdelt")
     p.add_argument("--dry-run", action="store_true", help="fetch, embed, classify; write nothing")
+    p = sub.add_parser("replay", help="replay archived GDELT GKG files into a separate DB")
+    p.add_argument("--days", type=int, default=3)
+    p.add_argument("--end", default=None, help="last slot, YYYYMMDDHHMMSS (default: 45 min ago)")
+    p.add_argument("--db", default="firstread_replay")
+    p.add_argument("--redis-db", type=int, default=1)
+    p.add_argument("--fresh", action="store_true", help="drop the replay DB and start over")
     args = parser.parse_args(argv)
+    if args.command == "replay":
+        from firstread_ingest import replay
+        from firstread_ingest.sources.gkg import parse_slot
+
+        end = parse_slot(args.end) if args.end else None
+        asyncio.run(replay.main(args.days, end, args.db, args.redis_db, args.fresh))
+        return
     settings = Settings()
     if args.command == "migrate":
         applied = asyncio.run(_migrate(settings))
