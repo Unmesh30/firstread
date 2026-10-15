@@ -56,7 +56,12 @@ def markdown(summary: dict[str, Any], dry_run: bool) -> str:
         if g.get("stale"):
             lines.append("- ⚠️ **Stale:** the newest GKG file is over an hour old.")
         if g.get("top_domains"):
-            lines += ["", "<details><summary>Top 20 GDELT outlets this run</summary>", ""]
+            lines += [
+                "",
+                "<details><summary>Top 20 GDELT outlets this run "
+                "(after the blocklist and country filter)</summary>",
+                "",
+            ]
             lines += _table(list(g["top_domains"].items()), ("outlet", "records"))
             lines += ["", "</details>"]
     if d.get("topics"):

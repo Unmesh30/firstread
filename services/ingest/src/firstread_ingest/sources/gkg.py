@@ -157,7 +157,7 @@ class GkgResult:
     stale: bool = False
     records: int = 0
     dropped: Counter[str] = field(default_factory=Counter)
-    domains: Counter[str] = field(default_factory=Counter)
+    domains: Counter[str] = field(default_factory=Counter)  # kept records per outlet
     error: str | None = None
 
     def summary(self) -> dict[str, Any]:
@@ -248,7 +248,6 @@ async def fetch_gkg(
         entry["records"] = len(records)
         result.records += len(records)
         for rec in records:
-            result.domains[rec.domain] += 1
             if places.blocked(rec.domain):
                 result.dropped["blocked_domain"] += 1
                 continue
@@ -259,6 +258,9 @@ async def fetch_gkg(
             if fips is None:
                 result.dropped["unplaced_domain"] += 1
                 continue
+            # Counted after the blocklist and country filter, so new spam stands out
+            # in the run summary instead of known blocked outlets.
+            result.domains[rec.domain] += 1
             result.items.append(to_raw(rec, fips))
         if not pending:
             result.cursor = slot
