@@ -38,6 +38,9 @@ class DomainCountries:
     countries: dict[str, str]
     overrides: dict[str, str]
     blocklist: frozenset[str]
+    # Press-release wires: syndicated releases look like broad coverage and would win
+    # the breadth ranking and trending, so they are dropped too (counted separately).
+    press_wires: frozenset[str] = frozenset()
 
     def _candidates(self, domain: str) -> list[str]:
         """``a.b.example.co.uk`` -> itself, then each parent down to two labels."""
@@ -46,6 +49,9 @@ class DomainCountries:
 
     def blocked(self, domain: str) -> bool:
         return any(d in self.blocklist for d in self._candidates(domain))
+
+    def press_wire(self, domain: str) -> bool:
+        return any(d in self.press_wires for d in self._candidates(domain))
 
     def fips(self, domain: str) -> str | None:
         """The outlet's FIPS country, or None if neither it nor a parent domain is known."""
@@ -81,6 +87,11 @@ def load_config(
     return overrides, frozenset(d.lower() for d in data.get("blocklist") or [])
 
 
+def load_press_wires(path: Path = CONFIG_DIR / "gdelt_domains.yaml") -> frozenset[str]:
+    data: dict[str, Any] = yaml.safe_load(path.read_text())
+    return frozenset(d.lower() for d in data.get("press_wires") or [])
+
+
 def lookup_path(cache_dir: Path | None = None) -> Path:
     return (cache_dir or default_model_cache_dir()) / "gdelt" / f"outlets-{LOOKUP_SHA256[:12]}.csv"
 
@@ -104,5 +115,6 @@ async def ensure_lookup(client: Any, cache_dir: Path | None = None) -> Path:
 
 def load_domain_countries(lookup_file: Path, config: Path | None = None) -> DomainCountries:
     overrides, blocklist = load_config(config) if config else load_config()
+    wires = load_press_wires(config) if config else load_press_wires()
     text = lookup_file.read_text(encoding="utf-8", errors="replace")
-    return DomainCountries(parse_lookup(text), overrides, blocklist)
+    return DomainCountries(parse_lookup(text), overrides, blocklist, wires)

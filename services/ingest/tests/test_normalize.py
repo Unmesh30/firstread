@@ -104,3 +104,44 @@ def test_normalize_all_counts_drops_by_reason() -> None:
 def test_items_in_other_languages_are_dropped(title: str, english: bool) -> None:
     out = normalize(replace(BASE, title=title, description=None), NOW)
     assert (out != "non_english") is english
+
+
+@pytest.mark.parametrize(
+    ("title", "rule"),
+    [
+        ("Dexterra Announces Date of Q3 2026 Results and Conference Call", "results_period_year"),
+        ("Dexterra Group Inc.: Dexterra Announces Date of Q3 2026 Results", "results_period_year"),
+        ("ROK Resources, Inc.: ROK Resources Announces Return of Capital", "company_prefix"),
+        (
+            "Hathway Cable and Datacom Limited Reports Q2 & H1 FY27 Financial Results",
+            "results_period_year",
+        ),
+        ("Acme Corp Reports Third Quarter 2026 Financial Results", "results_period_year"),
+        ("Acme to Host Third Quarter 2026 Earnings Conference Call", "call_announced"),
+        ("Acme to Host Earnings Conference Call on November 5", "call_announced"),
+        ("Acme earnings conference call and webcast details", "call_and_webcast"),
+        ("Acme Declares Quarterly Cash Dividend of $0.25 per Share", "dividend_declared"),
+        ("Acme announces the date of its fiscal results release", "results_date"),
+        ("Acme files Form 8-K with the SEC", "filing"),
+    ],
+)
+def test_corporate_announcements_are_dropped(title: str, rule: str) -> None:
+    assert normalize(replace(BASE, title=title, description=None), NOW) == f"press_release:{rule}"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        "Meta shares jump after earnings call",
+        "Nvidia to report results as AI boom faces test",
+        "Netflix reports third-quarter results as subscriber growth slows",
+        "Netflix is laying off 6% of its workforce",
+        "Stocks fall after earnings miss at Nvidia",
+        "Fed signals rate hike",
+        "Bank of England keeps rates on hold: what it means for mortgages",
+        "Election results 2026: who won in Ohio",
+    ],
+)
+def test_news_about_results_and_calls_is_kept(title: str) -> None:
+    out = normalize(replace(BASE, title=title, description=None), NOW)
+    assert isinstance(out, Candidate), out

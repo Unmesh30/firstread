@@ -1,0 +1,29 @@
+# Corporate-announcement titles dropped before dedupe, ranking and trending (ADR 0007).
+#
+# Press releases are syndicated across many outlets, so they look like broad coverage
+# and would win the breadth ranking. These patterns are deliberately PR-shaped, so news
+# ABOUT results or calls stays:
+#   dropped: "Dexterra Announces Date of Q3 2026 Results and Conference Call"
+#            "Hathway ... Reports Q2 & H1 FY27 Financial Results"
+#   kept:    "Netflix reports third-quarter results as subscriber growth slows" (no year)
+#            "Nvidia to report results as AI boom faces test" (no period, no year)
+#            "Meta shares jump after earnings call" (a call mentioned, not announced)
+#
+# Matched case-insensitively with Python `re.search`. Each name is a drop reason
+# (press_release:<name>) in the run summary.
+version: 1
+patterns:
+  # A fiscal period plus a year, then "results": "Third Quarter 2026 Financial Results",
+  # "Q2 & H1 FY27 Financial Results", "Full-Year 2026 Results".
+  results_period_year: >-
+    \b(q[1-4]|h[12]|first|second|third|fourth|fiscal|full[- ]year)\b[^.:;|]{0,25}?\b(fy)?['’]?(20\d{2}|\d{2})\b[^.:;|]{0,40}?\bresults\b
+  financial_results: \bfinancial results\b
+  # Calls only when they are being announced.
+  call_announced: \b(to host|will host|announces?|schedules?)\b.{0,80}\b(conference|earnings|investor) call\b
+  call_and_webcast: \b(conference|earnings) call and (live )?webcast\b
+  results_date: \bannounces? (the )?(date|timing|release date) (of|for)\b.{0,60}\bresults\b
+  dividend_declared: \bdeclares?\b.{0,40}\bdividends?\b
+  dividend_change: \bdividend (increase|declaration)\b
+  filing: \b(form 8-k|form 10-[kq]|6-k filing)\b|\bfiles? (its )?(annual|quarterly) report\b
+  # "Dexterra Group Inc.: Dexterra Announces ...", "ROK Resources, Inc.: ROK Resources ..."
+  company_prefix: ^[^:]{2,60}\b(inc|corp|corporation|ltd|limited|plc|llc|ag|sa|nv)\.?\s*:\s
