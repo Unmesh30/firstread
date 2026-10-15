@@ -1,7 +1,12 @@
-"""``firstread-ingest``: apply migrations, or run one ingestion pass.
+"""``firstread-ingest``: apply migrations, run one ingestion pass, or replay GKG archives.
 
-uv run firstread-ingest migrate
-uv run firstread-ingest run [--sources rss] [--dry-run]
+    uv run firstread-ingest migrate
+    uv run firstread-ingest run [--sources rss,gdelt] [--dry-run]
+    uv run firstread-ingest replay [--days 3] [--fresh]
+
+``run`` prints the summary as JSON and, when ``$GITHUB_STEP_SUMMARY`` is set (GitHub
+Actions), appends it as Markdown. Exit codes: 0 for ok/partial (partial also prints a
+warning annotation), 1 for failed.
 """
 
 from __future__ import annotations
@@ -9,9 +14,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import json
+import os
+import sys
 from collections.abc import Sequence
+from pathlib import Path
 
-from firstread_core.db import apply_migrations, connect, default_migrations_dir
+from firstread_core.db import apply_migrations, check_migration_dsn, connect, default_migrations_dir
 from firstread_ingest.config import Settings
 from firstread_ingest.models import PINNED, TopicClassifier, download_release, verify_release
 
@@ -24,7 +32,9 @@ def describe() -> str:
 
 
 async def _migrate(settings: Settings) -> list[str]:
-    conn = await connect(settings.database_url.get_secret_value())
+    dsn = settings.database_url.get_secret_value()
+    check_migration_dsn(dsn)
+    conn = await connect(dsn)
     try:
         return await apply_migrations(conn, default_migrations_dir())
     finally:
@@ -53,6 +63,11 @@ def main(argv: Sequence[str] | None = None) -> None:
     p = sub.add_parser("run", help="run one ingestion pass")
     p.add_argument("--sources", default=",".join(SOURCES), help="comma-separated: rss,gdelt")
     p.add_argument("--dry-run", action="store_true", help="fetch, embed, classify; write nothing")
+    p.add_argument(
+        "--require-db",
+        action="store_true",
+        help="fail fast if DATABASE_URL/REDIS_URL aren't set (GitHub Actions)",
+    )
     p = sub.add_parser("replay", help="replay archived GDELT GKG files into a separate DB")
     p.add_argument("--days", type=int, default=3)
     p.add_argument("--end", default=None, help="last slot, YYYYMMDDHHMMSS (default: 45 min ago)")
@@ -76,7 +91,29 @@ def main(argv: Sequence[str] | None = None) -> None:
     unknown = sorted(set(sources) - set(SOURCES))
     if unknown:
         parser.error(f"unknown sources {unknown}; available: {list(SOURCES)}")
-    print(json.dumps(asyncio.run(_run(settings, sources, args.dry_run)), indent=1, default=str))
+    if not args.dry_run and args.require_db:
+        missing = [v for v in ("DATABASE_URL", "REDIS_URL") if not os.environ.get(v)]
+        if missing:
+            print(f"::error::{', '.join(missing)} not set; use --dry-run until P5 adds the "
+                  "cloud database and Redis secrets")  # fmt: skip
+            raise SystemExit(1)
+    summary = asyncio.run(_run(settings, sources, args.dry_run))
+    print(json.dumps(summary, indent=1, default=str))
+    raise SystemExit(finish(summary, args.dry_run))
+
+
+def finish(summary: dict[str, object], dry_run: bool) -> int:
+    """Write the job summary (in GitHub Actions) and choose the exit code."""
+    from firstread_ingest.report import markdown
+
+    path = os.environ.get("GITHUB_STEP_SUMMARY")
+    if path:
+        with Path(path).open("a") as f:
+            f.write(markdown(summary, dry_run))
+    status = summary.get("status")
+    if status == "partial":
+        print("::warning::ingestion finished as partial; see the job summary", file=sys.stderr)
+    return 1 if status == "failed" else 0
 
 
 if __name__ == "__main__":

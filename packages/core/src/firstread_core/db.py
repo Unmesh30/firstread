@@ -61,6 +61,23 @@ async def create_pool(dsn: str, **kwargs: Any) -> Any:
     return await asyncpg.create_pool(dsn, statement_cache_size=0, **kwargs)
 
 
+# Supabase's transaction-mode pooler. Migrations take a session advisory lock, which
+# can't be released reliably through it, so they must use the direct/session port.
+TRANSACTION_POOLER_PORT = 6543
+
+
+def check_migration_dsn(dsn: str) -> None:
+    """Refuse to migrate through the transaction pooler (ADR 0008)."""
+    from urllib.parse import urlsplit
+
+    if urlsplit(dsn).port == TRANSACTION_POOLER_PORT:
+        raise MigrationError(
+            "migrations must use the direct/session connection (port 5432), not the "
+            "6543 transaction pooler: the runner's session advisory lock can't be "
+            "released reliably through it"
+        )
+
+
 def load_migrations(directory: Path) -> list[Migration]:
     files = sorted(p for p in directory.iterdir() if p.suffix == ".sql")
     bad = [p.name for p in files if not MIGRATION_NAME.match(p.name)]

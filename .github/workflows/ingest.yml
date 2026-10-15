@@ -1,0 +1,62 @@
+name: Ingest
+
+# One ingestion run: RSS + GDELT GKG -> Postgres + Redis pools (ADR 0007, 0010).
+# Manual dispatch only until P5: there is no cloud database or Redis yet, so the
+# default is a dry run (fetch, normalize, embed, classify; nothing written).
+on:
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Dry run: fetch, embed and classify, but write nothing"
+        type: boolean
+        default: true
+      sources:
+        description: "Comma-separated sources: rss,gdelt"
+        type: string
+        default: "rss,gdelt"
+  # Enabled in P5, together with the DATABASE_URL / REDIS_URL secrets. GitHub may
+  # start scheduled runs late, and disables them after 60 days without repo activity.
+  # schedule:
+  #   - cron: "*/15 * * * *"
+
+permissions:
+  contents: read
+
+# Runs must never overlap: the GKG cursor and the pool rebuild assume one writer.
+concurrency:
+  group: ingest
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    name: ingest
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      REDIS_URL: ${{ secrets.REDIS_URL }}
+      INGEST_SOURCES: ${{ inputs.sources }}
+      INGEST_DRY_RUN: ${{ inputs.dry_run }}
+    steps:
+      - uses: actions/checkout@v7
+      # setup-uv publishes no floating major tag, so pin the release commit.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+      - name: Install ingest (no ML training libraries)
+        run: uv sync --package firstread-ingest --frozen --no-dev
+      # The pinned embedding model, the v0.2.0 topic classifier and the pinned GDELT
+      # domain lookup all live under ~/.cache/firstread/models. The key changes only
+      # when a pin changes, so scheduled runs re-download nothing (GDELT's blog
+      # included). Every file is still hash-verified when it is used.
+      - name: Cache models and the GDELT domain lookup
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firstread/models
+          key: ingest-models-${{ hashFiles('packages/core/src/firstread_core/embedding.py', 'services/ingest/src/firstread_ingest/models.py', 'services/ingest/src/firstread_ingest/sources/gdelt_domains.py') }}
+      - name: Run ingestion
+        run: |
+          args=(run --require-db --sources "$INGEST_SOURCES")
+          if [ "$INGEST_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
+          uv run --frozen --no-dev firstread-ingest "${args[@]}"
