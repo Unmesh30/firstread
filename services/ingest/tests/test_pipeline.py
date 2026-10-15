@@ -162,9 +162,9 @@ async def test_rss_and_gdelt_together_with_cursor_and_coverage(
             cursor = await conn.fetchval(
                 "select cursor from public.source_cursor where source = 'gdelt-gkg'"
             )
-            # Older mocked slots 404; those under 90 min old are pending, so the cursor
-            # holds before them and the next run retries them.
-            assert cursor == gkg.slot_name(GKG_SLOT - timedelta(minutes=75))
+            # Older mocked slots 404; those inside the 2 h catch-up horizon are pending,
+            # so the cursor holds before them and the next run retries them.
+            assert cursor == gkg.slot_name(GKG_SLOT - timedelta(minutes=105))
             domains = await conn.fetchval(
                 "select count(distinct source_domain) from public.story_coverage "
                 "where source_domain like '%.co.uk' or source_domain = 'wisn.com'"
@@ -180,7 +180,7 @@ async def test_rss_and_gdelt_together_with_cursor_and_coverage(
                                places=places, conn=conn, now=later)  # fmt: skip
             assert second.inserted == 0  # the retried slots only hold duplicates now
             assert second.gdelt["files"][0]["slot"] == gkg.slot_name(
-                GKG_SLOT - timedelta(minutes=60)
+                GKG_SLOT - timedelta(minutes=90)
             )
         finally:
             await conn.close()

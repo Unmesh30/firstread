@@ -11,9 +11,10 @@ comes from the static GKG files instead: one zip every 15 minutes, no API.
 * **Staleness:** if the newest available file is over ``stale_after`` old, the run
   summary marks GDELT as stale.
 * **Index ahead of files:** ``lastupdate.txt`` can list a slot whose file still
-  404s. A 404 younger than ``missing_after`` is *pending*: later slots are still
-  processed, but the cursor stops before it so the next run retries it. Older 404s
-  are slots GDELT skipped, and the cursor moves past them.
+  404s (seen 2026-10-14: four listed slots 404'd for over 40 minutes, then appeared).
+  A 404 younger than the catch-up horizon (``max_files`` slots, 2 h) is *pending*:
+  later slots are still processed, but the cursor stops before it so the next run
+  retries it. Older 404s are treated as skipped, since catch-up can't reach them.
 * **Records:** URL, outlet domain, page title (``<PAGE_TITLE>`` in the Extras
   field, HTML-unescaped), sharing image, crawl time and, when present, the precise
   publication time. No summary: GDELT articles are embedded from the title.
@@ -198,10 +199,13 @@ async def fetch_gkg(
     places: DomainCountries,
     max_files: int = 8,
     stale_after: timedelta = timedelta(hours=1),
-    missing_after: timedelta = timedelta(minutes=90),
+    missing_after: timedelta | None = None,
 ) -> GkgResult:
     """Fetch and filter every GKG file since ``cursor``. Never raises: errors are data."""
     result = GkgResult(cursor=cursor)
+    # A slot older than the catch-up horizon can't be retried anyway (catch-up starts
+    # at most max_files slots back), so that's when a 404 stops being "pending".
+    missing_after = missing_after or SLOT * max_files
     try:
         resp = await fetch_with_retry(
             client, LASTUPDATE, headers={"Cache-Control": "no-cache", "Pragma": "no-cache"}
@@ -224,9 +228,8 @@ async def fetch_gkg(
             r = await fetch_with_retry(client, slot_url(slot))
             entry["status"] = r.status_code
             if r.status_code == 404:
-                # lastupdate.txt can list a slot before its file exists (seen 2026-10-14:
-                # three listed slots 404'd for minutes). Recent 404s are retried next run;
-                # old ones are treated as slots GDELT skipped.
+                # lastupdate.txt can list a slot before its file exists. Recent 404s are
+                # retried next run; ones beyond the catch-up horizon count as skipped.
                 if now - slot < missing_after:
                     entry["pending"] = True
                     pending = True

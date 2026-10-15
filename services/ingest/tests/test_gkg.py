@@ -96,9 +96,9 @@ async def test_fetch_filters_places_and_requests_fresh_lastupdate(
     assert all(i.origin == "gdelt" and i.description is None for i in r.items)
     assert not r.stale
     assert len(r.files) == 8  # first run: 7 older slots (404 here) + the newest
-    # 404s older than 90 min count as skipped; younger ones are pending, so the cursor
-    # holds at 17:30 and the next run retries 17:45 onwards.
-    assert r.cursor == LATEST - timedelta(minutes=75)
+    # 404s beyond the 2 h catch-up horizon count as skipped; younger ones are pending,
+    # so the cursor holds at 17:00 and the next run retries 17:15 onwards.
+    assert r.cursor == LATEST - timedelta(minutes=105)
     assert r.summary()["top_domains"]["iheart.com"] == 1
 
 

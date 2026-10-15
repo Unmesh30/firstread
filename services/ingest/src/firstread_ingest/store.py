@@ -235,3 +235,55 @@ async def save_cursor(conn: Any, source: str, cursor: str, now: datetime) -> Non
         cursor,
         now,
     )
+
+
+RETENTION_BATCH = 5000
+
+
+async def _delete_batched(conn: Any, table: str, column: str, before: datetime) -> int:
+    """Delete rows with ``column < before`` in batches (by ctid), so no statement runs long."""
+    total = 0
+    while True:
+        n = await conn.fetchval(
+            f"with gone as (delete from public.{table} where ctid in ("  # noqa: S608 (constants)
+            f"select ctid from public.{table} where {column} < $1 limit {RETENTION_BATCH}) "
+            "returning 1) select count(*) from gone",
+            before,
+        )
+        total += int(n)
+        if n < RETENTION_BATCH:
+            return total
+
+
+async def apply_retention(
+    conn: Any,
+    now: datetime,
+    articles: timedelta,
+    coverage: timedelta,
+    runs: timedelta,
+    feed_ids: Sequence[str] | None = None,
+) -> dict[str, int]:
+    """Delete expired rows; return how many went from each table."""
+    out = {
+        "articles": await _delete_batched(conn, "articles", "first_seen_at", now - articles),
+        "story_coverage": await _delete_batched(
+            conn, "story_coverage", "first_seen_at", now - coverage
+        ),
+        "ingestion_runs": await _delete_batched(conn, "ingestion_runs", "started_at", now - runs),
+    }
+    if feed_ids is not None:
+        gone = await conn.fetch(
+            "delete from public.feed_state where not (feed_id = any($1::text[])) returning 1",
+            list(feed_ids),
+        )
+        out["feed_state"] = len(gone)
+    return out
+
+
+async def database_size(conn: Any) -> dict[str, int]:
+    row = await conn.fetchrow(
+        "select pg_database_size(current_database()) as db, "
+        "pg_total_relation_size('public.articles') as articles, "
+        "pg_total_relation_size('public.story_coverage') as story_coverage"
+    )
+    return dict(row)

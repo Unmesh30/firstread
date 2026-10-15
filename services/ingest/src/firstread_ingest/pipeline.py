@@ -62,6 +62,9 @@ class RunSummary:
     origins: Counter[str] = field(default_factory=Counter)
     text_sources: Counter[str] = field(default_factory=Counter)
     gdelt: dict[str, Any] = field(default_factory=dict)
+    retention: dict[str, int] = field(default_factory=dict)
+    size: dict[str, int] = field(default_factory=dict)
+    size_warning: bool = False
     seconds: dict[str, float] = field(default_factory=dict)
     status: str = "ok"
     model_version: str = ""
@@ -90,6 +93,9 @@ class RunSummary:
                 "origins": dict(self.origins),
                 "text_sources": dict(self.text_sources),
                 "gdelt": self.gdelt,
+                "retention": self.retention,
+                "size": self.size,
+                "size_warning": self.size_warning,
                 "seconds": self.seconds,
                 "model_version": self.model_version,
             },
@@ -365,6 +371,21 @@ async def _run(
             await store.save_feed_states(conn, states, now)
             if gdelt is not None and gdelt.cursor is not None:
                 await store.save_cursor(conn, gkg.SOURCE_ID, gkg.slot_name(gdelt.cursor), now)
+        async with conn.transaction():
+            summary.retention = await store.apply_retention(
+                conn,
+                now,
+                articles=timedelta(days=settings.ingest_retention_article_days),
+                coverage=timedelta(hours=settings.ingest_retention_coverage_hours),
+                runs=timedelta(days=settings.ingest_retention_runs_days),
+                # Forget state only for feeds that left the configuration.
+                feed_ids=[f.id for f in (feeds or load_feeds(enabled_only=False))]
+                if "rss" in sources
+                else None,
+            )
+        summary.size = await store.database_size(conn)
+        if summary.size["db"] > settings.ingest_size_warn_mb * 1_000_000:
+            summary.size_warning = True
     else:
         inserted = {r.url_canonical for r in rows}
 
