@@ -36,11 +36,12 @@ from firstread_core.text import TEXT_PREP_VERSION
 from firstread_core.topics import TOPIC_IDS
 
 HF_REPO = "Unmesh30/firstread-models"
-# tag -> {"manifest_sha256", "revision"}; revision is the Hub commit once published.
+# tag -> {"manifest_sha256", "revision"}. Files are downloaded at the Hub commit, never
+# the (movable) tag, and the manifest must hash to the pinned value.
 PINNED: dict[str, dict[str, str]] = {
     "v0.2.0": {
         "manifest_sha256": "2f8ebe6385b6fd2813e39968777e4a4ab80170196e95dc70d33502fa7a84fb35",
-        "revision": "v0.2.0",  # replaced by the Hub commit after upload
+        "revision": "099201fabb57bde64af046d0c3be2f690adfff40",  # Hub commit of tag v0.2.0
     },
 }
 CLASSIFIER_FILES = ("category_classifier.onnx", "labels.json")

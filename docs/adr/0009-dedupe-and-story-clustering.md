@@ -24,11 +24,41 @@ Every item carries its story cluster, including dropped duplicates, so `story_co
 
 **Thresholds by pair type, validated on 291 hand-labelled live pairs (2026-10-14).** Pairs were sampled by `scripts/sample_pairs.py` (nearest neighbours, stratified by pair type and 0.025 cosine bin), labelled duplicate / same story / different, and scored by `scripts/score_pairs.py`. A threshold is accepted when **every** bin at or above it has ≥ 95% precision. Aggregates are in `docs/learn/data/02-thresholds.json`.
 
-| Pair type | n | Data says (τ_dup / τ_story) | **Used** | Why it differs |
-|---|---:|---|---|---|
-| GDELT↔GDELT (title↔title) | 144 | 0.975 / 0.875 | **0.975 / 0.875** | — |
-| GDELT↔RSS (title↔title+desc) | 96 | 0.925 / 0.725 | **0.95 / 0.80** | Only 2 duplicates labelled; the cross pairs were dominated by about 6 big stories, which flatters low-cosine precision |
-| RSS↔RSS (title+desc both) | 51 | — / 0.775 | **0.97 / 0.875** | No duplicates labelled and thin bins; kept strict |
+Labelled pairs by type and label:
+
+| Pair type | Pairs | Duplicate | Same story | Different |
+|---|---:|---:|---:|---:|
+| GDELT↔GDELT (title↔title) | 144 | 28 | 85 | 31 |
+| GDELT↔RSS (title↔title+description) | 96 | 2 | 91 | 3 |
+| RSS↔RSS (title+description both) | 51 | 0 | 25 | 26 |
+| **Total** | **291** | **30** | **201** | **60** |
+
+Thresholds (τ_dup / τ_story):
+
+| Pair type | Data supports | **Used** | Status |
+|---|---|---|---|
+| GDELT↔GDELT | 0.975 / 0.875 | **0.975 / 0.875** | Validated |
+| GDELT↔RSS | 0.925 / 0.725 | **0.95 / 0.80** | **Provisional** (re-check in 2b) |
+| RSS↔RSS | none / 0.775 | **0.97 / 0.875** | **Provisional** (re-check in 2b) |
+
+**Why the two provisional types are set above what the data supported:**
+
+- **GDELT↔RSS, τ_story 0.80 instead of 0.725.**
+  - The 96 pairs come from very few stories. The cross-source neighbours that day were dominated by about six big stories (the Pope's surgery, Netflix layoffs, Ukraine's Starlink access, Liverpool v LASK, Man City v PSG, Sally Rooney's books).
+  - Pairs inside one big, well-covered story are "same story" at low cosines, so precision at 0.725–0.80 is flattered and wouldn't hold for ordinary days with many small stories.
+  - Only 3 "different" pairs were seen, so the 95% bar was never really tested below 0.80.
+- **GDELT↔RSS, τ_dup 0.95 instead of 0.925.** Only **2** duplicates were labelled, too few to validate any duplicate threshold. 0.95 sits between the GDELT↔GDELT value and what the data hinted.
+- **RSS↔RSS, τ_story 0.875 instead of 0.775.**
+  - Only 51 pairs, from 9 feeds and mostly one publisher (BBC); the bins above 0.775 hold 1–5 pairs each, and the 0.85 bin has one "different" pair out of two.
+  - 0.875 is the lowest value with every non-empty bin above it fully "same story".
+- **RSS↔RSS, τ_dup 0.97.** **No** duplicates were labelled (identical BBC items are caught earlier by URL and fingerprint). 0.97 keeps near-duplicate drops close to "the same text".
+
+In every case the values were **raised, never lowered**: a missed merge shows two versions of a story, while a false merge hides one.
+
+**Re-check in 2b**, after several days of ingestion with more varied news:
+- re-run `sample_pairs.py` with more files and a per-story cap, so a few big stories can't dominate;
+- target at least 100 pairs and 10 duplicates per provisional type;
+- re-score, and update `VALIDATED_BY_PAIR` and this ADR.
 
 Values are only ever raised from what the data allowed, never lowered. They live in `dedupe.VALIDATED_BY_PAIR`; `INGEST_TAU_DUP` / `INGEST_TAU_STORY` set the fallback.
 

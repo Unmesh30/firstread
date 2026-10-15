@@ -77,5 +77,21 @@ def test_download_uses_the_pinned_revision(
     assert (out / "category_classifier.onnx").is_file()
 
 
-def test_v0_2_0_is_pinned_by_manifest_hash() -> None:
-    assert len(models.PINNED["v0.2.0"]["manifest_sha256"]) == 64
+def test_v0_2_0_is_pinned_by_manifest_hash_and_hub_commit() -> None:
+    pin = models.PINNED["v0.2.0"]
+    assert pin["manifest_sha256"] == (
+        "2f8ebe6385b6fd2813e39968777e4a4ab80170196e95dc70d33502fa7a84fb35"
+    )
+    assert pin["revision"] == "099201fabb57bde64af046d0c3be2f690adfff40"
+
+
+@pytest.mark.model
+def test_real_v0_2_0_downloads_verifies_and_scores(tmp_path: Path) -> None:
+    """The published release, at its pinned Hub commit (cached in CI like the embedder)."""
+    folder = models.download_release("v0.2.0")
+    clf = TopicClassifier.load(folder)
+    assert clf.labels == list(TOPIC_IDS)
+    assert clf.threshold == 0.5
+    assert clf.version == "v0.2.0"
+    p = clf.probabilities(np.random.default_rng(0).normal(size=(2, 384)).astype(np.float32))
+    assert p.shape == (2, 13)
