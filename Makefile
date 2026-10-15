@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -54,6 +54,10 @@ db-migrate: ## Apply infra/db/migrations to DATABASE_URL (local stack by default
 
 ingest: ## One ingestion run against the local stack (DRY_RUN=1 writes nothing)
 	uv run firstread-ingest run $(if $(DRY_RUN),--dry-run)
+
+DAYS ?= 3
+replay: ## Replay DAYS of archived GDELT GKG files into firstread_replay (FRESH=1 starts over)
+	uv run firstread-ingest replay --days $(DAYS) $(if $(FRESH),--fresh)
 
 # ---- Offline ML (Phase 1) ----
 mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
