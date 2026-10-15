@@ -163,7 +163,7 @@ Two operating modes:
 | `sources/gkg.py` | GKG files: slots, cursor, pending/missing, `lastupdate.txt`, parsing, placement |
 | `sources/gdelt_domains.py` | The pinned domain lookup, overrides, blocklist, press wires |
 | `sources/rss.py` | Feeds: conditional GET, per-host serial, thumbnails, the run clock |
-| `normalize.py` | Every drop has a reason: `no_url`, `non_english`, `short_title`, `junk_title`, `press_release:<rule>`, `stale` |
+| `normalize.py` | Every drop has a reason: `no_url`, `non_english`, `short_title`, `junk_title`, `section_page`, `press_release:<rule>`, `stale` |
 | `dedupe.py` | Exact, near-duplicate and story decisions; `VALIDATED_BY_PAIR` thresholds |
 | `select.py` | The per-run GDELT selection (breadth, caps, topic floor) |
 | `models.py` | Downloads v0.2.0 at a pinned Hub commit and checks the manifest SHA and its blocks against `packages/core` |
@@ -313,6 +313,8 @@ GDELT↔GDELT τ_story rose because templated headlines sit at 0.85–0.92 witho
 - **The domain lookup's "mentions most" rule** places international outlets that cover the US heavily in the US. That's what the overrides table is for.
 - **Breadth ranking without a per-story cap** spent 26% of the budget on copies of a few stories; found only by replaying.
 - **Templated headlines** fooled a 0.875 story threshold; found only with a per-story-capped sample.
+- **Section pages stored as articles** ("Health - Carroll Broadcasting Inc."), found during the 2b spot-check, are now dropped as `section_page`.
+- **Known limitations:** corporate-milestone press releases ("QuickMD Surpasses 2 Million Patient Visits") pass the filter, and local-TV suffixes ("– NBC4 Washington") aren't stripped, so syndicated copies cluster as the same story instead of dropping as duplicates. The per-story cap limits the impact (ADR 0007).
 - **Tighter story thresholds fragment big evolving stories** (the Pope's surgery appeared as three trending entries on 10-13). P3's 2-per-story feed rule and MMR must treat near-identical stories as one.
 - **Breadth favours UK local-news networks:** one PA wire story on dozens of UK local sites counts as dozens of outlets. An ownership-group weight is a P3/P6 candidate.
 - **The topic floor makes every topic change every run,** so the Redis budget's worst case (30 commands) is the normal case. That's fine (86K/month), but the estimate of ~16 was wrong.

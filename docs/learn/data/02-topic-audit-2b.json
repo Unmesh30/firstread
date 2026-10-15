@@ -315,7 +315,7 @@
   "correct": 3
  },
  "notes": [
-  "LLM-labeled; spot-checked by a second, independent LLM session, approved by the owner, before any number is published.",
+  "LLM-labeled; spot-checked by a second, independent LLM session, approved by the owner: all 20 sampled topic labels held (#14, #26 and #47 borderline but defensible).",
   "GDELT from a 3-day replay of archived GKG files; RSS from a live run (RSS can't be replayed)."
  ]
 }

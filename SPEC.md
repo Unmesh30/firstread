@@ -2,7 +2,7 @@
 
 Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-14 (ADRs 0006–0009: topics, live sources, schema, dedupe)
 
-> This document is the single source of truth for what we are building. Claude Code reads it before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
+> This document is the single source of truth for what we are building. It is read before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
 ---
 

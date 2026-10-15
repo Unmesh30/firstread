@@ -162,7 +162,7 @@ def score() -> None:
     }
     out["notes"] = [
         "LLM-labeled; spot-checked by a second, independent LLM session, approved by the "
-        "owner, before any number is published.",
+        "owner (see ADR 0009 for the outcome).",
         "GDELT from a 3-day replay of archived GKG files; RSS from a live run "
         "(RSS can't be replayed).",
     ]

@@ -89,3 +89,8 @@ SPEC §6 named the GDELT DOC 2.0 API as the primary live source and curated publ
 - **Size:** 3,153 B per article; ~227 MB for 14 days, within the 400 MB budget.
 - **Top domains** are dominated by blocklisted syndication (iheart.com) and US local TV/radio. The blocklist removed 27,538 records, and 6,020 were unplaceable.
 - **Trending breadth favours UK local-news networks:** one PA wire story republished across dozens of UK local sites counts as dozens of outlets. An ownership-group weighting is a P3/P6 candidate.
+- **Section pages** stored as articles ("Health - Carroll Broadcasting Inc.", seen in the 2b threshold sample) are dropped as `section_page`: a section name on one side of the separator, and an outlet or company name on the other (`junk_titles.yaml` → `sections`, `outlet_words`).
+
+**Known limitations** (not fixed in Phase 2):
+- **Corporate-milestone press releases pass the filter.** Titles like "QuickMD Surpasses 2 Million Patient Visits" have no PR-wire domain and no fiscal-results or dividend shape. They can rank like news and, when syndicated, trend. A learned press-release detector, or more patterns (e.g. "surpasses … users/visits/customers"), is a later option.
+- **Local-TV suffixes aren't stripped.** Titles like "… – NBC4 Washington" or "… – NBC 7 San Diego" don't match the outlet's domain, so the suffix stays. Syndicated copies of one story then differ in title fingerprint and cosine, and **cluster as the same story instead of dropping as duplicates**. The per-story cap (3) limits the impact: at most 3 copies are stored, and coverage still counts every outlet.
