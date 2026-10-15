@@ -1,7 +1,7 @@
 """RawItem -> Candidate: clean, filter and prepare the embedding text.
 
 Every drop has a reason, counted in the run summary: ``no_url``, ``non_english``,
-``short_title``, ``junk_title``, ``press_release:<pattern>``, ``stale``.
+``short_title``, ``junk_title``, ``section_page``, ``press_release:<pattern>``, ``stale``.
 """
 
 from __future__ import annotations
@@ -57,6 +57,31 @@ def announcement(title: str) -> str | None:
     return None
 
 
+_SECTION_SPLIT = re.compile(r"\s+[-|\u2013\u2014:]\s+")
+MAX_OUTLET_WORDS = 6
+
+
+def is_section_page(title: str, source_name: str, domain: str, junk: JunkTitles) -> bool:
+    """A section name on one side and an outlet/company name on the other.
+
+    "Health - Carroll Broadcasting Inc." is a section page; "Health - New study links
+    sleep to memory" is a headline (the other side isn't a name).
+    """
+    parts = _SECTION_SPLIT.split(title, maxsplit=1)
+    if len(parts) != 2:
+        return False
+    own = {_squash(source_name).replace(" ", ""), _squash(domain.split(".")[0])} - {""}
+    for section, other in (parts, parts[::-1]):
+        if _squash(section) not in junk.sections:
+            continue
+        words = _squash(other).split()
+        if not words or len(words) > MAX_OUTLET_WORDS:
+            continue
+        if "".join(words) in own or words[-1] in junk.outlet_words:
+            return True
+    return False
+
+
 def is_junk(title: str, junk: JunkTitles) -> bool:
     """Whole-title matches and media-only prefixes; "Live updates: ..." is kept."""
     if _squash(title) in junk.whole:
@@ -80,7 +105,10 @@ def normalize(
         return "no_url"
     if not item.language.lower().startswith("en"):
         return "non_english"
-    title = strip_source_suffix(clean_text(item.title), item.source_name, item.source_domain)
+    raw_title = clean_text(item.title)
+    if is_section_page(raw_title, item.source_name, item.source_domain, junk):
+        return "section_page"
+    title = strip_source_suffix(raw_title, item.source_name, item.source_domain)
     if not looks_english(f"{title} {clean_text(item.description or '')}"):
         return "non_english"
     if len(title.split()) < min_words:
