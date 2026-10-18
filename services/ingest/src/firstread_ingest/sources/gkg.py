@@ -254,6 +254,9 @@ async def fetch_gkg(
             if places.press_wire(rec.domain):
                 result.dropped["press_wire_domain"] += 1
                 continue
+            if places.press_release_url(rec.domain, rec.url):
+                result.dropped["press_wire_path"] += 1
+                continue
             fips = places.fips(rec.domain)
             if fips is None:
                 result.dropped["unplaced_domain"] += 1

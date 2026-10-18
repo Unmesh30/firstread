@@ -264,21 +264,23 @@ async def final_state(conn: Any, redis: Any) -> dict[str, Any]:
 
 def press_release_counts(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
     by_rule: Counter[str] = Counter()
-    wires = records = 0
+    wires = paths = records = 0
     for r in runs:
         for k, v in r["dropped"].items():
             if k.startswith("press_release:"):
                 by_rule[k.split(":", 1)[1]] += v
         g = r["gdelt"]
         wires += (g.get("dropped") or {}).get("press_wire_domain", 0)
+        paths += (g.get("dropped") or {}).get("press_wire_path", 0)
         records += g.get("records") or 0
     titles = sum(by_rule.values())
     return {
         "press_wire_domain": wires,
+        "press_wire_path": paths,
         "announcement_titles": titles,
         "by_pattern": dict(by_rule.most_common()),
         "gdelt_records": records,
-        "share_of_gdelt_records": round((wires + titles) / records, 4) if records else None,
+        "share_of_gdelt_records": round((wires + paths + titles) / records, 4) if records else None,
     }
 
 
