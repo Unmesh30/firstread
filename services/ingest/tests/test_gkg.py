@@ -1,4 +1,7 @@
+import csv
 import hashlib
+import io
+import zipfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -8,7 +11,14 @@ import respx
 
 from firstread_ingest.http import make_client
 from firstread_ingest.sources import gkg
-from firstread_ingest.sources.gdelt_domains import DomainCountries, parse_lookup
+from firstread_ingest.sources.gdelt_domains import (
+    DomainCountries,
+    load_config,
+    load_domain_countries,
+    load_press_paths,
+    load_press_wires,
+    parse_lookup,
+)
 
 FIX = next((Path(__file__).parent / "fixtures" / "gkg").glob("*.gkg.csv.zip"))
 LATEST = gkg.parse_slot(FIX.name.split(".")[0])  # 2026-10-14 18:45
@@ -196,14 +206,82 @@ def test_press_wire_domains_are_dropped_and_counted() -> None:
 
 
 def test_repo_press_wire_list_includes_the_spot_check_domains() -> None:
-    from firstread_ingest.sources.gdelt_domains import load_press_wires
-
     wires = load_press_wires()
     assert {"finanznachrichten.de", "equitybulls.com", "prnewswire.com"} <= wires
 
 
 def test_court_records_database_is_blocked() -> None:
-    from firstread_ingest.sources.gdelt_domains import load_config
-
     _, blocklist = load_config()
     assert "indiankanoon.org" in blocklist
+
+
+MANILA = "https://www.manilatimes.net/2026/10/12"
+
+
+def test_repo_review_of_2026_10_18(tmp_path: Path) -> None:
+    """A few entries from the owner's review of the PR #12 list, via the real config."""
+    lookup = tmp_path / "lookup.csv"
+    lookup.write_text("domain,countrycode,cnt\nmanilatimes.net,RP,9\naol.com,US,9\n")
+    places = load_domain_countries(lookup)
+    assert places.press_wire("www.miragenews.com")
+    assert places.press_wire("investegate.co.uk")
+    assert places.blocked("www.boredpanda.com")
+    assert places.blocked("fool.com")
+    assert places.blocked("aol.co.uk")
+    assert places.blocked("www.aol.com")
+    # The Big News Network family, including members found in the replay data.
+    for d in ("bignewsnetwork.com", "heraldglobe.com", "greekherald.com", "bruneinews.net"):
+        assert places.blocked(d), d
+    # Kept: manilatimes.net (minus its newswire path) and businesstoday.in.
+    assert not places.blocked("manilatimes.net")
+    assert not places.press_wire("manilatimes.net")
+    assert not places.blocked("businesstoday.in")
+    assert not places.press_wire("businesstoday.in")
+
+
+def test_press_release_paths_drop_only_the_newswire_section() -> None:
+    assert load_press_paths()["manilatimes.net"] == {"tmt-newswire"}
+    places = DomainCountries({}, {}, frozenset(), press_paths=load_press_paths())
+    wire = f"{MANILA}/tmt-newswire/globenewswire/atk-phantom-gaming-mice/2443415"
+    assert places.press_release_url("www.manilatimes.net", wire)
+    assert places.press_release_url("manilatimes.net", wire.replace("globenewswire", "pr-newswire"))
+    assert not places.press_release_url("manilatimes.net", f"{MANILA}/news/national/flood/2443400")
+    # Whole segments only, and only on the listed domain.
+    assert not places.press_release_url("manilatimes.net", f"{MANILA}/news/tmt-newswire-x/1")
+    assert not places.press_release_url("example.com", "https://example.com/tmt-newswire/a/1")
+
+
+def _with_manila_rows(blob: bytes) -> bytes:
+    """The fixture with wisn.com and fox4news.com moved to manilatimes.net URLs."""
+    with zipfile.ZipFile(io.BytesIO(blob)) as z:
+        name = z.namelist()[0]
+        rows = list(csv.reader(io.StringIO(z.read(name).decode()), delimiter="\t",
+                               quoting=csv.QUOTE_NONE))  # fmt: skip
+    urls = {
+        "wisn.com": f"{MANILA}/tmt-newswire/globenewswire/teladoc-to-announce-results/2446026",
+        "fox4news.com": f"{MANILA}/news/national/senate-passes-budget/2443401",
+    }
+    out = io.StringIO()
+    w = csv.writer(out, delimiter="\t", lineterminator="\n", quoting=csv.QUOTE_NONE,
+                   escapechar="\\")  # fmt: skip
+    for r in rows:
+        if r[3] in urls:
+            r[3], r[4] = "manilatimes.net", urls[r[3]]
+        w.writerow(r)
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w") as z:
+        z.writestr(name, out.getvalue())
+    return buf.getvalue()
+
+
+async def test_fetch_drops_and_counts_press_release_paths(
+    no_network: respx.MockRouter, places: DomainCountries
+) -> None:
+    places.countries["manilatimes.net"] = "RP"
+    places.press_paths = load_press_paths()
+    mock_gdelt(no_network, _with_manila_rows(FIX.read_bytes()))
+    async with make_client() as c:
+        r = await gkg.fetch_gkg(c, None, LATEST + timedelta(minutes=20), places)
+    assert r.dropped["press_wire_path"] == 1
+    kept = [i.url for i in r.items if i.source_domain == "manilatimes.net"]
+    assert kept == [f"{MANILA}/news/national/senate-passes-budget/2443401"]

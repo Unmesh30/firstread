@@ -14,9 +14,10 @@ from __future__ import annotations
 import csv
 import hashlib
 import io
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlsplit
 
 import yaml
 
@@ -41,6 +42,9 @@ class DomainCountries:
     # Press-release wires: syndicated releases look like broad coverage and would win
     # the breadth ranking and trending, so they are dropped too (counted separately).
     press_wires: frozenset[str] = frozenset()
+    # Real outlets that also host syndicated releases under a known path segment
+    # (domain -> segments), e.g. manilatimes.net's /tmt-newswire/. Dropped like wires.
+    press_paths: dict[str, frozenset[str]] = field(default_factory=dict)
 
     def _candidates(self, domain: str) -> list[str]:
         """``a.b.example.co.uk`` -> itself, then each parent down to two labels."""
@@ -52,6 +56,12 @@ class DomainCountries:
 
     def press_wire(self, domain: str) -> bool:
         return any(d in self.press_wires for d in self._candidates(domain))
+
+    def press_release_url(self, domain: str, url: str) -> bool:
+        segments = set(urlsplit(url).path.lower().split("/"))
+        return any(
+            segments & self.press_paths.get(d, frozenset()) for d in self._candidates(domain)
+        )
 
     def fips(self, domain: str) -> str | None:
         """The outlet's FIPS country, or None if neither it nor a parent domain is known."""
@@ -92,6 +102,14 @@ def load_press_wires(path: Path = CONFIG_DIR / "gdelt_domains.yaml") -> frozense
     return frozenset(d.lower() for d in data.get("press_wires") or [])
 
 
+def load_press_paths(
+    path: Path = CONFIG_DIR / "gdelt_domains.yaml",
+) -> dict[str, frozenset[str]]:
+    data: dict[str, Any] = yaml.safe_load(path.read_text())
+    paths = data.get("press_release_paths") or {}
+    return {d.lower(): frozenset(s.strip("/").lower() for s in segs) for d, segs in paths.items()}
+
+
 def lookup_path(cache_dir: Path | None = None) -> Path:
     return (cache_dir or default_model_cache_dir()) / "gdelt" / f"outlets-{LOOKUP_SHA256[:12]}.csv"
 
@@ -116,5 +134,6 @@ async def ensure_lookup(client: Any, cache_dir: Path | None = None) -> Path:
 def load_domain_countries(lookup_file: Path, config: Path | None = None) -> DomainCountries:
     overrides, blocklist = load_config(config) if config else load_config()
     wires = load_press_wires(config) if config else load_press_wires()
+    paths = load_press_paths(config) if config else load_press_paths()
     text = lookup_file.read_text(encoding="utf-8", errors="replace")
-    return DomainCountries(parse_lookup(text), overrides, blocklist, wires)
+    return DomainCountries(parse_lookup(text), overrides, blocklist, wires, paths)

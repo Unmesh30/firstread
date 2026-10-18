@@ -149,14 +149,15 @@ def test_aggregates_strip_headlines_and_runs() -> None:
 def test_press_release_counts_and_size_estimate() -> None:
     runs = [
         {"dropped": {"press_release:financial_results": 2, "stale": 5},
-         "gdelt": {"records": 100, "dropped": {"press_wire_domain": 3}}},
+         "gdelt": {"records": 100, "dropped": {"press_wire_domain": 3, "press_wire_path": 1}}},
         {"dropped": {"press_release:company_prefix": 1},
          "gdelt": {"records": 100, "dropped": {}}},
     ]  # fmt: skip
     pr = replay.press_release_counts(runs)
     assert pr["press_wire_domain"] == 3
+    assert pr["press_wire_path"] == 1
     assert pr["announcement_titles"] == 3
-    assert pr["share_of_gdelt_records"] == 0.03
+    assert pr["share_of_gdelt_records"] == 0.035
     state = {"sizes": {"articles": 1000, "total": 3_200_000, "heap": 1_600_000,
                        "indexes": 1_600_000, "hnsw": 1_200_000, "coverage": 1_000_000}}  # fmt: skip
     est = replay.size_estimate(state, gdelt_per_day=4800, rss_per_day=200)
