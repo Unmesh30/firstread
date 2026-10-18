@@ -100,3 +100,15 @@ SPEC §6 named the GDELT DOC 2.0 API as the primary live source and curated publ
 - **Yale Climate Connections disabled** (`enabled: false`). It answers **HTTP 403 to GitHub-hosted runners** (it works from a home IP). Ingestion runs on GitHub Actions in P5 too (Cloud Run only hosts the API), so this won't clear up there, and a feed that fails every run would make every run `partial` and hide real problems. **8 RSS feeds remain enabled.** Weather stays covered by the GDELT topic floor.
 - **`indiankanoon.org` blocklisted:** a court-records database, not news. Its templated "X vs The State Of Y on <date>" titles also skewed the story-threshold sample (ADR 0009).
 - **The run summary's top-20 outlets are counted after the blocklist and country filter,** so new spam stands out instead of known blocked outlets (iheart.com used to top the list).
+
+## Follow-up (2026-10-18): owner review of the PR #12 domain list
+
+The owner reviewed the likely non-news, press-release and syndication outlets listed in PR #12 (from the top 100 outlets of the 3-day replay). Every entry has a comment in `gdelt_domains.yaml`.
+- **Press wires:** miragenews.com, investegate.co.uk, targetednews.com, newsroomamerica.com.
+- **Blocked, not news:** boredpanda.com, fool.com, 247wallst.com, rttnews.com, hamlethub.com.
+- **Blocked, aggregators that republish others' stories** (no original reporting, and every copy inflates trending breadth): prokerala.com, webindia123.com, wn.com, el-balad.com, ghanamma.com, aol.com, aol.co.uk.
+- **Blocked: the Big News Network family, 100 domains.** Every record has the URL shape `/news/<9-digit id>/<slug>`, and one id appears on many domains (one story, many copies). Members were found in the replay data: all 100 domains with that shape share ids with the six named in PR #12, every one of their records has the shape, and no other domain carries those ids. Together they are 14,335 replay records.
+- **Kept, minus a path: manilatimes.net.** Its own reporting is real Philippine news, but `/YYYY/MM/DD/tmt-newswire/<wire>/…` republishes GlobeNewswire, PR Newswire, Media OutReach and Plentisoft releases (1,797 of its 2,182 replay records). A new `press_release_paths` map (domain → URL path segments) drops those URLs before ranking, counted as `press_wire_path`.
+- **Kept: businesstoday.in.** Its templated "<Company> Share Price Today" pages are a title-pattern issue, not a domain one.
+
+Impact on the replay: these rules cover 31,331 records, about 10.5% of the 297,424 that passed the earlier filters. Most of that is Big News Network (14,335) and aol (3,961). A new replay will measure the effect on inserts and trending.
