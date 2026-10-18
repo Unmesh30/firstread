@@ -1,0 +1,32 @@
+name: Expo check
+
+# Strict `npx expo install --check`: fails when installed Expo/React Native packages
+# drift from what the Expo SDK expects (Expo publishes patch releases often). CI runs
+# the same check as advisory, so upstream releases don't block unrelated PRs; this
+# weekly run makes drift visible as a failed run. Fix with `npx expo install --fix`.
+on:
+  schedule:
+    - cron: "17 9 * * 1" # Mondays 09:17 UTC (GitHub may start scheduled runs late)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  expo-check:
+    name: expo-check
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Expo SDK version check (strict)
+        run: npx expo install --check
