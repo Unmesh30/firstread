@@ -10,6 +10,13 @@
 # press_wires: press-release distribution and republishing sites. Syndicated releases
 # appear on many outlets at once, so they look like broad coverage and would win the
 # breadth ranking and trending. Dropped before ranking, counted as press_wire_domain.
+#
+# press_release_paths: real outlets that also host syndicated releases under a known
+# URL path segment (domain -> segments). Those URLs are dropped before ranking,
+# counted as press_wire_path; the outlet's own reporting is kept.
+#
+# Domain counts below are GKG records in the 3-day replay (2026-10-12 to 10-15), from
+# the review list in PR #12 (reviewed by the owner on 2026-10-18).
 version: 1
 overrides:
   aljazeera.com: QA        # lookup US (0.36)
@@ -36,6 +43,124 @@ blocklist:
   - iheart.com
   # A court-records database, not news (templated "X vs The State Of Y on <date>" titles).
   - indiankanoon.org
+  # Not news: listicles, stock tips, automated market summaries, event calendars.
+  - boredpanda.com      # viral listicles (1,793 records)
+  - fool.com            # stock-pick and retirement advice (830)
+  - 247wallst.com       # stock-pick and retirement advice (436)
+  - rttnews.com         # automated market summaries, "Asian Markets Trade Mixed" (560)
+  - hamlethub.com       # community events calendar (370)
+  # Aggregators that republish other outlets' stories (and inflate trending breadth).
+  - prokerala.com       # republishes IANS/ANI wire copy (878)
+  - webindia123.com     # republishes IANS/ANI wire copy (752)
+  - wn.com              # World News aggregator (414)
+  - el-balad.com        # machine-written sports and betting copy (520)
+  - ghanamma.com        # rewrites of other outlets' football and celebrity stories (1,239)
+  - aol.com             # syndicated copies of other outlets, e.g. Motley Fool (2,061)
+  - aol.co.uk           # syndicated copies of other outlets, e.g. PA (1,900)
+  # Big News Network: one publisher, 100 domains. Every record has the URL shape
+  # /news/<9-digit id>/<slug>, and the same id appears on many domains (one story,
+  # many copies). All 100 domains in the replay share ids with the six named in PR #12
+  # and no other domain uses those ids. 14,335 records in total.
+  - bignewsnetwork.com       # Big News Network: 1,326 records, all /news/<id>/ copies
+  - indiagazette.com         # Big News Network: 678 records, all /news/<id>/ copies
+  - calcuttanews.net         # Big News Network: 560 records, all /news/<id>/ copies
+  - heraldglobe.com          # Big News Network: 422 records, copies plus paid releases
+  - cambodiantimes.com       # Big News Network: 331 records, all /news/<id>/ copies
+  - nepalnational.com        # Big News Network: 287 records, copies plus paid releases
+  - laosnews.net             # Big News Network: 261 records, all /news/<id>/ copies
+  - bruneinews.net           # Big News Network: 249 records, all /news/<id>/ copies
+  - asiabulletin.com         # Big News Network: 232 records, all /news/<id>/ copies
+  - middleeaststar.com       # Big News Network: 207 records, all /news/<id>/ copies
+  - californiatelegraph.com  # Big News Network: 206 records, all /news/<id>/ copies
+  - europesun.com            # Big News Network: 187 records, all /news/<id>/ copies
+  - chinanationalnews.com    # Big News Network: 181 records, all /news/<id>/ copies
+  - srilankasource.com       # Big News Network: 179 records, all /news/<id>/ copies
+  - kenyastar.com            # Big News Network: 178 records, all /news/<id>/ copies
+  - russiaherald.com         # Big News Network: 177 records, all /news/<id>/ copies
+  - tennesseedaily.com       # Big News Network: 171 records, all /news/<id>/ copies
+  - japanherald.com          # Big News Network: 169 records, all /news/<id>/ copies
+  - shanghainews.net         # Big News Network: 167 records, all /news/<id>/ copies
+  - bangladeshsun.com        # Big News Network: 160 records, all /news/<id>/ copies
+  - hawaiitelegraph.com      # Big News Network: 157 records, all /news/<id>/ copies
+  - pakistantelegraph.com    # Big News Network: 157 records, all /news/<id>/ copies
+  - iranherald.com           # Big News Network: 153 records, all /news/<id>/ copies
+  - torontotelegraph.com     # Big News Network: 152 records, all /news/<id>/ copies
+  - vietnamtribune.com       # Big News Network: 152 records, all /news/<id>/ copies
+  - parisguardian.com        # Big News Network: 149 records, all /news/<id>/ copies
+  - sydneysun.com            # Big News Network: 145 records, all /news/<id>/ copies
+  - arabherald.com           # Big News Network: 143 records, all /news/<id>/ copies
+  - caribbeanherald.com      # Big News Network: 143 records, all /news/<id>/ copies
+  - batonrougepost.com       # Big News Network: 142 records, all /news/<id>/ copies
+  - malaysiasun.com          # Big News Network: 142 records, all /news/<id>/ copies
+  - newjerseytelegraph.com   # Big News Network: 142 records, all /news/<id>/ copies
+  - australiannews.net       # Big News Network: 140 records, all /news/<id>/ copies
+  - britainnews.net          # Big News Network: 139 records, all /news/<id>/ copies
+  - myanmarnews.net          # Big News Network: 137 records, all /news/<id>/ copies
+  - azerbaijannews.net       # Big News Network: 136 records, all /news/<id>/ copies
+  - africaleader.com         # Big News Network: 134 records, all /news/<id>/ copies
+  - austinglobe.com          # Big News Network: 127 records, all /news/<id>/ copies
+  - sierraleonetimes.com     # Big News Network: 127 records, all /news/<id>/ copies
+  - greekherald.com          # Big News Network: 124 records, all /news/<id>/ copies
+  - hongkongherald.com       # Big News Network: 124 records, all /news/<id>/ copies
+  - mexicostar.com           # Big News Network: 122 records, all /news/<id>/ copies
+  - haitisun.com             # Big News Network: 118 records, all /news/<id>/ copies
+  - singaporestar.com        # Big News Network: 117 records, all /news/<id>/ copies
+  - cincinnatisun.com        # Big News Network: 115 records, all /news/<id>/ copies
+  - southeastasiapost.com    # Big News Network: 115 records, all /news/<id>/ copies
+  - trinidadtimes.com        # Big News Network: 113 records, all /news/<id>/ copies
+  - afghanistannews.net      # Big News Network: 111 records, all /news/<id>/ copies
+  - philippinetimes.com      # Big News Network: 111 records, all /news/<id>/ copies
+  - brazilsun.com            # Big News Network: 110 records, all /news/<id>/ copies
+  - iraqsun.com              # Big News Network: 110 records, all /news/<id>/ copies
+  - zimbabwestar.com         # Big News Network: 109 records, all /news/<id>/ copies
+  - floridastatesman.com     # Big News Network: 107 records, all /news/<id>/ copies
+  - ohiostandard.com         # Big News Network: 106 records, all /news/<id>/ copies
+  - milwaukeesun.com         # Big News Network: 104 records, all /news/<id>/ copies
+  - nigeriasun.com           # Big News Network: 103 records, all /news/<id>/ copies
+  - argentinastar.com        # Big News Network: 102 records, all /news/<id>/ copies
+  - beijingbulletin.com      # Big News Network: 101 records, all /news/<id>/ copies
+  - jamaicantimes.com        # Big News Network: 99 records, all /news/<id>/ copies
+  - newyorkstatesman.com     # Big News Network: 99 records, all /news/<id>/ copies
+  - newyorktelegraph.com     # Big News Network: 98 records, all /news/<id>/ copies
+  - taiwansun.com            # Big News Network: 98 records, all /news/<id>/ copies
+  - orlandoecho.com          # Big News Network: 97 records, all /news/<id>/ copies
+  - texasguardian.com        # Big News Network: 97 records, all /news/<id>/ copies
+  - londonmercury.com        # Big News Network: 96 records, all /news/<id>/ copies
+  - shanghaisun.com          # Big News Network: 95 records, all /news/<id>/ copies
+  - afghanistansun.com       # Big News Network: 94 records, all /news/<id>/ copies
+  - sanantoniopost.com       # Big News Network: 92 records, all /news/<id>/ copies
+  - clevelandstar.com        # Big News Network: 90 records, all /news/<id>/ copies
+  - irishsun.com             # Big News Network: 90 records, all /news/<id>/ copies
+  - israelherald.com         # Big News Network: 90 records, all /news/<id>/ copies
+  - northkoreatimes.com      # Big News Network: 88 records, all /news/<id>/ copies
+  - thailandnews.net         # Big News Network: 88 records, all /news/<id>/ copies
+  - pittsburghstar.com       # Big News Network: 87 records, all /news/<id>/ copies
+  - dallassun.com            # Big News Network: 82 records, all /news/<id>/ copies
+  - sandiegosun.com          # Big News Network: 82 records, all /news/<id>/ copies
+  - massachusettssun.com     # Big News Network: 80 records, all /news/<id>/ copies
+  - newzealandstar.com       # Big News Network: 79 records, all /news/<id>/ copies
+  - theuknews.com            # Big News Network: 79 records, all /news/<id>/ copies
+  - utahindependent.com      # Big News Network: 79 records, all /news/<id>/ copies
+  - neworleanssun.com        # Big News Network: 78 records, all /news/<id>/ copies
+  - birminghamstar.com       # Big News Network: 77 records, all /news/<id>/ copies
+  - coloradostar.com         # Big News Network: 76 records, all /news/<id>/ copies
+  - oklahomacitysun.com      # Big News Network: 76 records, all /news/<id>/ copies
+  - tucsonpost.com           # Big News Network: 75 records, all /news/<id>/ copies
+  - bostonstar.com           # Big News Network: 67 records, all /news/<id>/ copies
+  - memphissun.com           # Big News Network: 65 records, all /news/<id>/ copies
+  - mainemirror.com          # Big News Network: 64 records, all /news/<id>/ copies
+  - oklahomastar.com         # Big News Network: 63 records, all /news/<id>/ copies
+  - australianherald.com     # Big News Network: 60 records, all /news/<id>/ copies
+  - nashvilleherald.com      # Big News Network: 57 records, all /news/<id>/ copies
+  - saltlakecitysun.com      # Big News Network: 56 records, all /news/<id>/ copies
+  - albuquerqueexpress.com   # Big News Network: 55 records, all /news/<id>/ copies
+  - phoenixherald.com        # Big News Network: 54 records, all /news/<id>/ copies
+  - baltimorestar.com        # Big News Network: 52 records, all /news/<id>/ copies
+  - stlouisstar.com          # Big News Network: 50 records, all /news/<id>/ copies
+  - centralasiatimes.com     # Big News Network: 48 records, all /news/<id>/ copies
+  - theusnews.com            # Big News Network: 46 records, all /news/<id>/ copies
+  - atlantaleader.com        # Big News Network: 38 records, all /news/<id>/ copies
+  - venezuelastar.com        # Big News Network: 32 records, all /news/<id>/ copies
 press_wires:
   - prnewswire.com          # PR Newswire
   - globenewswire.com       # GlobeNewswire
@@ -49,3 +174,11 @@ press_wires:
   - prweb.com               # PRWeb
   - newswire.ca             # Cision Canada
   - openpr.com              # openPR
+  - miragenews.com          # republishes media releases (1,135 records)
+  - investegate.co.uk       # UK RNS company announcements (767)
+  - targetednews.com        # government and corporate release digests (702)
+  - newsroomamerica.com     # release and tag-page aggregator (842)
+press_release_paths:
+  # Real Philippine news, but /YYYY/MM/DD/tmt-newswire/<wire>/... carries GlobeNewswire,
+  # PR Newswire, Media OutReach and Plentisoft releases (1,797 of 2,182 records).
+  manilatimes.net: [tmt-newswire]
