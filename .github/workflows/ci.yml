@@ -116,10 +116,17 @@ jobs:
           cache: npm
           cache-dependency-path: apps/mobile/package-lock.json
       - run: npm ci
-      # Fails (exit 1) if any installed Expo/React Native package doesn't match
-      # the Expo SDK, e.g. after a partial SDK bump.
-      - name: Expo SDK version check
-        run: npx expo install --check
+      # Advisory here: the check compares against Expo's latest patch releases, so it
+      # starts failing whenever Expo publishes one, without any change in this repo.
+      # Drift shows up as a warning annotation; expo-check.yml runs it strictly weekly.
+      # Fix drift with `npx expo install --fix`.
+      - name: Expo SDK version check (advisory)
+        continue-on-error: true
+        run: |
+          if ! npx expo install --check; then
+            echo "::warning title=Expo SDK drift::Run 'npx expo install --fix' in apps/mobile (see the log above)."
+            exit 1
+          fi
       - run: npm run lint
       - run: npm run format:check
       - run: npm run typecheck

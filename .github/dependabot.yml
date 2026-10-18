@@ -24,8 +24,8 @@ updates:
     ignore:
       # Expo group: no Dependabot updates at all. react must exactly match the
       # renderer bundled with React Native, and every SDK package is pinned by
-      # the Expo SDK, so these move only with `npx expo install --fix` (CI's
-      # `npx expo install --check` catches drift). Omitting update-types
+      # the Expo SDK, so these move only with `npx expo install --fix` (the weekly
+      # expo-check.yml workflow catches drift). Omitting update-types
       # ignores every update for the dependency.
       - dependency-name: "expo"
       - dependency-name: "expo-*"
