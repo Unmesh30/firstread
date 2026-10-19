@@ -1,4 +1,4 @@
-"""Redis pools rebuilt from Postgres (real Postgres + Redis db 15)."""
+"""Pools from the window snapshot, and the 3-command publish (real Postgres + Redis db 15)."""
 
 import uuid
 from datetime import UTC, datetime, timedelta
@@ -7,12 +7,13 @@ from typing import Any
 import numpy as np
 import pytest
 
+from firstread_core import pools as core_pools
 from firstread_core.db import apply_migrations, connect
 from firstread_core.dbtest import MIGRATIONS, skip_or_fail_if_unreachable_async, temp_database
-from firstread_core.topics import TOPIC_IDS
-from firstread_ingest import pools, store
+from firstread_ingest import pools, store, window
 
-NOW = datetime(2026, 10, 15, 12, 20, tzinfo=UTC)  # minute 20: not the hourly full rewrite
+NOW = datetime(2026, 10, 15, 12, 20, tzinfo=UTC)
+MODEL = "m"
 pytestmark = pytest.mark.integration
 
 
@@ -37,16 +38,12 @@ async def db(dsn: str) -> Any:
     return conn
 
 
-def test_plan_writes_fresh_and_trending_always_topics_when_changed() -> None:
-    topics: dict[str, dict[str, float]] = {t: {} for t in TOPIC_IDS}
-    w = pools.plan_writes({}, topics, {}, ["sports", "not-a-topic"], full=False)
-    assert set(w) == {pools.FRESH, pools.TRENDING, "pool:topic:sports"}
-    full = pools.plan_writes({}, topics, {}, [], full=True)
-    assert len(full) == 2 + 13
+async def snapshot(conn: Any) -> window.WindowSnapshot:
+    return (await window.sync(conn, None, NOW, MODEL)).snapshot
 
 
-async def test_pools_contents_order_caps_and_empty_pools(
-    redis_test: Any, monkeypatch: pytest.MonkeyPatch
+async def test_fresh_and_topic_pools_order_caps_and_windows(
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     await skip_or_fail_if_unreachable_async()
     monkeypatch.setattr(pools, "TOPIC_CAP", 2)
@@ -56,26 +53,29 @@ async def test_pools_contents_order_caps_and_empty_pools(
             rows = [row(i, "sports", timedelta(hours=i)) for i in range(4)]
             rows += [row(10, "health", timedelta(hours=30)), row(11, "health", timedelta(hours=80))]
             await store.insert_articles(conn, rows)
-            # A stale pool for a topic that is now empty must disappear, not error.
-            await redis_test.zadd("pool:topic:weather", {"old": 1.0})
-            result = await pools.rebuild(redis_test, conn, NOW, ["sports", "health", "weather"])
-            fresh = await redis_test.zrevrange(pools.FRESH, 0, -1)
-            assert [x.decode() for x in fresh] == [
-                str(r.id) for r in rows[:4]
-            ]  # 24 h, newest first
-            sports = await redis_test.zrevrange("pool:topic:sports", 0, -1)
-            assert [x.decode() for x in sports] == [str(r.id) for r in rows[:2]]  # cap 2
-            health = await redis_test.zrange("pool:topic:health", 0, -1)
-            assert [x.decode() for x in health] == [str(rows[4].id)]  # 72 h window
-            assert not await redis_test.exists("pool:topic:weather")  # empty -> DEL
-            assert not await redis_test.exists("pool:fresh:tmp")
-            # fresh (2) + empty trending (1 DEL) + sports, health (2 each) + weather DEL (1)
-            assert result.commands == 8
+            win = await snapshot(conn)
+            fresh = pools.fresh_members(win, NOW)
+            assert list(fresh) == [r.id for r in rows[:4]]  # 24 h, newest first
+            topics = pools.topic_members(win, NOW)
+            assert list(topics["sports"]) == [r.id for r in rows[:2]]  # cap 2
+            assert list(topics["health"]) == [rows[4].id]  # 72 h window
+            assert topics["weather"] == {}
+            # Identical to the pre-P3 SQL builders (the replay checks this every run).
+            assert pools.same_pool(fresh, await pools.legacy_fresh(conn, NOW), pools.FRESH_CAP)
+            legacy = await pools.legacy_topics(conn, NOW)
+            assert all(pools.same_pool(topics[t], legacy[t], 2) for t in topics)
         finally:
             await conn.close()
 
 
-async def test_trending_breadth_decay_and_minimum(redis_test: Any) -> None:
+def test_same_pool_tolerates_only_ties_at_the_cap() -> None:
+    a, b, c = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+    assert pools.same_pool({a: 2.0, b: 1.0}, {a: 2.0, c: 1.0}, cap=2)  # tie at the edge
+    assert not pools.same_pool({a: 2.0, b: 1.0}, {a: 2.0, c: 1.0}, cap=3)  # not at the cap
+    assert not pools.same_pool({a: 2.0, b: 1.0}, {c: 2.0, b: 1.0}, cap=2)  # above the edge
+
+
+async def test_trending_breadth_decay_and_minimum() -> None:
     await skip_or_fail_if_unreachable_async()
     async with temp_database() as dsn:
         conn = await db(dsn)
@@ -90,35 +90,117 @@ async def test_trending_breadth_decay_and_minimum(redis_test: Any) -> None:
             cov += [(single, "only.com", NOW)]  # 1 outlet: excluded
             cov += [(old_wide, f"o{i}.com", NOW - timedelta(hours=20)) for i in range(5)]
             await store.insert_coverage(conn, cov)
-            top = await pools.trending(conn, NOW)
-            assert [t["story_cluster_id"] for t in top] == [wide, old_wide]  # decay: 3 h > 20 h
-            assert top[0]["id"] == str(first.id)  # representative = earliest stored article
-            assert top[0]["score"] == pytest.approx(5 * 2 ** (-3 / 6), rel=1e-6)
-            assert top[0]["domains"] == 5
-            await pools.rebuild(redis_test, conn, NOW, [])
-            assert await redis_test.zcard(pools.TRENDING) == 2
+            snap = await pools.build_snapshot(conn, await snapshot(conn), NOW, "v1")
+            assert [t.clusters for t in snap.trending] == [(wide,), (old_wide,)]  # 3 h > 20 h
+            assert snap.trending[0].id == first.id  # representative = earliest stored article
+            assert snap.trending[0].score == pytest.approx(5 * 2 ** (-3 / 6), rel=1e-6)
+            assert snap.trending[0].outlets == 5
+            assert snap.member_ids() <= set(snap.articles)
+            assert set(snap.centroids) == {"world", "us"}
+            assert snap.stats["articles_24h"] == 4
         finally:
             await conn.close()
 
 
-async def test_full_hourly_rewrite_stays_within_budget(redis_test: Any) -> None:
+class Recorder:
+    """A fake Redis pipeline target that records commands in order."""
+
+    def __init__(self, fail_on: str | None = None) -> None:
+        self.log: list[tuple[str, ...]] = []
+        self.data: dict[str, Any] = {}
+        self.fail_on = fail_on
+
+    def pipeline(self, transaction: bool = False) -> "Recorder.Pipe":
+        assert transaction is False
+        return Recorder.Pipe(self)
+
+    class Pipe:
+        def __init__(self, r: "Recorder") -> None:
+            self.r, self.cmds = r, []  # type: ignore[var-annotated]
+
+        def set(self, k: str, v: Any) -> None:
+            self.cmds.append(("set", k, v))
+
+        def expire(self, k: str, s: int) -> None:
+            self.cmds.append(("expire", k, s))
+
+        async def execute(self) -> None:
+            for c in self.cmds:
+                if self.r.fail_on and c[0] == "set" and c[1] == self.r.fail_on:
+                    raise ConnectionError("lost")
+                self.r.log.append(tuple(str(x) for x in c[:2]))
+                if c[0] == "set":
+                    self.r.data[c[1]] = c[2]
+
+
+async def test_publish_order_three_commands_and_grace_period() -> None:
     await skip_or_fail_if_unreachable_async()
     async with temp_database() as dsn:
         conn = await db(dsn)
         try:
-            await store.insert_articles(
-                conn, [row(i, t, timedelta(hours=1)) for i, t in enumerate(TOPIC_IDS)]
+            await store.insert_articles(conn, [row(1, "sports", timedelta(hours=1))])
+            win = await snapshot(conn)
+            redis = Recorder()
+            first = await pools.publish(
+                redis, conn, await pools.build_snapshot(conn, win, NOW, "a")
             )
-            top_of_hour = NOW.replace(minute=5)
-            result = await pools.rebuild(redis_test, conn, top_of_hour, [])
-            assert result.commands <= pools.MAX_COMMANDS
-            for t in TOPIC_IDS:
-                assert await redis_test.zcard(f"pool:topic:{t}") == 1
+            assert first.commands == 2  # nothing to expire yet
+            second = await pools.publish(
+                redis, conn, await pools.build_snapshot(conn, win, NOW, "b")
+            )
+            assert second.commands == 3
+            assert redis.log[-3:] == [
+                ("set", "pools:blob:b"),
+                ("set", "pools:ver"),
+                ("expire", "pools:blob:a"),
+            ]
+            decoded = core_pools.decode(redis.data["pools:blob:b"], redis.data["pools:ver"])
+            assert decoded.version == "b"
         finally:
             await conn.close()
 
 
-async def test_budget_is_enforced(redis_test: Any) -> None:
-    writes = {f"pool:x{i}": {"a": 1.0} for i in range(16)}  # 32 commands
-    with pytest.raises(RuntimeError, match="budget"):
-        await pools.write_pools(redis_test, writes)
+async def test_a_failed_publish_keeps_the_old_version_and_the_next_run_expires_the_orphan() -> None:
+    await skip_or_fail_if_unreachable_async()
+    async with temp_database() as dsn:
+        conn = await db(dsn)
+        try:
+            await store.insert_articles(conn, [row(1, "sports", timedelta(hours=1))])
+            win = await snapshot(conn)
+            redis = Recorder()
+            await pools.publish(redis, conn, await pools.build_snapshot(conn, win, NOW, "a"))
+            redis.fail_on = "pools:ver"  # blob b is written, the version never moves
+            with pytest.raises(ConnectionError):
+                await pools.publish(redis, conn, await pools.build_snapshot(conn, win, NOW, "b"))
+            assert redis.data["pools:ver"] == "a"  # readers keep the old snapshot
+            redis.fail_on = None
+            c = await pools.publish(redis, conn, await pools.build_snapshot(conn, win, NOW, "c"))
+            assert c.orphan_expired
+            assert c.commands == 4
+            assert ("expire", "pools:blob:b") in redis.log  # orphan
+            assert redis.log[-1] == ("expire", "pools:blob:a")  # previous, after the switch
+        finally:
+            await conn.close()
+
+
+async def test_drop_legacy_is_one_delete(redis_test: Any) -> None:
+    await redis_test.zadd("pool:fresh", {"x": 1.0})
+    await redis_test.zadd("pool:topic:sports", {"x": 1.0})
+    assert await pools.drop_legacy(redis_test) == 2
+    assert not await redis_test.exists("pool:fresh", "pool:topic:sports")
+
+
+async def test_publish_against_real_redis(redis_test: Any) -> None:
+    await skip_or_fail_if_unreachable_async()
+    async with temp_database() as dsn:
+        conn = await db(dsn)
+        try:
+            await store.insert_articles(conn, [row(1, "sports", timedelta(hours=1))])
+            win = await snapshot(conn)
+            await pools.publish(redis_test, conn, await pools.build_snapshot(conn, win, NOW, "a"))
+            await pools.publish(redis_test, conn, await pools.build_snapshot(conn, win, NOW, "b"))
+            assert (await redis_test.get("pools:ver")) == b"b"
+            assert 0 < await redis_test.ttl("pools:blob:a") <= 120  # grace period
+            assert await redis_test.ttl("pools:blob:b") == -1  # current blob: no TTL
+        finally:
+            await conn.close()

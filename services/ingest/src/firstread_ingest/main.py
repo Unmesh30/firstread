@@ -2,7 +2,8 @@
 
     uv run firstread-ingest migrate
     uv run firstread-ingest run [--sources rss,gdelt] [--dry-run]
-    uv run firstread-ingest replay [--days 3] [--fresh]
+    uv run firstread-ingest replay [--days 3] [--fresh] [--compare]
+    uv run firstread-ingest drop-legacy-pools   # one-off: remove ADR 0010's pool:* keys
 
 ``run`` prints the summary as JSON and, when ``$GITHUB_STEP_SUMMARY`` is set (GitHub
 Actions), appends it as Markdown. Exit codes: 0 for ok/partial (partial also prints a
@@ -52,14 +53,35 @@ def load_classifier(settings: Settings) -> TopicClassifier:
 async def _run(settings: Settings, sources: Sequence[str], dry_run: bool) -> dict[str, object]:
     from firstread_ingest.pipeline import run
 
-    summary = await run(settings, load_classifier(settings), sources=sources, dry_run=dry_run)
+    summary = await run(
+        settings,
+        load_classifier(settings),
+        sources=sources,
+        dry_run=dry_run,
+        window_file=settings.ingest_window_file,
+    )
     return summary.as_dict()
+
+
+async def _drop_legacy(settings: Settings) -> int:
+    from redis.asyncio import Redis
+
+    from firstread_ingest.pools import drop_legacy
+
+    redis = Redis.from_url(settings.redis_url.get_secret_value())
+    try:
+        return await drop_legacy(redis)
+    finally:
+        await redis.aclose()
 
 
 def main(argv: Sequence[str] | None = None) -> None:
     parser = argparse.ArgumentParser(prog="firstread-ingest", description=__doc__)
     sub = parser.add_subparsers(dest="command", required=True)
     sub.add_parser("migrate", help="apply infra/db/migrations to DATABASE_URL")
+    sub.add_parser(
+        "drop-legacy-pools", help="one-off: delete the pre-P3 pool:* sorted sets (1 command)"
+    )
     p = sub.add_parser("run", help="run one ingestion pass")
     p.add_argument("--sources", default=",".join(SOURCES), help="comma-separated: rss,gdelt")
     p.add_argument("--dry-run", action="store_true", help="fetch, embed, classify; write nothing")
@@ -74,15 +96,25 @@ def main(argv: Sequence[str] | None = None) -> None:
     p.add_argument("--db", default="firstread_replay")
     p.add_argument("--redis-db", type=int, default=1)
     p.add_argument("--fresh", action="store_true", help="drop the replay DB and start over")
+    p.add_argument(
+        "--compare",
+        action="store_true",
+        help="also run the pre-P3 SQL paths and report any difference (evidence, costs egress)",
+    )
     args = parser.parse_args(argv)
     if args.command == "replay":
         from firstread_ingest import replay
         from firstread_ingest.sources.gkg import parse_slot
 
         end = parse_slot(args.end) if args.end else None
-        asyncio.run(replay.main(args.days, end, args.db, args.redis_db, args.fresh))
+        asyncio.run(
+            replay.main(args.days, end, args.db, args.redis_db, args.fresh, compare=args.compare)
+        )
         return
     settings = Settings()
+    if args.command == "drop-legacy-pools":
+        print(f"removed {asyncio.run(_drop_legacy(settings))} legacy pool key(s)")
+        return
     if args.command == "migrate":
         applied = asyncio.run(_migrate(settings))
         print(f"applied {len(applied)} migration(s): {', '.join(applied) or 'none pending'}")

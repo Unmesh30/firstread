@@ -48,6 +48,10 @@ class Settings(BaseSettings):
     ingest_retention_coverage_hours: int = 48
     ingest_retention_runs_days: int = 30
     ingest_size_warn_mb: int = 350
+    # Runner-side copy of the 72 h window (ADR 0012). GitHub Actions caches this file
+    # between runs; it's only a cache (any mismatch -> full reload). Empty: no file,
+    # the window is reloaded from Postgres every run (~14 MB of egress).
+    ingest_window_file: Path | None = None
     # GDELT GKG files (ADR 0007).
     ingest_gkg_max_files: int = 8  # catch up at most 2 h of 15-minute files per run
     ingest_gkg_stale_minutes: int = 60  # newest file older than this -> "stale" in the summary
@@ -57,7 +61,7 @@ class Settings(BaseSettings):
     ingest_gkg_max_per_story: int = 3  # stored articles per story (feed shows <= 2)
     ingest_gkg_topic_min: int = 2  # slots reserved per topic before ranking fills the rest
 
-    @field_validator("ingest_model_dir", mode="before")
+    @field_validator("ingest_model_dir", "ingest_window_file", mode="before")
     @classmethod
     def _empty_is_unset(cls, v: object) -> object:
         return None if v in ("", None) else v

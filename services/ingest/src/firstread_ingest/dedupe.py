@@ -22,7 +22,7 @@ Every decision carries the cluster it belongs to, including dropped duplicates, 
 from __future__ import annotations
 
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Literal
@@ -106,9 +106,12 @@ def decide(
     vectors: NDArray[np.float32],
     recent: Recent,
     thresholds: Thresholds,
+    make_id: Callable[[], uuid.UUID] = uuid.uuid4,
 ) -> list[Decision]:
-    """One decision per item, in order. ``vectors[i]`` is item i's normalized embedding."""
-    make_id = uuid.uuid4
+    """One decision per item, in order. ``vectors[i]`` is item i's normalized embedding.
+
+    ``make_id`` mints new article ids (a seeded factory makes two runs comparable).
+    """
     sims_recent = vectors @ recent.embeddings.T if len(recent.ids) else None
     kept_rows: list[int] = []  # indices into items that were inserted
     kept_clusters: list[uuid.UUID] = []

@@ -17,7 +17,7 @@ SUMMARY = {
                   "selected": 3, "capped": {}, "dropped": {"blocked_domain": 1},
                   "top_domains": {"wisn.com": 3}, "stale": True,
                   "newest_available": "20261015000000", "cursor": "20261014234500"},
-        "pools": {"pool:fresh": 4}, "retention": {"articles": 0}, "size": {"db": 12_000_000},
+        "pools": {"fresh": 4}, "retention": {"articles": 0}, "size": {"db": 12_000_000},
         "feed_errors": {"bbc-world": "HTTP 500"},
     },
 }  # fmt: skip

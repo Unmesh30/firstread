@@ -12,10 +12,12 @@ more than the database budget allows, so its inserts are ranked and capped per r
 from __future__ import annotations
 
 import time
+import uuid
 from collections import Counter
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
 from typing import Any
 
 import numpy as np
@@ -23,7 +25,7 @@ from numpy.typing import NDArray
 
 from firstread_core.embedding import EMBED_MODEL, Embedder, embedding_cache_key
 from firstread_core.topics import TopicDecision, resolve_topic
-from firstread_ingest import pools, store
+from firstread_ingest import pools, store, window
 from firstread_ingest.config import Feed, Settings, load_feeds
 from firstread_ingest.dedupe import VALIDATED_BY_PAIR, Decision, Item, Recent, Thresholds, decide
 from firstread_ingest.http import make_client
@@ -37,6 +39,7 @@ from firstread_ingest.sources.gdelt_domains import (
     ensure_lookup,
     load_domain_countries,
 )
+from firstread_ingest.window import WindowSnapshot
 
 EMBEDDING_MODEL_ID = f"{EMBED_MODEL}#{embedding_cache_key()[0][:12]}"
 EmbedFn = Callable[[Sequence[str]], NDArray[np.float32]]
@@ -64,6 +67,11 @@ class RunSummary:
     gdelt: dict[str, Any] = field(default_factory=dict)
     redis_commands: int = 0
     pools: dict[str, int] = field(default_factory=dict)
+    pool_version: str = ""
+    pool_blob_bytes: int = 0
+    window: dict[str, Any] = field(default_factory=dict)
+    egress_bytes_est: int = 0
+    compare: dict[str, Any] = field(default_factory=dict)
     retention: dict[str, int] = field(default_factory=dict)
     size: dict[str, int] = field(default_factory=dict)
     size_warning: bool = False
@@ -97,6 +105,11 @@ class RunSummary:
                 "text_sources": dict(self.text_sources),
                 "gdelt": self.gdelt,
                 "pools": self.pools,
+                "pool_version": self.pool_version,
+                "pool_blob_bytes": self.pool_blob_bytes,
+                "window": self.window,
+                "egress_bytes_est": self.egress_bytes_est,
+                **({"compare": self.compare} if self.compare else {}),
                 "retention": self.retention,
                 "size": self.size,
                 "size_warning": self.size_warning,
@@ -204,52 +217,77 @@ async def run(
     client: Any = None,
     conn: Any = None,
     redis: Any = None,
+    window_file: Path | None = None,
+    compare_legacy: bool = False,
 ) -> RunSummary:
+    """One run. ``window_file`` persists the 72 h window between runs (ADR 0012);
+    without it the window is reloaded from Postgres every run (tests, one-offs).
+    ``compare_legacy`` also runs the pre-P3 SQL paths and records any difference
+    (replay evidence only: it costs the old egress)."""
     now = now or datetime.now(UTC)
     summary = RunSummary(started_at=now, model_version=classifier.version)
     embed = embed or Embedder().embed
     owns_conn = conn is None and not dry_run
+    raw_conn = conn
     if owns_conn:
         from firstread_core.db import connect
 
-        conn = await connect(settings.database_url.get_secret_value())
+        raw_conn = await connect(settings.database_url.get_secret_value())
+    meter = store.Metered(raw_conn) if raw_conn is not None else None
     run_id = None
     try:
-        if conn is not None:
-            await store.register_codecs(conn)
-            run_id = await store.start_run(conn, now)
-        summary = await _run(
-            settings, classifier, embed, sources, feeds, places, conn, now, client, summary
-        )
-        if conn is not None:
-            await _update_pools(settings, conn, redis, now, summary)
+        if meter is not None:
+            await store.register_codecs(raw_conn)
+            run_id = await store.start_run(meter, now)
+        summary, snap = await _run(
+            settings, classifier, embed, sources, feeds, places, meter, now, client, summary,
+            window_file, compare_legacy,
+        )  # fmt: skip
+        if meter is not None and snap is not None:
+            version = f"{now:%Y%m%dT%H%M%SZ}-{(run_id or uuid.uuid4()).hex[:8]}"
+            await _update_pools(settings, meter, redis, now, summary, snap, version, compare_legacy)
     except Exception as exc:
         summary.status = "failed"
         summary.feed_errors["_run"] = f"{type(exc).__name__}: {exc}"[:300]
         summary.errors += 1
         raise
     finally:
-        if conn is not None and run_id is not None:
-            await store.finish_run(conn, run_id, summary.as_dict(), datetime.now(UTC))
-        if owns_conn and conn is not None:
-            await conn.close()
+        if meter is not None:
+            summary.egress_bytes_est = meter.bytes
+        if meter is not None and run_id is not None:
+            await store.finish_run(meter, run_id, summary.as_dict(), datetime.now(UTC))
+        if owns_conn and raw_conn is not None:
+            await raw_conn.close()
     return summary
 
 
 async def _update_pools(
-    settings: Settings, conn: Any, redis: Any, now: datetime, summary: RunSummary
+    settings: Settings,
+    conn: Any,
+    redis: Any,
+    now: datetime,
+    summary: RunSummary,
+    snap: WindowSnapshot,
+    version: str,
+    compare_legacy: bool,
 ) -> None:
-    """Rebuild the Redis pools from Postgres. A Redis failure makes the run partial;
-    Postgres stays the source of truth and the next run rebuilds everything."""
+    """Build the pool snapshot and publish it (3 Redis commands). A Redis failure makes
+    the run partial; the last published snapshot stays readable, and the next run
+    publishes a complete one."""
     owns = redis is None
     try:
+        snapshot = await pools.build_snapshot(conn, snap, now, version)
+        if compare_legacy:
+            summary.compare["pools"] = await _compare_pools(conn, snap, now)
         if owns:
             from redis.asyncio import Redis
 
             redis = Redis.from_url(settings.redis_url.get_secret_value())
-        result = await pools.rebuild(redis, conn, now, summary.topics.keys())
+        result = await pools.publish(redis, conn, snapshot)
         summary.redis_commands = result.commands
         summary.pools = result.sizes
+        summary.pool_version = result.version
+        summary.pool_blob_bytes = result.blob_bytes
     except Exception as exc:
         summary.feed_errors["_redis"] = f"{type(exc).__name__}: {exc}"[:300]
         summary.errors += 1
@@ -257,6 +295,49 @@ async def _update_pools(
     finally:
         if owns and redis is not None:
             await redis.aclose()
+
+
+async def _compare_pools(conn: Any, snap: WindowSnapshot, now: datetime) -> dict[str, bool]:
+    """Pools from the snapshot vs the pre-P3 SQL (replay evidence)."""
+    fresh = pools.same_pool(
+        pools.fresh_members(snap, now), await pools.legacy_fresh(conn, now), pools.FRESH_CAP
+    )
+    new_t, old_t = pools.topic_members(snap, now), await pools.legacy_topics(conn, now)
+    topics = all(pools.same_pool(new_t[t], old_t[t], pools.TOPIC_CAP) for t in new_t)
+    return {"fresh_equal": fresh, "topics_equal": topics}
+
+
+def _recent_rows(r: Recent) -> dict[uuid.UUID, tuple[Any, ...]]:
+    return {
+        i: (c, s, e.tobytes())
+        for i, c, s, e in zip(r.ids, r.clusters, r.text_sources, r.embeddings, strict=True)
+    }
+
+
+def _seeded_ids(seed: int) -> Callable[[], uuid.UUID]:
+    import random
+
+    rng = random.Random(seed)  # noqa: S311 (test ids, not security)
+    return lambda: uuid.UUID(int=rng.getrandbits(128), version=4)
+
+
+def _compare_recent(
+    items: Sequence[Item],
+    vectors: NDArray[np.float32],
+    new: Recent,
+    old: Recent,
+    thresholds: Thresholds,
+) -> dict[str, Any]:
+    """Dedupe's inputs and decisions from the snapshot vs the old load_recent."""
+    same_inputs = (
+        _recent_rows(new) == _recent_rows(old)
+        and new.url_cluster == old.url_cluster
+        and new.fingerprint_cluster == old.fingerprint_cluster
+    )
+    a = decide(items, vectors, new, thresholds, _seeded_ids(0))
+    b = decide(items, vectors, old, thresholds, _seeded_ids(0))
+    differ = sum(1 for x, y in zip(a, b, strict=True) if x != y)
+    return {"inputs_equal": same_inputs, "decisions": len(a), "decisions_changed": differ}
 
 
 async def _fetch(
@@ -321,7 +402,9 @@ async def _run(
     now: datetime,
     client: Any,
     summary: RunSummary,
-) -> RunSummary:
+    window_file: Path | None = None,
+    compare_legacy: bool = False,
+) -> tuple[RunSummary, WindowSnapshot | None]:
     t0 = time.perf_counter()
     owns_client = client is None
     client = client or make_client()
@@ -336,16 +419,24 @@ async def _run(
     summary.seconds["fetch"] = round(time.perf_counter() - t0, 2)
 
     cands, dropped = normalize_all(raw, now, settings.ingest_min_title_words)
-    recent = (
-        await store.load_recent(
-            conn,
-            now,
-            timedelta(hours=settings.ingest_dedupe_window_hours),
-            timedelta(hours=settings.ingest_fingerprint_window_hours),
-        )
-        if conn is not None
-        else Recent.empty()
-    )
+    dedupe_window = timedelta(hours=settings.ingest_dedupe_window_hours)
+    fp_window = timedelta(hours=settings.ingest_fingerprint_window_hours)
+    if max(dedupe_window, fp_window) > window.WINDOW:
+        raise ValueError(f"dedupe windows exceed the {window.WINDOW} snapshot window")
+    snap: WindowSnapshot | None = None
+    if conn is not None:
+        cached, why = window.load_file(window_file)
+        synced = await window.sync(conn, cached, now, EMBEDDING_MODEL_ID, reason_if_none=why)
+        snap = synced.snapshot
+        summary.window = {
+            "start": "reloaded" if synced.reloaded else "delta",
+            "reason": synced.reason,
+            "fetched_rows": synced.fetched_rows,
+            "rows": len(snap),
+        }
+        recent = snap.recent(now, dedupe_window, fp_window)
+    else:
+        recent = Recent.empty()
     cands, over_cap = limit_gdelt(cands, recent, settings.ingest_gkg_max_embed)
     if over_cap:
         dropped["gdelt_embed_cap"] += over_cap
@@ -367,6 +458,9 @@ async def _run(
         VALIDATED_BY_PAIR if settings.ingest_per_pair_thresholds else {},
     )
     decisions = decide(items, vectors, recent, thresholds)
+    if compare_legacy and conn is not None:
+        legacy = await store.load_recent(conn, now, dedupe_window, fp_window)
+        summary.compare["dedupe"] = _compare_recent(items, vectors, recent, legacy, thresholds)
     topics = classify(cands, decisions, vectors, classifier)
 
     gdelt_choices = [
@@ -418,6 +512,14 @@ async def _run(
         summary.size = await store.database_size(conn)
         if summary.size["db"] > settings.ingest_size_warn_mb * 1_000_000:
             summary.size_warning = True
+        if snap is not None:  # add this run's rows: exact stored values, delta only
+            after = await window.sync(conn, snap, now, EMBEDDING_MODEL_ID)
+            snap = after.snapshot
+            summary.window["end"] = "reloaded" if after.reloaded else "delta"
+            summary.window["end_fetched_rows"] = after.fetched_rows
+            summary.window["rows"] = len(snap)
+            if window_file is not None:
+                snap.save(window_file)
     else:
         inserted = {r.url_canonical for r in rows}
 
@@ -452,4 +554,4 @@ async def _run(
     if summary.errors:
         summary.status = "partial"
     summary.seconds["total"] = round(time.perf_counter() - t0, 2)
-    return summary
+    return summary, snap

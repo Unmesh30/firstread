@@ -37,7 +37,6 @@ from typing import Any
 import httpx
 
 from firstread_core.db import apply_migrations, connect, default_migrations_dir
-from firstread_core.topics import TOPIC_IDS
 from firstread_ingest import pools, store
 from firstread_ingest.config import Settings
 from firstread_ingest.http import fetch_with_retry, make_client
@@ -54,6 +53,7 @@ from firstread_ingest.sources.gdelt_domains import (
 REPO = Path(__file__).resolve().parents[4]
 CACHE = REPO / "data" / "replay" / "gkg"
 REPORT = REPO / "data" / "replay" / "report.json"
+WINDOW_FILE = REPO / "data" / "replay" / "window.npz"  # the same snapshot path as cron
 AGGREGATES = REPO / "docs" / "learn" / "data" / "02-replay.json"
 RUN_DELAY = timedelta(minutes=20)  # each slot is "processed" 20 min after it starts
 SNAPSHOT_TIME = (23, 45)  # top-10 trending per replayed day, at this slot
@@ -175,6 +175,8 @@ async def replay(
     cache: Path = CACHE,
     embed: EmbedFn | None = None,
     progress: Callable[[str], None] = print,
+    window_file: Path | None = WINDOW_FILE,
+    compare: bool = False,
 ) -> Replay:
     """Run the pipeline once per slot with the clock set to that slot (GDELT only)."""
     result = Replay()
@@ -194,6 +196,8 @@ async def replay(
                 conn=conn,
                 redis=redis,
                 now=now,
+                window_file=window_file,
+                compare_legacy=compare,
             )
         d = summary.as_dict()
         result.runs.append(
@@ -223,6 +227,10 @@ async def replay(
                 "topics": d["details"]["topics"],
                 "retention": d["details"]["retention"],
                 "seconds": d["details"]["seconds"].get("total"),
+                "window": d["details"]["window"],
+                "egress_bytes_est": d["details"]["egress_bytes_est"],
+                "pool_blob_bytes": d["details"]["pool_blob_bytes"],
+                **({"compare": d["details"]["compare"]} if compare else {}),
             }
         )
         if (slot.hour, slot.minute) == SNAPSHOT_TIME or i == len(todo) - 1:
@@ -239,8 +247,12 @@ async def final_state(conn: Any, redis: Any) -> dict[str, Any]:
     """Pool sizes, table sizes and article mix at the end of the replay."""
     await conn.execute("vacuum analyze public.articles")
     await conn.execute("vacuum analyze public.story_coverage")
-    keys = [pools.FRESH, pools.TRENDING, *(pools.topic_key(t) for t in TOPIC_IDS)]
-    zcard = {k: int(await redis.zcard(k)) for k in keys}
+    from firstread_core import pools as core_pools
+
+    ver = await redis.get(core_pools.VER_KEY)
+    blob = await redis.get(core_pools.blob_key(ver.decode())) if ver else None
+    snapshot = core_pools.decode(blob, ver.decode()) if blob and ver else None
+    pool_sizes = dict(core_pools.summarize(snapshot)) if snapshot else {}
     sizes = await conn.fetchrow(
         "select count(*) as articles, "
         "pg_relation_size('public.articles') as heap, "
@@ -256,7 +268,8 @@ async def final_state(conn: Any, redis: Any) -> dict[str, Any]:
         "select category, origin, geo, count(*) as n from public.articles group by 1, 2, 3"
     )
     return {
-        "zcard": zcard,
+        "pools": pool_sizes,
+        "pool_blob_bytes": len(blob) if blob else 0,
         "sizes": dict(sizes),
         "mix": [dict(r) for r in mix],
     }
@@ -310,6 +323,39 @@ def size_estimate(
     return out
 
 
+def compare_totals(runs: Sequence[dict[str, Any]]) -> dict[str, Any] | None:
+    """Snapshot path vs the pre-P3 SQL paths over every compared run."""
+    compared = [r for r in runs if "compare" in r]
+    if not compared:
+        return None
+    dedupe = [r["compare"].get("dedupe", {}) for r in compared]
+    pool = [r["compare"].get("pools", {}) for r in compared]
+    return {
+        "runs_compared": len(compared),
+        "dedupe_inputs_differ_runs": sum(1 for d in dedupe if not d.get("inputs_equal", True)),
+        "decisions": sum(d.get("decisions", 0) for d in dedupe),
+        "decisions_changed": sum(d.get("decisions_changed", 0) for d in dedupe),
+        "fresh_pool_differs_runs": sum(1 for p in pool if not p.get("fresh_equal", True)),
+        "topic_pools_differ_runs": sum(1 for p in pool if not p.get("topics_equal", True)),
+    }
+
+
+def egress_totals(runs: Sequence[dict[str, Any]]) -> dict[str, Any]:
+    """Estimated Postgres result bytes per run (Supabase egress, ADR 0011)."""
+    vals = sorted(r.get("egress_bytes_est", 0) for r in runs)
+    reloads = sum(1 for r in runs if (r.get("window") or {}).get("start") == "reloaded")
+    if not vals:
+        return {}
+    return {
+        "per_run_median": vals[len(vals) // 2],
+        "per_run_max": vals[-1],
+        "per_run_mean": round(sum(vals) / len(vals)),
+        "window_reloads": reloads,
+        "note": "estimated from result sizes; the first run (empty window) and any "
+        "reloads carry the full-window cost",
+    }
+
+
 def aggregates(report: dict[str, Any]) -> dict[str, Any]:
     """The committed copy: no headlines or URLs (same rule as the threshold pairs)."""
     agg: dict[str, Any] = json.loads(json.dumps(report, default=str))
@@ -342,7 +388,9 @@ async def rss_estimate(
     }
 
 
-async def main(days: int, end: datetime | None, db: str, redis_db: int, fresh: bool) -> None:
+async def main(
+    days: int, end: datetime | None, db: str, redis_db: int, fresh: bool, compare: bool = False
+) -> None:
     from redis.asyncio import Redis
 
     from firstread_core.dbtest import with_database
@@ -375,11 +423,20 @@ async def main(days: int, end: datetime | None, db: str, redis_db: int, fresh: b
         await apply_migrations(conn, default_migrations_dir())
         if fresh or not exists:
             await redis.flushdb()
+            WINDOW_FILE.unlink(missing_ok=True)
         classifier = load_classifier(settings)
         embedder = Embedder()
         places = load_domain_countries(lookup)
         result = await replay(
-            settings, classifier, slots, conn, redis, places, lookup, embed=embedder.embed
+            settings,
+            classifier,
+            slots,
+            conn,
+            redis,
+            places,
+            lookup,
+            embed=embedder.embed,
+            compare=compare,
         )
         state = await final_state(conn, redis)
         rss = await rss_estimate(settings, classifier, embedder.embed)
@@ -421,6 +478,8 @@ async def main(days: int, end: datetime | None, db: str, redis_db: int, fresh: b
             1 for r in runs for f in r["files"] if f.get("missing") or f.get("pending")
         ),
         "press_releases": press_release_counts(runs),
+        "egress": egress_totals(runs),
+        **({"equivalence": compare_totals(runs)} if compare_totals(runs) else {}),
         "trending_days": trending_days,
         "final": state,
         "rss_estimate": rss,

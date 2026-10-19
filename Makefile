@@ -56,8 +56,8 @@ ingest: ## One ingestion run against the local stack (DRY_RUN=1 writes nothing)
 	uv run firstread-ingest run $(if $(DRY_RUN),--dry-run)
 
 DAYS ?= 3
-replay: ## Replay DAYS of archived GDELT GKG files into firstread_replay (FRESH=1 starts over)
-	uv run firstread-ingest replay --days $(DAYS) $(if $(FRESH),--fresh)
+replay: ## Replay DAYS of GKG files into firstread_replay (FRESH=1 starts over, COMPARE=1 checks vs pre-P3 SQL)
+	uv run firstread-ingest replay --days $(DAYS) $(if $(FRESH),--fresh) $(if $(COMPARE),--compare)
 
 # ---- Offline ML (Phase 1) ----
 mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
