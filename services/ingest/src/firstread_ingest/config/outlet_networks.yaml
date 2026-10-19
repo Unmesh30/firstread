@@ -4,7 +4,7 @@
 # sets have Jaccard >= 0.5, as connected components of >= 3 domains. PENDING OWNER REVIEW.
 # `apply` is set by the pre-registered materiality rule in ADR 0013, not by hand.
 version: 1
-apply: false
+apply: true  # material on the 3-day replay (ADR 0013): 6, 4, 9 of the top 10 changed; networks 70-91% of the score
 networks:
   network-01:  # 142 domains, 573 stories
     - andoveradvertiser.co.uk
