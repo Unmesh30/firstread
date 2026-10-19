@@ -30,29 +30,13 @@ from typing import Literal
 import numpy as np
 from numpy.typing import NDArray
 
-TextSource = Literal["title", "title_summary"]
+# The thresholds live in core: the feed uses them too (ADR 0013). Re-exported here.
+from firstread_core.stories import VALIDATED_BY_PAIR as VALIDATED_BY_PAIR
+from firstread_core.stories import PairType as PairType
+from firstread_core.stories import TextSource as TextSource
+from firstread_core.stories import pair_type as pair_type
+
 Action = Literal["insert", "duplicate", "near_duplicate"]
-PairType = tuple[TextSource, TextSource]
-
-
-def pair_type(a: TextSource, b: TextSource) -> PairType:
-    return (a, b) if a <= b else (b, a)  # order-free
-
-
-# Per pair type: (tau_dup, tau_story). A threshold is accepted when every cosine bin at or
-# above it has >= 95% precision (score_pairs.py, ADR 0009). Values are only ever raised.
-#  - GDELT-GDELT: validated on the 2b re-check (144 LLM-labeled pairs, 26 duplicates,
-#    per-story-capped sample from 3 replayed days). tau_story rose 0.875 -> 0.925:
-#    templated headlines ("<State> Midterm Elections 2026: Key Races...", court case
-#    listings) sit at 0.85-0.92 without being the same story.
-#  - GDELT-RSS and RSS-RSS: PROVISIONAL. Neither sample reached 100 pairs and 10
-#    duplicates (183 and 93 pairs over 2a+2b, 2 and 0 duplicates); kept stricter than
-#    the data allowed.
-VALIDATED_BY_PAIR: dict[PairType, tuple[float, float]] = {
-    ("title", "title"): (0.975, 0.925),
-    ("title", "title_summary"): (0.95, 0.80),  # provisional
-    ("title_summary", "title_summary"): (0.97, 0.875),  # provisional
-}
 
 
 @dataclass(frozen=True)
