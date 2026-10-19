@@ -1,0 +1,23 @@
+{
+ "window": {
+  "first": "20261012023000",
+  "last": "20261015021500",
+  "slots": 288,
+  "days": 4
+ },
+ "equivalence": {
+  "runs_compared": 288,
+  "dedupe_inputs_differ_runs": 0,
+  "decisions": 267877,
+  "decisions_changed": 0,
+  "fresh_pool_differs_runs": 0,
+  "topic_pools_differ_runs": 0
+ },
+ "redis_commands_per_run": {
+  "max": 3,
+  "mean": 3.0
+ },
+ "window_reloads": 1,
+ "pool_blob_bytes": 191838,
+ "note": "Every run compared the snapshot path with the pre-P3 SQL paths (store.load_recent and the SQL pool builders). Egress is measured separately on a replay without --compare, since compare mode runs the old 14 MB load too."
+}
