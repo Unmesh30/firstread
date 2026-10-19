@@ -204,3 +204,89 @@ async def test_publish_against_real_redis(redis_test: Any) -> None:
             assert await redis_test.ttl("pools:blob:b") == -1  # current blob: no TTL
         finally:
             await conn.close()
+
+
+def near(base: int, cos: float) -> np.ndarray:
+    """A unit vector at cosine ``cos`` to basis vector ``base``."""
+    v = np.zeros(384, np.float32)
+    v[base] = cos
+    v[(base + 1) % 384] = float(np.sqrt(1 - cos**2))
+    return v
+
+
+async def test_split_stories_merge_and_every_outlet_counts_once() -> None:
+    await skip_or_fail_if_unreachable_async()
+    async with temp_database() as dsn:
+        conn = await db(dsn)
+        try:
+            c1, c2, other = uuid.uuid4(), uuid.uuid4(), uuid.uuid4()
+            a = row(1, "world", timedelta(hours=2), c1)
+            b = row(2, "world", timedelta(hours=1), c2)
+            b = store.ArticleRow(**{**b.__dict__, "embedding": near(1, 0.95)})  # ~ a: same story
+            x = row(50, "sports", timedelta(hours=1), other)  # unrelated
+            await store.insert_articles(conn, [a, b, x])
+            t = NOW - timedelta(hours=2)
+            cov = [(c1, d, t) for d in ("p.com", "q.com", "shared.com")]
+            cov += [(c2, d, t) for d in ("r.com", "shared.com")]  # shared.com carried both
+            cov += [(other, d, t) for d in ("s.com", "u.com")]
+            await store.insert_coverage(conn, cov)
+            win = await snapshot(conn)
+            entries, info = await pools.trending_entries(conn, win, NOW, networks={})
+            assert info.merged_groups == 1
+            assert info.largest_group == 2
+            top = entries[0]
+            assert set(top.clusters) == {c1, c2}
+            assert top.outlets == 4  # p, q, r, shared (once)
+            assert top.score == pytest.approx(4 * 2 ** (-2 / 6), rel=1e-6)
+            unmerged, _ = await pools.trending_entries(conn, win, NOW, networks={}, merge=False)
+            assert len(unmerged) == 3  # what Phase 2 showed: the split story twice
+        finally:
+            await conn.close()
+
+
+async def test_a_network_counts_as_one_outlet() -> None:
+    await skip_or_fail_if_unreachable_async()
+    async with temp_database() as dsn:
+        conn = await db(dsn)
+        try:
+            c = uuid.uuid4()
+            await store.insert_articles(conn, [row(1, "world", timedelta(hours=1), c)])
+            t = NOW - timedelta(hours=1)
+            await store.insert_coverage(
+                conn, [(c, d, t) for d in ("a.co.uk", "b.co.uk", "c.co.uk", "indie.com")]
+            )
+            win = await snapshot(conn)
+            raw, _ = await pools.trending_entries(conn, win, NOW, networks={})
+            nets = {d: "newsgroup" for d in ("a.co.uk", "b.co.uk", "c.co.uk")}
+            collapsed, _ = await pools.trending_entries(conn, win, NOW, networks=nets)
+            assert raw[0].outlets == 4
+            assert collapsed[0].outlets == 2  # the network + indie.com
+        finally:
+            await conn.close()
+
+
+async def test_representative_quality_order_and_window_only() -> None:
+    await skip_or_fail_if_unreachable_async()
+    async with temp_database() as dsn:
+        conn = await db(dsn)
+        try:
+            c, stale = uuid.uuid4(), uuid.uuid4()
+            early = row(1, "world", timedelta(hours=5), c)  # gdelt, no image, earliest
+            pic = store.ArticleRow(**{**row(2, "world", timedelta(hours=4), c).__dict__,
+                                      "image_url": "https://i/x.jpg"})  # fmt: skip
+            feed = store.ArticleRow(**{**row(3, "world", timedelta(hours=3), c).__dict__,
+                                       "origin": "rss"})  # fmt: skip
+            old = row(4, "us", timedelta(hours=100), stale)  # outside the 72 h window
+            await store.insert_articles(conn, [early, pic, feed, old])
+            t = NOW - timedelta(hours=1)
+            await store.insert_coverage(conn, [(c, f"d{i}.com", t) for i in range(3)])
+            await store.insert_coverage(conn, [(stale, f"d{i}.com", t) for i in range(3)])
+            win = await snapshot(conn)
+            entries, info = await pools.trending_entries(conn, win, NOW, networks={})
+            assert [e.id for e in entries] == [feed.id]  # RSS beats image beats earliest
+            assert info.no_window_article == 1  # the old story has nothing in the window
+            key = pools.quality_key
+            k = {aid: i for i, aid in enumerate(win.ids)}
+            assert key(win, k[pic.id], {}) < key(win, k[early.id], {})  # image first
+        finally:
+            await conn.close()

@@ -36,10 +36,12 @@ from typing import Any
 import numpy as np
 
 from firstread_core import pools as core_pools
+from firstread_core import stories
 from firstread_core.pools import ArticleInfo, PoolSnapshot, TrendingEntry
 from firstread_core.topics import TOPIC_IDS
 from firstread_ingest import store
-from firstread_ingest.window import CATEGORY_SOURCES, TEXT_SOURCES, WindowSnapshot
+from firstread_ingest.config import load_outlet_networks
+from firstread_ingest.window import CATEGORY_SOURCES, ORIGINS, TEXT_SOURCES, WindowSnapshot
 
 FRESH_WINDOW, TOPIC_WINDOW, TRENDING_WINDOW = (
     timedelta(hours=24),
@@ -53,6 +55,7 @@ FRESH_CAP, TOPIC_CAP, TRENDING_CAP = (
 )
 HALF_LIFE_HOURS = 6.0
 MIN_DOMAINS = 2
+TRENDING_CANDIDATES = 400  # clusters considered for merging before the top 200 are kept
 MAX_COMMANDS = 3  # per run; +1 only when expiring a blob orphaned by a failed run
 CENTROID_MIN_CONFIDENCE = 0.50  # the release's low_confidence_threshold
 CURSOR_PUBLISHED, CURSOR_PENDING = "pools", "pools_pending"
@@ -127,6 +130,130 @@ async def trending(conn: Any, now: datetime, limit: int = TRENDING_CAP) -> list[
     return [dict(r) for r in rows]
 
 
+# ---- trending v2 (ADR 0013): every outlet, networks collapsed, split stories merged ----
+
+# Per (cluster, outlet) the earliest sighting; an outlet is a syndication network when
+# the domain is in one (applied networks only), otherwise the domain itself. With no
+# networks this is exactly the ADR 0010 score.
+_OUTLETS = """
+  select {key}, coalesce(net.network, sc.source_domain) as outlet,
+         min(sc.first_seen_at) as first_seen_at
+  from public.story_coverage sc
+  {join}
+  left join unnest($4::text[], $5::text[]) as net(domain, network)
+    on net.domain = sc.source_domain
+  where sc.first_seen_at > $1::timestamptz - $2::interval and sc.first_seen_at <= $1::timestamptz
+  group by 1, 2
+"""
+_SCORE = (
+    "sum(power(2.0, -extract(epoch from ($1::timestamptz - first_seen_at)) / 3600.0"
+    " / $3::float8))::float8"
+)
+
+TRENDING_CANDIDATES_SQL = f"""
+with cov as ({_OUTLETS.format(key="sc.story_cluster_id", join="")})
+select story_cluster_id, {_SCORE} as score, count(*) as outlets
+from cov group by 1 having count(*) >= $6::int
+order by score desc, story_cluster_id limit $7::int
+"""  # noqa: S608 (constant fragments)
+
+MERGED_SQL = f"""
+with m as (select * from unnest($6::uuid[], $7::int[]) as m(cluster, g)),
+cov as ({_OUTLETS.format(key="m.g", join="join m on m.cluster = sc.story_cluster_id")})
+select g, {_SCORE} as score, count(*) as outlets from cov group by g
+"""  # noqa: S608 (constant fragments)
+
+
+def _network_arrays(networks: dict[str, str]) -> tuple[list[str], list[str]]:
+    domains = sorted(networks)
+    return domains, [networks[d] for d in domains]
+
+
+def quality_key(win: WindowSnapshot, k: int, networks: dict[str, str]) -> tuple[Any, ...]:
+    """Representative order (ADR 0013), best first: RSS (a permitted feed with a
+    description and usually an image), has an image, not a syndicated copy, a confident
+    model topic, earliest seen, then id."""
+    confident = (
+        win.category_source[k] == CATEGORY_SOURCES.index("model")
+        and win.confidence[k] >= CENTROID_MIN_CONFIDENCE
+    )
+    return (
+        win.origin[k] != ORIGINS.index("rss"),
+        not win.has_image[k],
+        win.source_domain[k] in networks,
+        not confident,
+        int(win.first_seen_us[k]),
+        win.ids[k].bytes,
+    )
+
+
+@dataclass
+class TrendingInfo:
+    candidates: int = 0
+    merged_groups: int = 0  # entries made of more than one story cluster
+    clusters_merged: int = 0  # clusters folded into another entry
+    largest_group: int = 0
+    no_window_article: int = 0  # candidate stories with nothing stored in the last 72 h
+    samples: list[list[uuid.UUID]] = field(default_factory=list)  # merged rep ids
+
+
+async def trending_entries(
+    conn: Any,
+    win: WindowSnapshot,
+    now: datetime,
+    networks: dict[str, str] | None = None,
+    merge: bool = True,
+    limit: int = TRENDING_CAP,
+) -> tuple[list[TrendingEntry], TrendingInfo]:
+    """Trending stories, best first, with near-identical stories merged (no chaining)."""
+    nets = load_outlet_networks().mapping() if networks is None else networks
+    domains, names = _network_arrays(nets)
+    window_args = (now, TRENDING_WINDOW, HALF_LIFE_HOURS, domains, names)
+    rows = await conn.fetch(TRENDING_CANDIDATES_SQL, *window_args, MIN_DOMAINS, TRENDING_CANDIDATES)
+    info = TrendingInfo(candidates=len(rows))
+    by_cluster: dict[uuid.UUID, list[int]] = defaultdict(list)
+    for k, c in enumerate(win.clusters):
+        by_cluster[c].append(k)
+    cands = []  # (cluster, score, outlets, best window row)
+    for r in rows:
+        ks = by_cluster.get(r["story_cluster_id"])
+        if not ks:
+            info.no_window_article += 1  # the feed's window is 72 h: nothing to show
+            continue
+        best = min(ks, key=lambda k: quality_key(win, k, nets))
+        cands.append((r["story_cluster_id"], float(r["score"]), int(r["outlets"]), best))
+    if merge and cands:
+        groups = stories.group(
+            win.embedding[[c[3] for c in cands]].astype(np.float32),
+            [TEXT_SOURCES[win.text_source[c[3]]] for c in cands],  # type: ignore[misc]
+            [c[0] for c in cands],
+        )
+    else:
+        groups = list(range(len(cands)))
+    members: dict[int, list[int]] = defaultdict(list)
+    for i, g in enumerate(groups):
+        members[g].append(i)
+    multi = {g: m for g, m in members.items() if len(m) > 1}
+    merged_scores: dict[int, tuple[float, int]] = {}
+    if multi:
+        flat = [(cands[i][0], g) for g, m in multi.items() for i in m]
+        out = await conn.fetch(MERGED_SQL, *window_args, [c for c, _ in flat], [g for _, g in flat])
+        merged_scores = {r["g"]: (float(r["score"]), int(r["outlets"])) for r in out}
+    entries = []
+    for g, m in members.items():
+        rep = min((cands[i][3] for i in m), key=lambda k: quality_key(win, k, nets))
+        score, outlets = merged_scores.get(g, (cands[m[0]][1], cands[m[0]][2]))
+        entries.append(TrendingEntry(win.ids[rep], score, outlets, tuple(cands[i][0] for i in m)))
+        if len(m) > 1:
+            info.merged_groups += 1
+            info.clusters_merged += len(m) - 1
+            info.largest_group = max(info.largest_group, len(m))
+            if len(info.samples) < 10:
+                info.samples.append([win.ids[cands[i][3]] for i in m])
+    entries.sort(key=lambda e: (-e.score, e.id.bytes))
+    return entries[:limit], info
+
+
 # ---- the snapshot ----
 
 
@@ -172,12 +299,8 @@ async def build_snapshot(
 ) -> PoolSnapshot:
     fresh = fresh_members(win, now)
     topics = topic_members(win, now)
-    trend = await trending(conn, now)
-    entries = [
-        TrendingEntry(r["id"], float(r["score"]), int(r["domains"]), (r["story_cluster_id"],))
-        for r in trend
-    ]
-    members = set(fresh) | {i for pool in topics.values() for i in pool}
+    entries, info = await trending_entries(conn, win, now)
+    members = set(fresh) | {i for pool in topics.values() for i in pool} | {e.id for e in entries}
     pos = {aid: k for k, aid in enumerate(win.ids)}
     articles: dict[uuid.UUID, ArticleInfo] = {}
     for aid in members:
@@ -188,14 +311,7 @@ async def build_snapshot(
             int(win.first_seen_us[k] // 1_000_000),
             TEXT_SOURCES[win.text_source[k]],
         )
-    for r in trend:  # the representative may be older than the 72 h window
-        articles.setdefault(
-            r["id"],
-            ArticleInfo(
-                r["story_cluster_id"], r["category"], int(r["first_seen"]), r["text_source"]
-            ),
-        )
-    return PoolSnapshot(
+    snapshot = PoolSnapshot(
         version=version,
         built_at=now,
         fresh=list(fresh),
@@ -205,6 +321,13 @@ async def build_snapshot(
         centroids=centroids(win, now),
         stats=await stats(conn, win, now),
     )
+    snapshot.stats["trending"] = {
+        "candidates": info.candidates,
+        "merged_groups": info.merged_groups,
+        "clusters_merged": info.clusters_merged,
+        "largest_group": info.largest_group,
+    }
+    return snapshot
 
 
 @dataclass

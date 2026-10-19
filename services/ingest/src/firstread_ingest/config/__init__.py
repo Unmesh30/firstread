@@ -143,3 +143,38 @@ def load_junk_titles(path: Path = CONFIG_DIR / "junk_titles.yaml") -> JunkTitles
         sections=frozenset(data.get("sections") or []),
         outlet_words=frozenset(data.get("outlet_words") or []),
     )
+
+
+class OutletNetworks(BaseModel):
+    """Syndication networks for trending breadth (ADR 0013).
+
+    ``apply`` is set by the pre-registered materiality rule: when false, the list is
+    kept for the record but trending counts every domain as its own outlet.
+    """
+
+    apply: bool
+    networks: dict[str, list[str]]
+
+    def mapping(self) -> dict[str, str]:
+        """domain -> network id, only when applied."""
+        if not self.apply:
+            return {}
+        return {d: name for name, domains in self.networks.items() for d in domains}
+
+    @model_validator(mode="after")
+    def _one_network_per_domain(self) -> OutletNetworks:
+        seen: dict[str, str] = {}
+        for name, domains in self.networks.items():
+            for d in domains:
+                if d in seen:
+                    raise ValueError(f"{d} is in both {seen[d]} and {name}")
+                seen[d] = name
+        return self
+
+
+@lru_cache
+def load_outlet_networks(path: Path = CONFIG_DIR / "outlet_networks.yaml") -> OutletNetworks:
+    if not path.is_file():
+        return OutletNetworks(apply=False, networks={})
+    data = _yaml(path)
+    return OutletNetworks(apply=bool(data["apply"]), networks=data.get("networks") or {})
