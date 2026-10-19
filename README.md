@@ -15,7 +15,7 @@ Most recommenders learn from clicks, so a brand-new article is invisible until p
 |---|---|
 | App | Expo (React Native + TypeScript, Expo Router), web on GitHub Pages |
 | API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run |
-| Ingestion | GDELT GKG files + RSS feeds with explicit publisher permission, every 15 min on GitHub Actions |
+| Ingestion | GDELT GKG files + RSS feeds with explicit publisher permission, every 15 min on GitHub Actions; the 72 h dedupe window stays on the runner (~84 KB of database egress a run) and pools are published as one versioned Redis snapshot ([ADR 0012](docs/adr/0012-runner-window-and-pool-snapshot.md)) |
 | ML | PyTorch (NRMS-lite user encoder), `bge-small-en-v1.5` embeddings, trained/evaluated on MIND |
 | Data | Supabase Postgres + pgvector, Upstash Redis |
 | Tooling | uv workspace, ruff, mypy, pytest, Jest, pre-commit, Docker Compose, GitHub Actions |

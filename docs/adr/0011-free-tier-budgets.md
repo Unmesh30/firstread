@@ -1,6 +1,6 @@
 # ADR 0011: Free-tier budgets as hard constraints
 
-- Status: Accepted (estimates; re-measured in P3e and against the real usage pages in P5)
+- Status: Accepted (ingestion measured on the replay; sessions estimated, re-measured in P3e and against the real usage pages in P5)
 - Date: 2026-10-18
 
 ## Context
@@ -35,10 +35,10 @@ Every design choice in Phase 3 is costed per ingestion run and per feed session 
 
 | Resource | Quota | Per ingestion run | Per feed session | At 100 sessions/day | Sessions/day the budget allows |
 |---|---|---|---|---|---|
-| Supabase egress | 5 GB | ~95 KB (window delta, check, trending aggregates, bookkeeping) → ~0.27 GB/month, plus ~4 full window reloads × 14 MB | ~200 KB (2 computed pages × ~96 KB, plus events and profile) | ~0.93 GB (19%) | ~780 |
+| Supabase egress | 5 GB | **84 KB measured** (replay median; p95 86 KB): window delta, check, trending aggregates, bookkeeping → 0.24 GB/month, plus ~4 full window reloads × 14 MB | ~200 KB (2 computed pages × ~96 KB, plus events and profile) | ~0.9 GB (18%) | ~790 |
 | Supabase DB size | 500 MB (target 400; guard from 350) | articles ~227 MB and coverage ~13 MB at steady state | events (impressions kept 7 days), history ≤ 50 rows/user, slates | ~280 MB | ~400 before the 350 MB guard |
 | Upstash commands | 300K (SPEC) / 500K | **3** (blob, version, expire previous) → 8.6K/month | ~28 | ~108K (36%) | **~330 (binding)**; ~570 against 500K |
-| Upstash bandwidth | 10 GB | one blob write | ~160 KB | ≤ 1.8 GB | ~1,900 |
+| Upstash bandwidth | 10 GB | one blob write, **192 KB measured** → 0.55 GB/month | ~160 KB | 0.5 GB + blob writes 0.55 GB + blob reads 0.55–1.7 GB (1–3 instances) = ≤ 2.7 GB | ~1,500 |
 | Upstash memory | 250 MB | 1 live blob (2 briefly) | ~60 KB per active reader (7-day TTL) | ~30 MB | ~4,000 weekly-active readers |
 | Cloud Run requests | 2M | — | ~10 | 30K (1.5%) | ~6,600 |
 | Cloud Run vCPU-s | 180K | — | ~1 (100 ms rounding, 1 vCPU), plus cold starts | ~6K (3%) | ~5,600 |

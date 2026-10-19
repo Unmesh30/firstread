@@ -55,8 +55,14 @@ The API also needs more than ids from ingestion: topic centroids for cold-start 
 
 ## Consequences
 
-- Ingestion egress falls from ~14 MB a run to the delta, the check and the trending aggregates (measured on the replay; the budget is in [ADR 0011](0011-free-tier-budgets.md)). Redis falls from ≤ 30 to 3 commands a run.
-- **Replay evidence** (`make replay FRESH=1 COMPARE=1`, aggregates in `docs/learn/data/03-replay-equivalence.json`): over every replayed run, dedupe's inputs and decisions and the fresh and topic pools are compared with the pre-P3 SQL paths. See learn chapter 03 for the numbers.
+- **Measured on the 3-day replay (288 runs, ADR 0011's budget):**
+  - estimated egress fell from ~14 MB to **84 KB a run** (median; p95 86 KB, max 87 KB), about 0.24 GB a month;
+  - Redis fell from ≤ 30 to **3 commands a run**;
+  - the blob is **192 KB**;
+  - the only full reload was the first run (no file yet).
+- **Equivalence** (`make replay FRESH=1 COMPARE=1`; `docs/learn/data/03-replay-equivalence.json`), comparing every run with the pre-P3 SQL paths:
+  - dedupe's inputs were identical in all 288 runs, and **0 of 267,877 decisions changed**;
+  - the fresh and topic pools were identical in every run.
 - A snapshot restored from an older cache entry just costs a bigger delta. A lost cache costs one full reload (~14 MB).
 - Changing the snapshot's columns means bumping `FORMAT_VERSION`; changing the blob means bumping `SCHEMA_VERSION`, and the API must understand the new schema before ingestion publishes it.
 - Tests: snapshot round trip, delta, every reload trigger, bit-identical inputs to the old `load_recent`, publish order and command count, the failure/orphan path, the TTLs on real Redis, the blob cap, and the workflow's permissions and step order.
