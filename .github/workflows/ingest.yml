@@ -32,11 +32,19 @@ jobs:
     name: ingest
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    # actions: write only here, and only to delete superseded window snapshots
+    # (ADR 0012). The workflow default above stays read-only.
+    permissions:
+      contents: read
+      actions: write
     env:
       DATABASE_URL: ${{ secrets.DATABASE_URL }}
       REDIS_URL: ${{ secrets.REDIS_URL }}
       INGEST_SOURCES: ${{ inputs.sources }}
       INGEST_DRY_RUN: ${{ inputs.dry_run }}
+      # Runner-side copy of the 72 h window: saves ~14 MB of Supabase egress per run.
+      # It's only a cache; any mismatch with Postgres means a full reload.
+      INGEST_WINDOW_FILE: ${{ github.workspace }}/.window/window.npz
     steps:
       - uses: actions/checkout@v7
       # setup-uv publishes no floating major tag, so pin the release commit.
@@ -55,8 +63,32 @@ jobs:
         with:
           path: ~/.cache/firstread/models
           key: ingest-models-${{ hashFiles('packages/core/src/firstread_core/embedding.py', 'services/ingest/src/firstread_ingest/models.py', 'services/ingest/src/firstread_ingest/sources/gdelt_domains.py') }}
+      # The newest saved window (restore-keys picks the most recently created entry).
+      - name: Restore the window snapshot
+        uses: actions/cache/restore@v6
+        with:
+          path: .window
+          key: ingest-window-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: ingest-window-
       - name: Run ingestion
         run: |
           args=(run --require-db --sources "$INGEST_SOURCES")
           if [ "$INGEST_DRY_RUN" = "true" ]; then args+=(--dry-run); fi
           uv run --frozen --no-dev firstread-ingest "${args[@]}"
+      # Cache keys are immutable, so each run saves a new entry...
+      - name: Save the window snapshot
+        if: success() && hashFiles('.window/window.npz') != ''
+        uses: actions/cache/save@v6
+        with:
+          path: .window
+          key: ingest-window-${{ github.run_id }}-${{ github.run_attempt }}
+      # ...and only after that save succeeded are older entries deleted, keeping the
+      # newest 2. Otherwise ~1.3 GB/day of snapshots would evict the model caches.
+      - name: Delete superseded window snapshots
+        if: success() && hashFiles('.window/window.npz') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh cache list --repo "$GITHUB_REPOSITORY" --key ingest-window- \
+            --sort created_at --order desc --limit 100 --json id --jq '.[2:][].id' |
+          while read -r id; do gh cache delete "$id" --repo "$GITHUB_REPOSITORY"; done

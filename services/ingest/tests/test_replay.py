@@ -108,9 +108,11 @@ async def test_replay_steps_the_clock_and_behaves_like_production(
         conn = await connect(dsn)
         try:
             await apply_migrations(conn, MIGRATIONS)
+            win = tmp_path / "window.npz"
             result = await replay.replay(settings, classifier, [old, missing, now_slot], conn,
                                          redis_test, places, lookup, cache=tmp_path,
-                                         embed=fake_embed, progress=lambda _: None)  # fmt: skip
+                                         embed=fake_embed, progress=lambda _: None,
+                                         window_file=win, compare=True)  # fmt: skip
             assert [r["slot"] for r in result.runs] == [
                 gkg.slot_name(s) for s in (old, missing, now_slot)
             ]
@@ -121,14 +123,26 @@ async def test_replay_steps_the_clock_and_behaves_like_production(
             assert result.runs[0]["retention"]["story_coverage"] == 0
             assert sum(r["retention"]["story_coverage"] for r in result.runs[1:]) > 0
             assert await conn.fetchval("select count(*) from public.articles") == 16
+            # The snapshot path matches the pre-P3 SQL paths in every run.
+            eq = replay.compare_totals(result.runs)
+            assert eq is not None
+            assert eq["runs_compared"] == 3
+            assert eq["dedupe_inputs_differ_runs"] == 0
+            assert eq["decisions_changed"] == 0
+            assert eq["fresh_pool_differs_runs"] == 0
+            assert eq["topic_pools_differ_runs"] == 0
+            assert win.is_file()
+            assert result.runs[0]["window"]["start"] == "reloaded"  # first run: no file yet
+            assert [r["window"]["start"] for r in result.runs[1:]] == ["delta", "delta"]
             state = await replay.final_state(conn, redis_test)
-            assert state["zcard"]["pool:fresh"] == 8  # only the last slot is within 24 h
-            assert set(state["zcard"]) >= {"pool:trending", "pool:topic:us", "pool:topic:world"}
+            assert state["pools"]["fresh"] == 8  # only the last slot is within 24 h
+            assert {"trending", "topic:us", "topic:world"} <= set(state["pools"])
             assert state["sizes"]["articles"] == 16
             assert result.trending_days  # a snapshot for the last replayed day
             again = await replay.replay(settings, classifier, [old, missing, now_slot], conn,
                                         redis_test, places, lookup, cache=tmp_path,
-                                        embed=fake_embed, progress=lambda _: None)  # fmt: skip
+                                        embed=fake_embed, progress=lambda _: None,
+                                        window_file=win)  # fmt: skip
             assert sum(r["inserted"] for r in again.runs) == 0
         finally:
             await conn.close()
