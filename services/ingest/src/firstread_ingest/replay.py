@@ -54,7 +54,9 @@ REPO = Path(__file__).resolve().parents[4]
 CACHE = REPO / "data" / "replay" / "gkg"
 REPORT = REPO / "data" / "replay" / "report.json"
 WINDOW_FILE = REPO / "data" / "replay" / "window.npz"  # the same snapshot path as cron
-AGGREGATES = REPO / "docs" / "learn" / "data" / "02-replay.json"
+# Phase 2's committed copy (02-replay.json) is history; P3 replays write 03-*.
+AGGREGATES = REPO / "docs" / "learn" / "data" / "03-replay.json"
+EQUIVALENCE = REPO / "docs" / "learn" / "data" / "03-replay-equivalence.json"
 RUN_DELAY = timedelta(minutes=20)  # each slot is "processed" 20 min after it starts
 SNAPSHOT_TIME = (23, 45)  # top-10 trending per replayed day, at this slot
 
@@ -552,4 +554,13 @@ async def main(
     REPORT.write_text(json.dumps(report, indent=1, default=str) + "\n")
     AGGREGATES.parent.mkdir(parents=True, exist_ok=True)
     AGGREGATES.write_text(json.dumps(aggregates(report), indent=1, default=str) + "\n")
+    if "equivalence" in report:
+        evidence = {
+            "window": report["window"],
+            "equivalence": report["equivalence"],
+            "egress": report["egress"],
+            "redis_commands_per_run": report["redis_commands_per_run"],
+            "pool_blob_bytes": report["final"].get("pool_blob_bytes"),
+        }
+        EQUIVALENCE.write_text(json.dumps(evidence, indent=1, default=str) + "\n")
     print(f"wrote {REPORT} and {AGGREGATES}")

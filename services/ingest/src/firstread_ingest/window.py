@@ -233,7 +233,8 @@ class WindowSnapshot:
             "watermark": _from_us(self.watermark_us).isoformat() if len(self) else None,
         }
         buf = io.BytesIO()
-        np.savez_compressed(
+        # Uncompressed: fp16 vectors barely compress, and the Actions cache compresses.
+        np.savez(
             buf,
             header=np.frombuffer(json.dumps(header).encode(), np.uint8),
             ids=np.frombuffer(b"".join(i.bytes for i in self.ids), np.uint8),
