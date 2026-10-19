@@ -51,3 +51,4 @@ Also:
 - Credit GDELT with a link to gdeltproject.org wherever its data appears.
 - Embeddings are L2-normalized, so inner product equals cosine similarity. Use the matching pgvector operator class.
 - pgvector lives in the `extensions` schema (Supabase convention, also locally), which isn't on the local `search_path`: write `extensions.halfvec(384)` and `OPERATOR(extensions.<#>)` explicitly in SQL.
+- Supabase egress (5 GB/month, pooler egress included) and Upstash commands (every pipelined command billed) are budgets, not afterthoughts: never select vectors in bulk per run or per request. Ingestion keeps the 72 h window on the runner (ADR 0012); cost every new query against ADR 0011.

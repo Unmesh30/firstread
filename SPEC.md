@@ -1,6 +1,6 @@
 # FirstRead — Product & Technical Spec (v1)
 
-Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-14 (ADRs 0006–0009: topics, live sources, schema, dedupe)
+Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-18 (ADRs 0011–0013: free-tier budgets, runner-side window and pool snapshot, trending v2)
 
 > This document is the single source of truth for what we are building. It is read before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
@@ -47,8 +47,8 @@ FirstRead is a personalized "For You" news feed that recommends **breaking stori
 - **$0 per month.** Allowed services and their free limits (re-verify at the start of the phase that uses them):
   - GitHub: public repo, GitHub Pages, GitHub Actions (free on standard runners for public repos).
   - Google Cloud always-free tier with a **$1 budget alert**: Cloud Run (always-free tier of roughly 2M requests, 180K vCPU-seconds, 360K GiB-seconds per month with request-based billing), Artifact Registry (0.5 GiB storage free), Secret Manager free tier, Cloud Logging.
-  - Supabase Free: 500 MB Postgres, Auth (50K MAU), project pauses after ~1 week of inactivity (our ingestion writes keep it active).
-  - Upstash Redis Free: ~500K commands/month, 256 MB.
+  - Supabase Free: 500 MB Postgres (read-only above it, until space is reclaimed), **5 GB/month egress** (with the shared pooler, the pooler's egress counts), Auth (50K MAU), project pauses after ~1 week of inactivity (our ingestion writes keep it active). Budgets per run and per session: ADR 0011.
+  - Upstash Redis Free: 500K commands/month (every pipelined command is billed), 250 MB, 10 GB/month bandwidth.
   - Hugging Face Hub: public model repo for versioned model artifacts.
   - Local Mac (Apple Silicon, 16 GB+) for development and most training; Kaggle/Colab free GPUs as a fallback.
 - **Never add a paid service** or anything that can bill without the owner's explicit approval.
@@ -190,7 +190,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - **`events`**: `id uuid pk` (client-generated, for idempotency), `user_id`, `article_id`, `type`, `position`, `dwell_ms`, `request_id`, `model_version`, `created_at`. Index `(user_id, created_at desc)`.
 - **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `window_start`, `window_end`, `fetched`, `inserted`, `duplicates`, `near_duplicates`, `clustered`, `errors`, `gdelt_calls`, `redis_commands`, `status ('running'|'ok'|'partial'|'failed')`, `details jsonb`.
 - **`story_coverage`**: `(story_cluster_id, source_domain)` pk, `first_seen_at`: every outlet that carried a story, including dropped duplicates (trending, ADR 0010).
-- **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor.
+- **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor, and the published/pending pool snapshot versions (ADR 0012).
 - **`demo_personas`**, **`persona_articles`**: persona definitions built from live articles.
 - **RLS on every table** (ADR 0008): articles are public-read; profiles and events are owner-only; all service tables have no policy. Services use a dedicated DB role (P5).
 - **Retention:** articles 14 days, `story_coverage` 48 h, `ingestion_runs` 30 days, events 30 days (P3). Target DB size < 400 MB; measured steady state ≈ 227 MB (3-day replay, ADR 0008). P3 must keep clicked articles' vectors beyond 14 days for user histories.
@@ -201,10 +201,10 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - `u:{uid}:vec` (cached user vector, TTL 10 min)
 - `u:{uid}:seen` (set, TTL 3 days)
 - `u:{uid}:feed:{cursor}` (TTL 60 s)
-- `pool:fresh`, `pool:trending`, `pool:topic:{category}` (sorted sets)
+- `pools:ver` (current snapshot version) and `pools:blob:{ver}` (one compressed snapshot: fresh, trending, 13 topic pools, centroids, stats; no TTL, the previous one expires 120 s after the switch). Replaces the `pool:*` sorted sets (ADR 0012).
 - `rl:{key}` (rate limiting)
 
-**Command budget:** ≤300K/month. Batch `ZADD`s, pipeline reads, count commands in metrics.
+**Command budget:** ≤300K/month. Ingestion publishes in 3 commands a run; pipeline reads; count commands in metrics (ADR 0011).
 
 ---
 
@@ -261,7 +261,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - `ci.yml` — PRs and main: lint, typecheck, tests, docker build.
 - `deploy-api.yml` — main: build → Artifact Registry → Cloud Run; keyless auth via Workload Identity Federation; smoke test.
 - `deploy-web.yml` — main: `expo export -p web` → GitHub Pages.
-- `ingest.yml` — manual dispatch now (`dry_run` defaults to true); the `*/15 * * * *` schedule is enabled in P5 together with the database and Redis secrets; concurrency group so runs never overlap; caches the models and the pinned GDELT domain lookup.
+- `ingest.yml` — manual dispatch now (`dry_run` defaults to true); the `*/15 * * * *` schedule is enabled in P5 together with the database and Redis secrets; concurrency group so runs never overlap; caches the models and the pinned GDELT domain lookup, plus the runner-side 72 h window snapshot (ADR 0012; `actions: write` on that job only, to delete superseded entries).
 - `codeql.yml`, plus Dependabot.
 
 **Conventions:** protected `main`; branch per phase (`phase-N-name`); PRs; Conventional Commits; release tags `v0.x`.
