@@ -1,6 +1,6 @@
 # ADR 0010: Redis candidate pools and trending, rebuilt from Postgres each run
 
-- Status: Accepted
+- Status: Accepted; the pool **format** (sorted sets rebuilt with ZADD + RENAME, ≤ 30 commands a run) is superseded by [ADR 0012](0012-runner-window-and-pool-snapshot.md) (one versioned snapshot blob, 3 commands a run), and trending is amended by [ADR 0013](0013-trending-v2.md). The pool definitions and the trending formula below still apply.
 - Date: 2026-10-15
 
 ## Context
