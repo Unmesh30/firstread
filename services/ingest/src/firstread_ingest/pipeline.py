@@ -72,6 +72,7 @@ class RunSummary:
     window: dict[str, Any] = field(default_factory=dict)
     egress_bytes_est: int = 0
     compare: dict[str, Any] = field(default_factory=dict)
+    trending: dict[str, Any] = field(default_factory=dict)
     retention: dict[str, int] = field(default_factory=dict)
     size: dict[str, int] = field(default_factory=dict)
     size_warning: bool = False
@@ -109,6 +110,7 @@ class RunSummary:
                 "pool_blob_bytes": self.pool_blob_bytes,
                 "window": self.window,
                 "egress_bytes_est": self.egress_bytes_est,
+                "trending": self.trending,
                 **({"compare": self.compare} if self.compare else {}),
                 "retention": self.retention,
                 "size": self.size,
@@ -277,6 +279,7 @@ async def _update_pools(
     owns = redis is None
     try:
         snapshot = await pools.build_snapshot(conn, snap, now, version)
+        summary.trending = dict(snapshot.stats.get("trending", {}))
         if compare_legacy:
             summary.compare["pools"] = await _compare_pools(conn, snap, now)
         if owns:

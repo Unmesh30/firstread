@@ -135,32 +135,84 @@ def replay_transport(slot: datetime, cache: Path, lookup: Path) -> httpx.MockTra
 @dataclass
 class Replay:
     runs: list[dict[str, Any]] = field(default_factory=list)
-    trending_days: dict[str, list[dict[str, Any]]] = field(default_factory=dict)
+    trending_days: dict[str, dict[str, Any]] = field(default_factory=dict)
     downloads: dict[str, list[str]] = field(default_factory=dict)
 
 
-async def snapshot_trending(conn: Any, now: datetime) -> list[dict[str, Any]]:
-    """Top 10 trending stories with their topic, breadth and top outlets."""
-    top = await pools.trending(conn, now, limit=10)
-    out = []
-    for t in top:
-        art = await conn.fetchrow(
-            "select title, category from public.articles where id = $1::uuid", t["id"]
+async def _describe(
+    conn: Any, rep: Any, clusters: Sequence[Any], score: float, outlets: int
+) -> dict[str, Any]:
+    art = await conn.fetchrow("select title, category from public.articles where id = $1", rep)
+    doms = await conn.fetch(
+        "select source_domain from public.story_coverage where story_cluster_id = any($1) "
+        "order by first_seen_at limit 5",
+        list(clusters),
+    )
+    return {
+        "headline": art["title"],
+        "topic": art["category"],
+        "domains": outlets,
+        "score": round(score, 3),
+        "clusters": [str(c) for c in clusters],
+        "top_domains": [d["source_domain"] for d in doms],
+    }
+
+
+NETWORK_SHARE_SQL = """
+select coalesce(sum(case when source_domain = any($3::text[]) then w end), 0)::float8
+         / nullif(sum(w), 0)::float8 as share
+from (
+  select source_domain, power(2.0, -extract(epoch from ($1 - first_seen_at)) / 3600.0 / 6.0) as w
+  from public.story_coverage
+  where story_cluster_id = any($2::uuid[])
+    and first_seen_at > $1 - interval '24 hours' and first_seen_at <= $1
+) t
+"""
+
+
+async def snapshot_trending(
+    conn: Any, now: datetime, window_file: Path | None = WINDOW_FILE
+) -> dict[str, Any]:
+    """Top 10 trending stories three ways (ADR 0013 evidence):
+
+    * ``p2``: the Phase 2 SQL (one cluster per entry, every domain an outlet);
+    * ``merged``: near-identical stories merged, representative by quality order;
+    * ``networks``: merged, and each syndication network counted as one outlet
+      (from ``config/outlet_networks.yaml`` whether or not it's applied).
+    """
+    from firstread_ingest.config import load_outlet_networks
+    from firstread_ingest.window import WindowSnapshot
+
+    p2 = [
+        await _describe(conn, t["id"], [t["story_cluster_id"]], t["score"], t["domains"])
+        for t in await pools.trending(conn, now, limit=10)
+    ]
+    out: dict[str, Any] = {"p2": p2}
+    if window_file is None or not window_file.is_file():  # noqa: ASYNC240 (local batch tool)
+        return out
+    win, _ = WindowSnapshot.load(window_file)
+    nets = load_outlet_networks()
+    all_nets = {d: n for n, ds in nets.networks.items() for d in ds}
+    merged, info = await pools.trending_entries(conn, win, now, networks={}, limit=10)
+    out["merged"] = [await _describe(conn, e.id, e.clusters, e.score, e.outlets) for e in merged]
+    out["merge_samples"] = [
+        [r["title"] for r in await conn.fetch(
+            "select title from public.articles where id = any($1)", ids
+        )]
+        for ids in info.samples
+    ]  # fmt: skip
+    if all_nets:
+        with_nets, _ = await pools.trending_entries(conn, win, now, networks=all_nets, limit=10)
+        out["networks"] = [
+            await _describe(conn, e.id, e.clusters, e.score, e.outlets) for e in with_nets
+        ]
+        share = await conn.fetchval(
+            NETWORK_SHARE_SQL, now, [c for e in merged for c in e.clusters], sorted(all_nets)
         )
-        doms = await conn.fetch(
-            "select source_domain from public.story_coverage where story_cluster_id = $1 "
-            "order by first_seen_at limit 5",
-            t["story_cluster_id"],
-        )
-        out.append(
-            {
-                "headline": art["title"],
-                "topic": art["category"],
-                "domains": t["domains"],
-                "score": round(t["score"], 3),
-                "top_domains": [d["source_domain"] for d in doms],
-            }
-        )
+        out["network_share_of_top10_score"] = round(share or 0.0, 4)
+        mine = [set(e["clusters"]) for e in out["merged"]]
+        theirs = [set(e["clusters"]) for e in out["networks"]]
+        out["top10_changed_by_networks"] = sum(1 for a in mine if not any(a & b for b in theirs))
     return out
 
 
@@ -234,7 +286,9 @@ async def replay(
             }
         )
         if (slot.hour, slot.minute) == SNAPSHOT_TIME or i == len(todo) - 1:
-            result.trending_days[slot.strftime("%Y-%m-%d")] = await snapshot_trending(conn, now)
+            result.trending_days[slot.strftime("%Y-%m-%d")] = await snapshot_trending(
+                conn, now, window_file
+            )
         if (i + 1) % 8 == 0 or i == len(todo) - 1:
             done = sum(r["inserted"] for r in result.runs)
             progress(
@@ -360,8 +414,16 @@ def aggregates(report: dict[str, Any]) -> dict[str, Any]:
     """The committed copy: no headlines or URLs (same rule as the threshold pairs)."""
     agg: dict[str, Any] = json.loads(json.dumps(report, default=str))
     for day in agg.get("trending_days", {}).values():
-        for story in day:
+        stories = (
+            day
+            if isinstance(day, list)
+            else [s for k in ("p2", "merged", "networks") for s in day.get(k, [])]
+        )
+        for story in stories:
             story.pop("headline", None)
+            story.pop("clusters", None)
+        if isinstance(day, dict):
+            day.pop("merge_samples", None)
     agg.pop("runs", None)  # per-run detail stays local; totals below are enough
     return agg
 
