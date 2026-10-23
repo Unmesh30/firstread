@@ -1,0 +1,26 @@
+# Demo readers for recruiters and first-time visitors (SPEC section 2, ADR 0018).
+# Each persona's 20 articles are selected once a day from live news in its topics
+# (firstread_ingest.personas): never from MIND. Changing a persona's topics takes
+# effect on the next ingestion run.
+version: 1
+personas:
+  - id: markets-tech
+    name: Markets & tech
+    description: Follows companies, markets, technology and science.
+    topics: [business, tech_science]
+  - id: sports-health
+    name: Sports & health
+    description: Follows sport and health news.
+    topics: [sports, health]
+  - id: world-affairs
+    name: World affairs
+    description: Follows international news and politics.
+    topics: [world, politics]
+  - id: culture-food
+    name: Culture & food
+    description: Follows entertainment, food and lifestyle stories.
+    topics: [entertainment, food_drink, lifestyle]
+  - id: us-news
+    name: U.S. news
+    description: Follows U.S. national news, politics and the weather.
+    topics: [us, politics, weather]

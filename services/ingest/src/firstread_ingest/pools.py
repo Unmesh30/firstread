@@ -279,8 +279,9 @@ async def stats(conn: Any, win: WindowSnapshot, now: datetime) -> dict[str, Any]
     runs = await conn.fetchrow(
         "select count(*) as runs, count(*) filter (where status = 'ok') as ok, "
         "count(*) filter (where status = 'partial') as partial, "
-        "max(finished_at) as last_finished from public.ingestion_runs "
-        "where started_at > $1 and finished_at is not null",
+        "max(finished_at) as last_finished, (select status from public.ingestion_runs "
+        "where finished_at is not null order by finished_at desc limit 1) as last_status "
+        "from public.ingestion_runs where started_at > $1 and finished_at is not null",
         now - timedelta(hours=24),
     )
     return {
@@ -291,6 +292,7 @@ async def stats(conn: Any, win: WindowSnapshot, now: datetime) -> dict[str, Any]
         "runs_ok_24h": int(runs["ok"]),
         "runs_partial_24h": int(runs["partial"]),
         "last_run_finished": runs["last_finished"].isoformat() if runs["last_finished"] else None,
+        "last_run_status": runs["last_status"],
     }
 
 

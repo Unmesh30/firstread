@@ -8,6 +8,7 @@ import numpy as np
 import pytest
 
 from firstread_core import pools
+from firstread_core.personas import PersonaSample, PersonaSummary, parse_all
 from firstread_core.pools import ArticleInfo, PoolSnapshot, SnapshotError, TrendingEntry
 from firstread_core.topics import TOPIC_IDS
 
@@ -34,7 +35,17 @@ def full_snapshot(version: str = "v1") -> PoolSnapshot:
     }
     centroids = {t: rng.normal(size=384).astype(np.float32) for t in TOPIC_IDS}
     stats = {"articles_24h": 4855, "sources_24h": 1200, "median_lag_s": 912.0}
-    return PoolSnapshot(version, NOW, fresh, topics, trending, articles, centroids, stats)
+    # Five demo personas (ADR 0018) with long sample headlines.
+    personas = [
+        PersonaSummary(
+            f"persona-{k}", "A persona name", "A one-line description of who this reader is.",
+            ("business", "tech_science", "politics"), 20, 1_760_000_000,
+            tuple(PersonaSample(f"{k}{j} " + "w" * 197, "A Source Name", "business")
+                  for j in range(3)),
+        ).to_dict()
+        for k in range(5)
+    ]  # fmt: skip
+    return PoolSnapshot(version, NOW, fresh, topics, trending, articles, centroids, stats, personas)
 
 
 def test_round_trip_keeps_everything() -> None:
@@ -49,6 +60,8 @@ def test_round_trip_keeps_everything() -> None:
     assert back.articles == snap.articles
     assert np.allclose(back.centroids["sports"], snap.centroids["sports"], atol=1e-2)  # fp16
     assert back.stats == snap.stats
+    assert parse_all(back.personas) == parse_all(snap.personas)
+    assert len(parse_all(back.personas)) == 5
 
 
 def test_blob_at_the_caps_stays_under_the_limit() -> None:
@@ -88,3 +101,10 @@ def test_topic_centroids_prefer_confident_rows_and_skip_empty_topics() -> None:
     mixed = pools.topic_centroids(e, topics, good, min_rows=2)
     assert np.isclose(np.linalg.norm(mixed["sports"]), 1.0)  # too few confident: all rows
     assert mixed["sports"][1] > 0
+
+
+def test_malformed_persona_summaries_are_skipped() -> None:
+    good = full_snapshot().personas[0]
+    bad_topics = {**good, "topics": ["nope"]}
+    missing = {k: v for k, v in good.items() if k != "samples"}
+    assert [p.id for p in parse_all([good, bad_topics, missing, {"id": 3}])] == [good["id"]]

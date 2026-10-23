@@ -25,7 +25,7 @@ from numpy.typing import NDArray
 
 from firstread_core.embedding import EMBED_MODEL, Embedder, embedding_cache_key
 from firstread_core.topics import TopicDecision, resolve_topic
-from firstread_ingest import pools, store, window
+from firstread_ingest import personas, pools, store, window
 from firstread_ingest.config import Feed, Settings, load_feeds
 from firstread_ingest.dedupe import VALIDATED_BY_PAIR, Decision, Item, Recent, Thresholds, decide
 from firstread_ingest.http import make_client
@@ -74,6 +74,7 @@ class RunSummary:
     egress_bytes_est: int = 0
     compare: dict[str, Any] = field(default_factory=dict)
     trending: dict[str, Any] = field(default_factory=dict)
+    personas: dict[str, Any] = field(default_factory=dict)
     retention: dict[str, int] = field(default_factory=dict)
     size: dict[str, int] = field(default_factory=dict)
     size_warning: bool = False
@@ -112,6 +113,7 @@ class RunSummary:
                 "window": self.window,
                 "egress_bytes_est": self.egress_bytes_est,
                 "trending": self.trending,
+                "personas": self.personas,
                 **({"compare": self.compare} if self.compare else {}),
                 "retention": self.retention,
                 "size": self.size,
@@ -274,13 +276,21 @@ async def _update_pools(
     version: str,
     compare_legacy: bool,
 ) -> None:
-    """Build the pool snapshot and publish it (3 Redis commands). A Redis failure makes
-    the run partial; the last published snapshot stays readable, and the next run
-    publishes a complete one."""
+    """Build the pool snapshot (with the demo personas, refreshed when due) and publish
+    it (3 Redis commands). A Redis failure makes the run partial; the last published
+    snapshot stays readable, and the next run publishes a complete one."""
     owns = redis is None
     try:
         snapshot = await pools.build_snapshot(conn, snap, now, version)
         summary.trending = dict(snapshot.stats.get("trending", {}))
+        try:  # a persona failure must not block the pools: publish without them
+            chosen = await personas.refresh_or_load(conn, snap, now, snapshot.trending)
+            snapshot.personas = [p.to_dict() for p in chosen.summaries]
+            summary.personas = chosen.as_dict()
+        except Exception as exc:
+            summary.feed_errors["_personas"] = f"{type(exc).__name__}: {exc}"[:300]
+            summary.errors += 1
+            summary.status = "partial"
         if compare_legacy:
             summary.compare["pools"] = await _compare_pools(conn, snap, now)
         if owns:
