@@ -1,6 +1,6 @@
 # FirstRead — Product & Technical Spec (v1)
 
-Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-18 (ADRs 0011–0013: free-tier budgets, runner-side window and pool snapshot, trending v2)
+Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-23 (ADRs 0011–0016: budgets, runner window and pool snapshot, trending v2, ranking, auth, user data)
 
 > This document is the single source of truth for what we are building. It is read before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
@@ -186,23 +186,24 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 ### Postgres (migrations in `infra/db/`)
 
 - **`articles`**: `id uuid pk`, `url`, `url_canonical unique`, `title`, `summary` (always NULL in v1), `source_name`, `source_domain`, `image_url`, `language`, `source_country` (ISO 3166-1 alpha-2), `category` (an app topic id, ADR 0006), `category_confidence`, `category_source ('model'|'feed_hint'|'geo_rule')`, `geo ('us'|'intl')`, `published_at`, `first_seen_at`, `embedding extensions.halfvec(384)`, `embedding_model`, `text_source ('title'|'title_summary')`, `title_fingerprint`, `story_cluster_id`, `origin ('gdelt'|'rss')`, `created_at`. Indexes: HNSW on `embedding` (`halfvec_ip_ops`: inner product on normalized vectors), btree on `first_seen_at desc`, `(category, first_seen_at desc)`, `(title_fingerprint, first_seen_at)`, `story_cluster_id`. pgvector lives in the `extensions` schema (ADR 0008).
-- **`profiles`**: `user_id` (FK `auth.users`, cascade delete), `topics text[]`, `active_persona`, timestamps.
-- **`events`**: `id uuid pk` (client-generated, for idempotency), `user_id`, `article_id`, `type`, `position`, `dwell_ms`, `request_id`, `model_version`, `created_at`. Index `(user_id, created_at desc)`.
+- **`profiles`**: `user_id` (FK `auth.users`, cascade delete), `topics text[]`, `hidden_sources text[]`, `is_anonymous`, `active_persona`, `hist_version` (one per history write; Redis entries carry it, ADR 0016), timestamps incl. `last_seen_at` (touched at most once a day).
+- **`user_history`**: per (reader, article) the click-time copy of the vector, title, source, topic, cluster and text source, plus its version; ≤ 50 per reader; outlives article retention (ADR 0016).
+- **`events`**: `id uuid pk` (client-generated, for idempotency), `user_id`, `article_id` (no FK: articles expire first), `type`, `scope` (hides: article or source), `position`, `dwell_ms`, `request_id`, `model_version`, `client_ts`, `created_at`. Indexes `(user_id, created_at desc)`, `(type, created_at)`.
+- **`served_slates`**: per feed page the article ids and the blend's components, for joining events to what was shown.
 - **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `window_start`, `window_end`, `fetched`, `inserted`, `duplicates`, `near_duplicates`, `clustered`, `errors`, `gdelt_calls`, `redis_commands`, `status ('running'|'ok'|'partial'|'failed')`, `details jsonb`.
 - **`story_coverage`**: `(story_cluster_id, source_domain)` pk, `first_seen_at`: every outlet that carried a story, including dropped duplicates (trending, ADR 0010).
 - **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor, and the published/pending pool snapshot versions (ADR 0012).
 - **`demo_personas`**, **`persona_articles`**: persona definitions built from live articles.
-- **RLS on every table** (ADR 0008): articles are public-read; profiles and events are owner-only; all service tables have no policy. Services use a dedicated DB role (P5).
-- **Retention:** articles 14 days, `story_coverage` 48 h, `ingestion_runs` 30 days, events 30 days (P3). Target DB size < 400 MB; measured steady state ≈ 227 MB (3-day replay, ADR 0008). P3 must keep clicked articles' vectors beyond 14 days for user histories.
+- **RLS on every table** (ADR 0008/0016): articles are public-read; user tables are owner-only (`select` only; on Supabase `anon` gets nothing); all service tables have no policy. Services use a dedicated DB role (P5). Locally a shim provides `auth.users`/`auth.uid()` only where no `auth` schema exists (never on Supabase).
+- **Retention** (run by ingestion): articles 14 days, `story_coverage` 48 h, `ingestion_runs` 30 days, impressions 7 days, other events and served slates 30 days, inactive anonymous readers' app rows after 30 days. A **size guard** shortens these above 350/375/400 MB and vacuums after big deletes (Supabase Free is read-only above 500 MB; ADR 0016). Target DB size < 400 MB; measured article steady state ≈ 227 MB (3-day replay, ADR 0008).
 
 ### Redis keys
 
-- `u:{uid}:hist` (list, last 50 clicks)
-- `u:{uid}:vec` (cached user vector, TTL 10 min)
-- `u:{uid}:seen` (set, TTL 3 days)
-- `u:{uid}:feed:{cursor}` (TTL 60 s)
+- `u:{uid}:hist` (list, 7 d): versioned history entries, append-only (`RPUSH` + `LTRIM`); rebuilt from `user_history` on any version gap (ADR 0016)
+- `u:{uid}:hidden` (set, 7 d, with a sentinel) and `u:{uid}:seen` (set of viewed ids, 3 d)
+- `u:{uid}` (hash, 7 d): cached user vector, stale after 10 min or when the history version moves
+- `u:{uid}:slate` (30 min): the ranked slate, served ids and a 60 s page cache (P3d)
 - `pools:ver` (current snapshot version) and `pools:blob:{ver}` (one compressed snapshot: fresh, trending, 13 topic pools, centroids, stats; no TTL, the previous one expires 120 s after the switch). Replaces the `pool:*` sorted sets (ADR 0012).
-- `rl:{key}` (rate limiting)
 
 **Command budget:** ≤300K/month. Ingestion publishes in 3 commands a run; pipeline reads; count commands in metrics (ADR 0011).
 
@@ -213,7 +214,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - Supabase **anonymous sign-in** on first launch (enable CAPTCHA/Turnstile before public launch). **Google** via `linkIdentity` (manual linking enabled), so history is kept. Handle the "Google identity already linked to another user" case.
 - API verifies Supabase JWTs (prefer the project's JWKS / asymmetric signing keys; check current Supabase docs).
 - Minimal PII (email only when Google is linked). "Delete my data" in-app. Privacy page. No ads or third-party trackers.
-- CORS restricted to the GitHub Pages origin and localhost. Rate limiting. Pydantic validation.
+- CORS restricted to the GitHub Pages origin and localhost. Rate limiting (in-process token buckets per instance, per user and per IP; ADR 0015). Pydantic validation; one error schema with `request_id`.
 - Secrets only in `.env` (gitignored), GitHub Actions secrets and GCP Secret Manager. gitleaks in pre-commit; CodeQL and Dependabot in CI.
 
 ---
