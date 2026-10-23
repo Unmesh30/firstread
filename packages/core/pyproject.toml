@@ -12,6 +12,9 @@ dependencies = ["numpy>=2.5.4", "pyyaml>=6.0.3"]
 embed = ["fastembed==0.9.0"]
 # Postgres helpers (connect with the Supabase-pooler setting, migrations).
 db = ["asyncpg==0.32.0", "pgvector==0.5.1"]
+# Downloading model releases (ingest; the API's Docker build stage). fastembed 0.9.0
+# caps huggingface-hub below 2.0.
+release = ["huggingface-hub>=0.36,<2.0"]
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14"]

@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from firstread_core import release as core_release
 from firstread_core.topics import TOPIC_IDS
 from firstread_ingest import models
 from firstread_ingest.models import ModelReleaseError, TopicClassifier, verify_release
@@ -45,7 +46,7 @@ def test_manifest_must_match_packages_core(release_dir: tuple[Path, str], change
     else:
         m["category_classifier"]["kind"] = "mind_categories"
     (folder / "manifest.json").write_text(json.dumps(m))
-    sha = models._sha256(folder / "manifest.json")
+    sha = core_release.sha256(folder / "manifest.json")
     with pytest.raises(ModelReleaseError):
         verify_release(folder, sha)
 
