@@ -42,3 +42,5 @@ node_modules/
 # Load test: local keys and tokens, raw k6 samples (aggregates are committed)
 loadtest/.tokens/
 loadtest/results/raw*.csv
+loadtest/results/k6-summary.json
+loadtest/results/metrics-after.txt

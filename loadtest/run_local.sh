@@ -8,6 +8,7 @@
 # Runs the runtime image at Cloud Run's shape (1 vCPU, 512 MiB), real ES256 JWT
 # verification against loadtest/.tokens/jwks.json, rate limits raised for the test;
 # then measures startup-to-ready (median of 5) and runs k6 (pinned image).
+# RATES=10,20 picks the rates; LT_ENV=<file> passes extra API settings (diagnostics).
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -33,7 +34,7 @@ start() {
     -e AUTH_ISSUER=https://test-project.supabase.co/auth/v1 \
     -e RL_IP_PER_MIN=10000000 -e RL_USER_FEED_PER_MIN=1000000 \
     -e RL_USER_EVENTS_PER_MIN=1000000 -e RL_USER_WRITES_PER_MIN=1000000 \
-    -e LOG_LEVEL=WARNING \
+    -e LOG_LEVEL=WARNING ${LT_ENV:+--env-file "$LT_ENV"} \
     -v "$PWD/loadtest/.tokens:/lt:ro" "$IMAGE" >/dev/null
 }
 
@@ -54,7 +55,8 @@ echo "startup to /readyz (ms): $(tr '\n' ' ' < "$OUT/startup-ms.txt")"
 start
 until curl -fs "http://127.0.0.1:$PORT/readyz" >/dev/null 2>&1; do sleep 0.05; done
 docker run --rm --network "$NET" -v "$PWD/loadtest:/lt" "$K6" run --quiet \
-  --out "csv=/lt/results/raw.csv" -e BASE="http://$NAME:8000" /lt/k6/feed.js
+  --out "csv=/lt/results/raw.csv" -e BASE="http://$NAME:8000" -e RATES="${RATES:-50,100}" \
+  /lt/k6/feed.js
 docker stats --no-stream --format '{{.MemUsage}}' "$NAME" > "$OUT/memory-after.txt"
 curl -fs "http://127.0.0.1:$PORT/metrics" > "$OUT/metrics-after.txt"
 echo "k6 done: $OUT/k6-summary.json"

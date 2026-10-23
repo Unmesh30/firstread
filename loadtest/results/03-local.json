@@ -1,0 +1,152 @@
+{
+ "machine": {
+  "host": "Apple M4, Darwin",
+  "host_cpus": "10",
+  "docker": "10 CPUs, 4106346496 bytes",
+  "api_container": "--cpus=1 --memory=512m (Cloud Run's shape), one uvicorn worker",
+  "db_and_redis": "the same Docker Desktop VM, no CPU limit (not Supabase Nano or Upstash)"
+ },
+ "image_bytes": 503503730,
+ "startup_to_ready_ms": {
+  "runs": [
+   892,
+   876,
+   903,
+   845,
+   865
+  ],
+  "median": 876
+ },
+ "memory_after_run": "149.6MiB / 512MiB",
+ "k6": "grafana/k6:2.3.0, constant arrival rate, 60 s at each rate, fresh container",
+ "mix": "60% first pages, 25% cursor pages, 15% event batches",
+ "dropped_iterations": 1,
+ "scenarios": {
+  "rps50": {
+   "target_rps": 50,
+   "achieved_rps": 50.0,
+   "client_ms": {
+    "all": {
+     "n": 3001,
+     "p50": 14.1,
+     "p95": 22.3,
+     "p99": 34.5,
+     "mean": 13.1
+    },
+    "page1": {
+     "n": 1836,
+     "p50": 14.1,
+     "p95": 22.4,
+     "p99": 33.6,
+     "mean": 15.3
+    },
+    "cursor": {
+     "n": 723,
+     "p50": 15.7,
+     "p95": 26.5,
+     "p99": 36.3,
+     "mean": 14.1
+    },
+    "events": {
+     "n": 442,
+     "p50": 1.7,
+     "p95": 5.2,
+     "p99": 13.6,
+     "mean": 2.4
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 2559,
+     "p50": 12.8,
+     "p95": 20.5,
+     "p99": 32.6,
+     "mean": 13.3
+    },
+    "page1": {
+     "n": 1836,
+     "p50": 12.7,
+     "p95": 20.0,
+     "p99": 31.8,
+     "mean": 13.6
+    },
+    "cursor": {
+     "n": 723,
+     "p50": 14.3,
+     "p95": 22.4,
+     "p99": 34.8,
+     "mean": 12.6
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {},
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  },
+  "rps100": {
+   "target_rps": 100,
+   "achieved_rps": 100.0,
+   "client_ms": {
+    "all": {
+     "n": 6000,
+     "p50": 1012.5,
+     "p95": 1051.4,
+     "p99": 1069.7,
+     "mean": 818.5
+    },
+    "page1": {
+     "n": 3696,
+     "p50": 1016.2,
+     "p95": 1054.2,
+     "p99": 1071.4,
+     "mean": 947.1
+    },
+    "cursor": {
+     "n": 1407,
+     "p50": 1013.0,
+     "p95": 1053.0,
+     "p99": 1067.8,
+     "mean": 867.0
+    },
+    "events": {
+     "n": 897,
+     "p50": 194.3,
+     "p95": 537.1,
+     "p99": 779.2,
+     "mean": 212.4
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 5103,
+     "p50": 794.5,
+     "p95": 1000.1,
+     "p99": 1018.5,
+     "mean": 720.5
+    },
+    "page1": {
+     "n": 3696,
+     "p50": 808.2,
+     "p95": 1000.4,
+     "p99": 1017.1,
+     "mean": 745.6
+    },
+    "cursor": {
+     "n": 1407,
+     "p50": 701.8,
+     "p95": 999.5,
+     "p99": 1021.0,
+     "mean": 654.5
+    }
+   },
+   "error_rate": 0.592,
+   "degraded": {
+    "any": 10,
+    "encoder": 4,
+    "redis": 7
+   },
+   "slo_p95_server_ms": 150,
+   "meets_slo": false
+  }
+ }
+}

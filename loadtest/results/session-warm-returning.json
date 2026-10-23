@@ -1,0 +1,160 @@
+{
+ "label": "warm-returning",
+ "sessions": 20,
+ "median": {
+  "requests": 8.0,
+  "billed_s": 0.8,
+  "redis_commands": 30.0,
+  "db_bytes_est": 152816.0,
+  "redis_net_bytes": 105952.0
+ },
+ "max": {
+  "requests": 8,
+  "billed_s": 0.8,
+  "redis_commands": 30.0,
+  "db_bytes_est": 161411.0,
+  "redis_net_bytes": 106494
+ },
+ "rows": [
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 143448.0,
+   "redis_net_bytes": 106275
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 161411.0,
+   "redis_net_bytes": 106494
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 158117.0,
+   "redis_net_bytes": 105314
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 147515.0,
+   "redis_net_bytes": 105644
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 142175.0,
+   "redis_net_bytes": 106306
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 161411.0,
+   "redis_net_bytes": 106410
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 158117.0,
+   "redis_net_bytes": 105337
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 146208.0,
+   "redis_net_bytes": 105653
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 142175.0,
+   "redis_net_bytes": 106285
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 161411.0,
+   "redis_net_bytes": 106425
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 158117.0,
+   "redis_net_bytes": 105398
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 146208.0,
+   "redis_net_bytes": 105621
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 142175.0,
+   "redis_net_bytes": 106252
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 161411.0,
+   "redis_net_bytes": 106467
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 158117.0,
+   "redis_net_bytes": 105364
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 146208.0,
+   "redis_net_bytes": 105614
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 142175.0,
+   "redis_net_bytes": 106251
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 161411.0,
+   "redis_net_bytes": 106412
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 158117.0,
+   "redis_net_bytes": 105369
+  },
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 30.0,
+   "db_bytes_est": 146208.0,
+   "redis_net_bytes": 105646
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "label": "cold",
+ "sessions": 1,
+ "median": {
+  "requests": 8,
+  "billed_s": 0.8,
+  "redis_commands": 37.0,
+  "db_bytes_est": 372729.0,
+  "redis_net_bytes": 289441
+ },
+ "max": {
+  "requests": 8,
+  "billed_s": 0.8,
+  "redis_commands": 37.0,
+  "db_bytes_est": 372729.0,
+  "redis_net_bytes": 289441
+ },
+ "rows": [
+  {
+   "requests": 8,
+   "billed_s": 0.8,
+   "redis_commands": 37.0,
+   "db_bytes_est": 372729.0,
+   "redis_net_bytes": 289441
+  }
+ ]
+}
