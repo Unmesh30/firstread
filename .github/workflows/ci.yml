@@ -178,6 +178,17 @@ jobs:
                              'huggingface_hub') if importlib.util.find_spec(m)]
           print('ML packages in image:', bad or 'none')
           sys.exit(1 if bad or not importlib.util.find_spec('onnxruntime') else 0)"
+      # numpy's OpenBLAS must use one thread: a thread per visible host CPU spins under
+      # the 1-vCPU quota and starved the API in the P3e load test.
+      - name: One BLAS thread in the image
+        run: |
+          docker run --rm --cpus=1 --entrypoint python firstread-api:ci -c "
+          import ctypes, glob, os, sys
+          import numpy
+          libs = os.path.join(os.path.dirname(numpy.__file__), '..', 'numpy.libs', '*openblas*')
+          n = ctypes.CDLL(glob.glob(libs)[0]).scipy_openblas_get_num_threads64_()
+          print('openblas threads:', n)
+          sys.exit(0 if n == 1 else 1)"
       # The baked release loads and verifies (it also did at startup, above).
       - name: Encoder bench in the image (smoke)
         run: docker run --rm --cpus=1 --entrypoint python firstread-api:ci -m firstread_api.bench_encoder --runs 20 --warmup 2

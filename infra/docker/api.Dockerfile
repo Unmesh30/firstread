@@ -62,8 +62,14 @@ RUN useradd --create-home --uid 10001 app
 COPY --from=builder --chown=app:app /app/.venv /app/.venv
 COPY --from=models /models /app/models
 # The API re-verifies these files at startup (hashes, feature blocks): no network.
+# One BLAS thread: numpy's OpenBLAS otherwise starts a thread per *visible* host CPU,
+# and those threads spin under Cloud Run's 1-vCPU quota. Measured locally at 1 vCPU:
+# CPU throttled in 88% of scheduler periods and requests failing from 10 RPS, vs 0
+# errors and a 21 ms p95 at 50 RPS with one thread (docs/learn/03, §6.2).
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
+    OPENBLAS_NUM_THREADS=1 \
+    OMP_NUM_THREADS=1 \
     PORT=8000 \
     API_MODEL_TAG=${MODEL_TAG} \
     API_MODEL_DIR=/app/models/${MODEL_TAG}
@@ -81,7 +87,7 @@ ARG MODEL_TAG
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-dev --package firstread-api
 COPY --from=models /models /app/models
-ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 \
+ENV PATH="/app/.venv/bin:$PATH" PYTHONUNBUFFERED=1 OPENBLAS_NUM_THREADS=1 OMP_NUM_THREADS=1 \
     API_MODEL_TAG=${MODEL_TAG} API_MODEL_DIR=/app/models/${MODEL_TAG}
 EXPOSE 8000
 CMD ["uvicorn", "firstread_api.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload", \
