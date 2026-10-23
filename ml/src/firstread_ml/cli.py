@@ -122,6 +122,20 @@ def _eval_gate(args: argparse.Namespace) -> None:
     raise SystemExit(code)
 
 
+def _rank_tune(args: argparse.Namespace) -> None:
+    from firstread_ml.eval import rank_tune
+
+    r = rank_tune.tune(write=args.write_config)
+    print(json.dumps(r["config"], indent=1))
+
+
+def _rank_report(args: argparse.Namespace) -> None:
+    from firstread_ml.eval import rank_tune
+
+    r = rank_tune.dev_report(args.release, args.version)
+    print(json.dumps(r["sample"], indent=1, default=float))
+
+
 def _release(args: argparse.Namespace) -> None:
     from firstread_ml import release
     from firstread_ml.paths import data_dir
@@ -208,6 +222,19 @@ def build_parser() -> argparse.ArgumentParser:
         "--release", type=Path, default=Path("data/release/dry-run"), help="release folder"
     )
     p.set_defaults(func=_eval_gate)
+
+    p = sub.add_parser("rank-tune", help="tune the ranking blend on MIND-small holdout (ADR 0014)")
+    p.add_argument(
+        "--write-config", action="store_true", help="write packages/core ranking/rank-1.yaml"
+    )
+    p.set_defaults(func=_rank_tune)
+
+    p = sub.add_parser("rank-report", help="report a ranking config once on MIND-large dev")
+    p.add_argument(
+        "--release", type=Path, default=Path("data/release/v0.2.0"), help="release folder"
+    )
+    p.add_argument("--version", default="rank-1", help="ranking config version")
+    p.set_defaults(func=_rank_report)
 
     p = sub.add_parser("release", help="build / upload / verify a model release (ADR 0005)")
     p.add_argument("action", choices=["build", "upload", "verify", "verify-tag"])

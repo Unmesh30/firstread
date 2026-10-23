@@ -172,3 +172,17 @@ def impressions_from_frame(df: pl.DataFrame) -> Impressions:
         cand=cand,
         label=label,
     )
+
+
+def load_user_ids(variant: str, split: str, raw_dir: Path | None = None) -> pl.DataFrame:
+    """(imp_id, user) from the raw ``behaviors.tsv``; the processed parquet drops users.
+
+    Only the stated-topic proxy of the ranking study needs it (ADR 0014): a user's
+    clicks in *other*, earlier impressions. Stays local like all MIND data.
+    """
+    path = (raw_dir or mind_raw_dir()) / split_name(variant, split) / "behaviors.tsv"
+    df = _read_tsv(path, BEHAVIOR_COLS).select(
+        pl.col(BEHAVIOR_COLS[0]).cast(pl.Int64).alias("imp_id"),
+        pl.col(BEHAVIOR_COLS[1]).alias("user"),
+    )
+    return df

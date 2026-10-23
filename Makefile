@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real rank-tune rank-report topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -88,6 +88,12 @@ topics: ## Train + evaluate the topic classifier on MIND-large (ADR 0006) -> ml/
 
 skew: ## Title-only vs title+abstract ranking study on MIND-small dev (needs data/release/v0.1.0)
 	uv run firstread-ml skew --release data/release/v0.1.0
+
+rank-tune: ## Tune the ranking blend, MMR and cold start on MIND-small holdout; writes rank-1.yaml (ADR 0014)
+	uv run firstread-ml rank-tune --write-config
+
+rank-report: ## Report the ranking config once on MIND-large dev with the shipped encoder (ADR 0014)
+	uv run firstread-ml rank-report --release data/release/v0.2.0
 
 eval-gate-real: ## Real-data gate: ONNX user encoder in RELEASE vs mean_history on MIND-small dev (local)
 	uv run firstread-ml eval-gate --real --release $(RELEASE)
