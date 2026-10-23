@@ -1,6 +1,6 @@
 """Summarize a local k6 run into ``loadtest/results/03-local.json`` (aggregates only).
 
-    uv run python loadtest/analyze.py
+    uv run python loadtest/analyze.py [out-name [raw-csv]]   # default 03-local raw.csv
 
 Reads ``results/raw.csv`` (every sample, from ``--out csv``), ``k6-summary.json``
 and the small files ``run_local.sh`` writes, and reports per scenario (50 and 100
@@ -59,13 +59,13 @@ def machine() -> dict[str, Any]:
     }
 
 
-def main() -> None:
+def main(out_name: str = "03-local", raw: str = "raw.csv") -> None:
     dur: dict[tuple[str, str], list[float]] = defaultdict(list)
     srv: dict[tuple[str, str], list[float]] = defaultdict(list)
     errs: dict[str, list[float]] = defaultdict(list)
     degraded: dict[tuple[str, str], float] = defaultdict(float)
     reqs: dict[str, int] = defaultdict(int)
-    with (RES / "raw.csv").open() as f:
+    with (RES / raw).open() as f:
         for row in csv.DictReader(f):
             name, sc = row["metric_name"], row.get("scenario") or ""
             kind = tags(row).get("kind", "")
@@ -86,7 +86,8 @@ def main() -> None:
     summary = json.loads((RES / "k6-summary.json").read_text())
     dropped = summary["metrics"].get("dropped_iterations", {}).get("values", {}).get("count", 0)
     scenarios = {}
-    for sc, rate in (("rps50", 50), ("rps100", 100)):
+    names = sorted({sc for sc, _ in dur}, key=lambda x: int(x.removeprefix("rps")))
+    for sc, rate in ((n, int(n.removeprefix("rps"))) for n in names):
         kinds = ("all", "page1", "cursor", "events")
         feed_p95 = pct(srv[(sc, "feed")], 95)
         scenarios[sc] = {
@@ -105,14 +106,16 @@ def main() -> None:
         "image_bytes": int((RES / "image-bytes.txt").read_text()),
         "startup_to_ready_ms": {"runs": startup, "median": statistics.median(startup)},
         "memory_after_run": (RES / "memory-after.txt").read_text().strip(),
-        "k6": "grafana/k6:2.3.0, constant arrival rate, 60 s at each rate",
+        "k6": "grafana/k6:2.3.0, constant arrival rate, 60 s at each rate, fresh container",
         "mix": "60% first pages, 25% cursor pages, 15% event batches",
         "dropped_iterations": int(dropped),
         "scenarios": scenarios,
     }
-    (RES / "03-local.json").write_text(json.dumps(out, indent=1) + "\n")
+    (RES / f"{out_name}.json").write_text(json.dumps(out, indent=1) + "\n")
     print(json.dumps(out, indent=1))
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+
+    main(*sys.argv[1:3])

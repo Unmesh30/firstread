@@ -1,0 +1,58 @@
+{
+ "note": "The first 50/100 RPS run (2026-10-23), before the image pinned OpenBLAS to one thread. Its raw samples were not kept; these are the analyzer's numbers as printed then (ms; Server-Timing sum for server).",
+ "image": "runtime image without OPENBLAS_NUM_THREADS (10 BLAS threads under a 1-CPU quota)",
+ "scenarios": {
+  "rps50": {
+   "achieved_rps": 49.9,
+   "error_rate": 0.794,
+   "degraded": {
+    "any": 88,
+    "redis": 42,
+    "ann": 29,
+    "pools": 2,
+    "encoder": 29
+   },
+   "client_ms": {
+    "all": {
+     "p50": 1039.2,
+     "p95": 1172.5,
+     "p99": 1238.3
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "p50": 755.7,
+     "p95": 1002.5,
+     "p99": 1084.0
+    }
+   },
+   "meets_slo": false
+  },
+  "rps100": {
+   "achieved_rps": 99.6,
+   "error_rate": 0.9609,
+   "degraded": {
+    "any": 25,
+    "encoder": 11,
+    "redis": 8,
+    "ann": 9
+   },
+   "client_ms": {
+    "all": {
+     "p50": 1058.4,
+     "p95": 1166.8,
+     "p99": 1220.1
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "p50": 614.9,
+     "p95": 1002.8,
+     "p99": 1078.4
+    }
+   },
+   "meets_slo": false
+  }
+ },
+ "cpu": "throttled in 2,235 of 2,542 CFS periods (88%) over the 10-40 RPS step run; 74 ms of CPU per request at 10 RPS against ~29 ms of wall time"
+}

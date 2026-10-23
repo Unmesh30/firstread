@@ -1,6 +1,6 @@
 // FirstRead feed load test (P3e). Local Docker stack only, never production.
 //
-// Constant arrival rate: 50 requests/s for 60 s, then 100 requests/s for 60 s.
+// Constant arrival rate, 60 s at each rate in RATES (default 50 then 100 requests/s).
 // Mix: 60% first feed pages, 25% cursor pages, 15% event batches (10 impressions,
 // one in five with a click). Readers and their ES256 tokens come from
 // loadtest/seed_local.py; the API verifies them against AUTH_LOCAL_JWKS_FILE.
@@ -25,40 +25,27 @@ for (const r of ["redis", "encoder", "ann", "pools", "timeout"]) {
 }
 
 const STATS = ["avg", "min", "med", "p(90)", "p(95)", "p(99)", "max", "count"];
-export const options = {
-  summaryTrendStats: STATS,
-  scenarios: {
-    rps50: {
-      executor: "constant-arrival-rate",
-      rate: 50,
-      timeUnit: "1s",
-      duration: "60s",
-      preAllocatedVUs: 50,
-      maxVUs: 400,
-    },
-    rps100: {
-      executor: "constant-arrival-rate",
-      rate: 100,
-      timeUnit: "1s",
-      duration: "60s",
-      startTime: "60s",
-      preAllocatedVUs: 100,
-      maxVUs: 600,
-    },
-  },
-  // Sub-metrics per scenario and request kind (reported, not used to fail the run).
-  thresholds: {
-    "http_req_duration{scenario:rps50}": ["p(95)<1000000"],
-    "http_req_duration{scenario:rps100}": ["p(95)<1000000"],
-    "server_ms{scenario:rps50}": ["p(95)<1000000"],
-    "server_ms{scenario:rps100}": ["p(95)<1000000"],
-    "http_req_duration{kind:page1}": ["p(95)<1000000"],
-    "http_req_duration{kind:cursor}": ["p(95)<1000000"],
-    "http_req_duration{kind:events}": ["p(95)<1000000"],
-    "errors{scenario:rps50}": ["rate<1"],
-    "errors{scenario:rps100}": ["rate<1"],
-  },
-};
+// RATES: comma-separated requests/s, 60 s each, one after another (default: SPEC's 50 then 100).
+const RATES = (__ENV.RATES || "50,100").split(",").map(Number);
+const scenarios = {};
+const thresholds = {};
+RATES.forEach((rate, k) => {
+  const name = `rps${rate}`;
+  scenarios[name] = {
+    executor: "constant-arrival-rate",
+    rate,
+    timeUnit: "1s",
+    duration: "60s",
+    startTime: `${k * 60}s`,
+    preAllocatedVUs: Math.max(rate, 10),
+    maxVUs: rate * 6,
+  };
+  // Sub-metrics per scenario (reported, never used to fail the run).
+  thresholds[`http_req_duration{scenario:${name}}`] = ["p(95)<1000000"];
+  thresholds[`server_ms{scenario:${name}}`] = ["p(95)<1000000"];
+  thresholds[`errors{scenario:${name}}`] = ["rate<1"];
+});
+export const options = { summaryTrendStats: STATS, scenarios, thresholds };
 
 const state = {}; // per VU: uid -> {cursor, items}
 

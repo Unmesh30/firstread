@@ -1,0 +1,333 @@
+{
+ "machine": {
+  "host": "Apple M4, Darwin",
+  "host_cpus": "10",
+  "docker": "10 CPUs, 4106346496 bytes",
+  "api_container": "--cpus=1 --memory=512m (Cloud Run's shape), one uvicorn worker",
+  "db_and_redis": "the same Docker Desktop VM, no CPU limit (not Supabase Nano or Upstash)"
+ },
+ "image_bytes": 503503730,
+ "startup_to_ready_ms": {
+  "runs": [
+   892,
+   876,
+   903,
+   845,
+   865
+  ],
+  "median": 876
+ },
+ "k6": "grafana/k6:2.3.0, constant arrival rate, 60 s at each rate, fresh container",
+ "mix": "60% first pages, 25% cursor pages, 15% event batches",
+ "scenarios": {
+  "rps10": {
+   "target_rps": 10,
+   "achieved_rps": 10.0,
+   "client_ms": {
+    "all": {
+     "n": 601,
+     "p50": 24.9,
+     "p95": 42.3,
+     "p99": 52.6,
+     "mean": 23.0
+    },
+    "page1": {
+     "n": 363,
+     "p50": 26.9,
+     "p95": 44.0,
+     "p99": 53.7,
+     "mean": 30.1
+    },
+    "cursor": {
+     "n": 140,
+     "p50": 11.5,
+     "p95": 42.1,
+     "p99": 51.0,
+     "mean": 16.2
+    },
+    "events": {
+     "n": 98,
+     "p50": 5.2,
+     "p95": 11.0,
+     "p99": 15.7,
+     "mean": 6.3
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 503,
+     "p50": 22.4,
+     "p95": 36.9,
+     "p99": 46.1,
+     "mean": 22.2
+    },
+    "page1": {
+     "n": 363,
+     "p50": 23.0,
+     "p95": 36.8,
+     "p99": 48.3,
+     "mean": 25.7
+    },
+    "cursor": {
+     "n": 140,
+     "p50": 7.3,
+     "p95": 36.9,
+     "p99": 45.9,
+     "mean": 13.0
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {},
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  },
+  "rps20": {
+   "target_rps": 20,
+   "achieved_rps": 20.0,
+   "client_ms": {
+    "all": {
+     "n": 1200,
+     "p50": 17.7,
+     "p95": 29.2,
+     "p99": 47.8,
+     "mean": 16.7
+    },
+    "page1": {
+     "n": 739,
+     "p50": 18.3,
+     "p95": 29.5,
+     "p99": 66.1,
+     "mean": 20.6
+    },
+    "cursor": {
+     "n": 301,
+     "p50": 16.6,
+     "p95": 30.3,
+     "p99": 39.4,
+     "mean": 14.0
+    },
+    "events": {
+     "n": 160,
+     "p50": 3.0,
+     "p95": 5.2,
+     "p99": 6.7,
+     "mean": 3.3
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 1040,
+     "p50": 16.1,
+     "p95": 26.8,
+     "p99": 45.6,
+     "mean": 16.5
+    },
+    "page1": {
+     "n": 739,
+     "p50": 16.2,
+     "p95": 26.3,
+     "p99": 62.0,
+     "mean": 18.2
+    },
+    "cursor": {
+     "n": 301,
+     "p50": 14.8,
+     "p95": 27.2,
+     "p99": 36.2,
+     "mean": 12.1
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {},
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  },
+  "rps30": {
+   "target_rps": 30,
+   "achieved_rps": 30.0,
+   "client_ms": {
+    "all": {
+     "n": 1801,
+     "p50": 15.1,
+     "p95": 24.3,
+     "p99": 41.6,
+     "mean": 14.3
+    },
+    "page1": {
+     "n": 1123,
+     "p50": 15.4,
+     "p95": 25.0,
+     "p99": 45.5,
+     "mean": 17.0
+    },
+    "cursor": {
+     "n": 442,
+     "p50": 16.4,
+     "p95": 24.6,
+     "p99": 37.0,
+     "mean": 13.7
+    },
+    "events": {
+     "n": 236,
+     "p50": 2.4,
+     "p95": 4.0,
+     "p99": 13.1,
+     "mean": 2.8
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 1565,
+     "p50": 13.9,
+     "p95": 22.4,
+     "p99": 39.1,
+     "mean": 14.2
+    },
+    "page1": {
+     "n": 1123,
+     "p50": 13.8,
+     "p95": 22.4,
+     "p99": 40.2,
+     "mean": 15.1
+    },
+    "cursor": {
+     "n": 442,
+     "p50": 14.8,
+     "p95": 22.4,
+     "p99": 35.1,
+     "mean": 12.1
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {},
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  },
+  "rps40": {
+   "target_rps": 40,
+   "achieved_rps": 40.0,
+   "client_ms": {
+    "all": {
+     "n": 2400,
+     "p50": 13.7,
+     "p95": 22.1,
+     "p99": 36.2,
+     "mean": 13.4
+    },
+    "page1": {
+     "n": 1472,
+     "p50": 13.7,
+     "p95": 21.8,
+     "p99": 39.4,
+     "mean": 15.7
+    },
+    "cursor": {
+     "n": 580,
+     "p50": 15.2,
+     "p95": 24.3,
+     "p99": 36.1,
+     "mean": 14.3
+    },
+    "events": {
+     "n": 348,
+     "p50": 1.9,
+     "p95": 3.6,
+     "p99": 6.2,
+     "mean": 2.2
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 2052,
+     "p50": 12.5,
+     "p95": 21.1,
+     "p99": 36.4,
+     "mean": 13.5
+    },
+    "page1": {
+     "n": 1472,
+     "p50": 12.2,
+     "p95": 20.0,
+     "p99": 37.3,
+     "mean": 13.9
+    },
+    "cursor": {
+     "n": 580,
+     "p50": 13.8,
+     "p95": 22.1,
+     "p99": 34.2,
+     "mean": 12.8
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {
+    "any": 2,
+    "ann": 1,
+    "redis": 1
+   },
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  },
+  "rps50": {
+   "target_rps": 50,
+   "achieved_rps": 50.0,
+   "client_ms": {
+    "all": {
+     "n": 3001,
+     "p50": 13.6,
+     "p95": 22.4,
+     "p99": 35.3,
+     "mean": 13.2
+    },
+    "page1": {
+     "n": 1818,
+     "p50": 13.5,
+     "p95": 22.5,
+     "p99": 35.2,
+     "mean": 14.8
+    },
+    "cursor": {
+     "n": 728,
+     "p50": 15.3,
+     "p95": 26.3,
+     "p99": 38.2,
+     "mean": 16.1
+    },
+    "events": {
+     "n": 455,
+     "p50": 1.7,
+     "p95": 5.5,
+     "p99": 11.6,
+     "mean": 2.4
+    }
+   },
+   "server_ms": {
+    "feed": {
+     "n": 2546,
+     "p50": 12.5,
+     "p95": 20.6,
+     "p99": 32.8,
+     "mean": 13.5
+    },
+    "page1": {
+     "n": 1818,
+     "p50": 12.1,
+     "p95": 20.0,
+     "p99": 32.1,
+     "mean": 13.1
+    },
+    "cursor": {
+     "n": 728,
+     "p50": 13.9,
+     "p95": 23.8,
+     "p99": 35.5,
+     "mean": 14.5
+    }
+   },
+   "error_rate": 0.0,
+   "degraded": {},
+   "slo_p95_server_ms": 150,
+   "meets_slo": true
+  }
+ }
+}
