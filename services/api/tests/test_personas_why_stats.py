@@ -136,7 +136,7 @@ async def test_personas_and_stats_come_from_the_snapshot_without_postgres(api: L
     body = r.json()
     assert [p["id"] for p in body["personas"]] == ["sports-fan", "health-nut"]
     assert body["personas"][0]["samples"][0]["title"] == "A headline for sports-fan"
-    assert body["model_version"] == "v0.2.0+rank-2"
+    assert body["model_version"] == "v0.2.0+rank-3"
     r = await api.client.get("/v1/stats")
     assert r.status_code == 200
     assert r.headers["cache-control"] == "public, max-age=60"

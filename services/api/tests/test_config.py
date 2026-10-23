@@ -24,7 +24,7 @@ def test_settings_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("REDIS_URL", "redis://example:6379/1")
     s = make()
     assert s.redis_url.get_secret_value() == "redis://example:6379/1"
-    assert s.model_version == "v0.2.0+rank-2"
+    assert s.model_version == "v0.2.0+rank-3"
 
 
 def test_secrets_are_masked_in_repr() -> None:

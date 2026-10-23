@@ -135,7 +135,7 @@ async def test_anonymous_reader_topics_feed_click_next_page_why_delete(api: Live
     first = await page(api, uid)
     assert first["degraded"] == []
     assert len(first["items"]) == 20
-    assert first["model_version"] == "v0.2.0+rank-2"
+    assert first["model_version"] == "v0.2.0+rank-3"
     assert all(i["reasons"] for i in first["items"])
     assert {by_id[i].category for i in ids(first)} == set(TOPICS)  # topics, cold start
     timing = first["_headers"]["server-timing"]
@@ -165,7 +165,7 @@ async def test_anonymous_reader_topics_feed_click_next_page_why_delete(api: Live
     w = why.json()
     assert w["components"]["final"] == pytest.approx(second["items"][0]["score"], abs=2e-3)
     assert [s["article_id"] for s in w["similar_reads"]] == [str(clicked.id)]
-    assert w["topic_weight"] == pytest.approx(0.75)  # rank-2: k = 3, one click
+    assert w["topic_weight"] == pytest.approx(0.75)  # k = 3 (rank-2 and rank-3), one click
     assert w["reasons"]
 
     conn = await api.db()
