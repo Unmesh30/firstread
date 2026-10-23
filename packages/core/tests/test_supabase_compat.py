@@ -6,7 +6,8 @@ hosted Supabase. Checks:
 
 * the migrations apply (twice) and never touch the `auth` schema (0007's shim is a
   no-op where `auth` exists);
-* RLS lets anon read articles but write nothing; service tables are invisible;
+* RLS lets anon read articles but write nothing; service tables are invisible, and
+  the persona tables aren't granted at all;
 * user tables: deleting an auth user cascades; `authenticated` sees only its own
   rows (with the JWT claims set as PostgREST does); anon sees nothing; nobody writes;
 * pgvector is 0.8+ (iterative index scans, P3d).
@@ -36,6 +37,7 @@ TABLES = (
 )
 INSERTS = {"articles": "url", "feed_state": "feed_id"}
 USER_TABLES = ("profiles", "user_history", "events", "served_slates")
+NO_GRANTS = ("demo_personas", "persona_articles")  # service-only, no grants at all (ADR 0018)
 AUTH_OBJECTS = (
     "select coalesce(string_agg(c.relname || ':' || c.relkind::text, ',' order by c.relname), '') "
     "|| '|' || coalesce((select string_agg(p.proname || ':' || md5(p.prosrc), ',' "
@@ -50,6 +52,12 @@ async def count_as(conn: asyncpg.Connection, role: str, table: str) -> int:
         await conn.execute(f"set local role {role}")
         n: int = await conn.fetchval(f"select count(*) from public.{table}")  # noqa: S608 (constant)
     return n
+
+
+async def select_as(conn: asyncpg.Connection, role: str, table: str) -> None:
+    async with conn.transaction():
+        await conn.execute(f"set local role {role}")
+        await conn.fetchval(f"select count(*) from public.{table}")  # noqa: S608 (constant)
 
 
 async def insert_as(conn: asyncpg.Connection, role: str, table: str) -> None:
@@ -89,6 +97,9 @@ async def test_migrations_apply_as_a_non_superuser_and_rls_holds() -> None:
             for table in INSERTS:
                 with pytest.raises(asyncpg.InsufficientPrivilegeError):
                     await insert_as(conn, role, table)
+            for table in NO_GRANTS:
+                with pytest.raises(asyncpg.InsufficientPrivilegeError):
+                    await select_as(conn, role, table)
     finally:
         await conn.close()
 

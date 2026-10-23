@@ -11,7 +11,7 @@ import respx
 from firstread_core import pools as core_pools
 from firstread_core.db import apply_migrations, connect
 from firstread_core.dbtest import MIGRATIONS, skip_or_fail_if_unreachable_async, temp_database
-from firstread_ingest.config import Feed, Settings
+from firstread_ingest.config import Feed, Settings, load_personas
 from firstread_ingest.models import TopicClassifier
 from firstread_ingest.pipeline import EmbedFn, run
 from firstread_ingest.sources import gkg
@@ -103,6 +103,12 @@ async def test_second_run_over_the_same_items_inserts_nothing(
             second = await run(settings(), classifier, embed=fake_embed, feeds=FEEDS, sources=RSS,
                                conn=conn, redis=redis_test, now=later)  # fmt: skip
             assert second.inserted == 0
+            # Personas: refreshed by the first run, then only read; both blobs carry them.
+            assert first.personas["refreshed"] == "config"
+            assert second.personas["refreshed"] in (None, "empty")
+            ver = (await redis_test.get(core_pools.VER_KEY)).decode()
+            blob = core_pools.decode(await redis_test.get(core_pools.blob_key(ver)), ver)
+            assert [p["id"] for p in blob.personas] == [p.id for p in load_personas()]
             assert (
                 second.duplicates + second.near_duplicates
                 == first.inserted + first.duplicates + first.near_duplicates

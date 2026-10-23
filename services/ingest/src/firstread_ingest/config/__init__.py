@@ -183,3 +183,35 @@ def load_outlet_networks(path: Path = CONFIG_DIR / "outlet_networks.yaml") -> Ou
         return OutletNetworks(apply=False, networks={})
     data = _yaml(path)
     return OutletNetworks(apply=bool(data["apply"]), networks=data.get("networks") or {})
+
+
+class PersonaSpec(BaseModel):
+    """A demo reader (ADR 0018): its articles are selected from live news daily."""
+
+    id: str
+    name: str
+    description: str
+    topics: tuple[str, ...]
+
+    @field_validator("id")
+    @classmethod
+    def _slug(cls, v: str) -> str:
+        if not re.fullmatch(r"[a-z0-9-]{1,40}", v):
+            raise ValueError(f"persona id {v!r} must be a short lowercase slug")
+        return v
+
+    @field_validator("topics")
+    @classmethod
+    def _known_topics(cls, v: tuple[str, ...]) -> tuple[str, ...]:
+        if not v or not set(v) <= set(TOPIC_IDS) or len(set(v)) != len(v):
+            raise ValueError(f"persona topics must be distinct app topics, got {v!r}")
+        return v
+
+
+@lru_cache
+def load_personas(path: Path = CONFIG_DIR / "personas.yaml") -> tuple[PersonaSpec, ...]:
+    personas = tuple(PersonaSpec(**p) for p in _yaml(path)["personas"])
+    ids = [p.id for p in personas]
+    if len(set(ids)) != len(ids):
+        raise ValueError(f"{path}: duplicate persona ids")
+    return personas
