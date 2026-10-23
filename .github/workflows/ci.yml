@@ -56,6 +56,13 @@ jobs:
         with:
           path: ~/.cache/firstread/models
           key: embed-model-${{ hashFiles('packages/core/src/firstread_core/embedding.py') }}
+      # The pinned model release (~3.4 MB encoder files): the feed's E2E and readiness
+      # tests run the real encoder. The pins live in release.py, so its hash is the key.
+      - name: Cache model release
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firstread/models/firstread-models
+          key: model-release-${{ hashFiles('packages/core/src/firstread_core/release.py') }}
       - name: Ruff lint
         run: uv run --frozen ruff check --output-format=github .
       - name: Ruff format
@@ -100,6 +107,8 @@ jobs:
         run: uv sync --all-packages --frozen
       - name: Migrations on the Supabase image (RLS, non-superuser)
         run: uv run --frozen pytest -m supabase packages/core/tests/test_supabase_compat.py -v
+      - name: The feed's ANN queries on the Supabase image (pgvector 0.8+, SET LOCAL)
+        run: uv run --frozen pytest -m supabase services/api/tests/test_supabase_ann.py -v
 
   mobile:
     name: mobile
@@ -157,16 +166,21 @@ jobs:
           docker run -d --name api -p 8000:8000 firstread-api:ci
           for i in $(seq 1 20); do curl -fsS localhost:8000/healthz && exit 0; sleep 1; done
           docker logs api; exit 1
-      # The API never trains or embeds text: ML deps must stay out of the image.
+      # The API never trains or embeds text: ML deps must stay out of the image. It runs
+      # the user encoder with ONNX Runtime only, from files verified at build time, so
+      # huggingface_hub (download) stays in the models build stage too.
       - name: No ML dependencies in the image
         run: |
           docker image inspect firstread-api:ci --format 'image size: {{.Size}} bytes'
           docker run --rm --entrypoint python firstread-api:ci -c "
           import importlib.util, sys
-          bad = [m for m in ('torch', 'fastembed', 'sklearn', 'polars', 'onnx', 'matplotlib')
-                 if importlib.util.find_spec(m)]
+          bad = [m for m in ('torch', 'fastembed', 'sklearn', 'polars', 'onnx', 'matplotlib',
+                             'huggingface_hub') if importlib.util.find_spec(m)]
           print('ML packages in image:', bad or 'none')
-          sys.exit(1 if bad else 0)"
+          sys.exit(1 if bad or not importlib.util.find_spec('onnxruntime') else 0)"
+      # The baked release loads and verifies (it also did at startup, above).
+      - name: Encoder bench in the image (smoke)
+        run: docker run --rm --cpus=1 --entrypoint python firstread-api:ci -m firstread_api.bench_encoder --runs 20 --warmup 2
 
   secrets:
     name: secrets
