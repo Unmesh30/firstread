@@ -1,6 +1,53 @@
 {
   "components": {
     "schemas": {
+      "Components": {
+        "description": "The blend's terms for this item (ADR 0014): ``final = model + fresh + trend``.",
+        "properties": {
+          "final": {
+            "title": "Final",
+            "type": "number"
+          },
+          "fresh": {
+            "title": "Fresh",
+            "type": "number"
+          },
+          "model": {
+            "title": "Model",
+            "type": "number"
+          },
+          "trend": {
+            "title": "Trend",
+            "type": "number"
+          }
+        },
+        "required": [
+          "model",
+          "fresh",
+          "trend",
+          "final"
+        ],
+        "title": "Components",
+        "type": "object"
+      },
+      "Credit": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "url"
+        ],
+        "title": "Credit",
+        "type": "object"
+      },
       "ErrorDetail": {
         "properties": {
           "code": {
@@ -392,6 +439,67 @@
         "title": "HistoryItem",
         "type": "object"
       },
+      "IngestionStats": {
+        "properties": {
+          "last_run_finished": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Finished"
+          },
+          "last_run_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run Status"
+          },
+          "runs_24h": {
+            "title": "Runs 24H",
+            "type": "integer"
+          },
+          "runs_ok_24h": {
+            "title": "Runs Ok 24H",
+            "type": "integer"
+          },
+          "snapshot_built_at": {
+            "format": "date-time",
+            "title": "Snapshot Built At",
+            "type": "string"
+          },
+          "success_rate_24h": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Success Rate 24H"
+          }
+        },
+        "required": [
+          "last_run_finished",
+          "last_run_status",
+          "runs_24h",
+          "runs_ok_24h",
+          "success_rate_24h",
+          "snapshot_built_at"
+        ],
+        "title": "IngestionStats",
+        "type": "object"
+      },
       "MeResponse": {
         "properties": {
           "active_persona": {
@@ -460,6 +568,105 @@
           "recent_history"
         ],
         "title": "MeResponse",
+        "type": "object"
+      },
+      "PersonaOut": {
+        "properties": {
+          "articles": {
+            "title": "Articles",
+            "type": "integer"
+          },
+          "description": {
+            "title": "Description",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "refreshed_at": {
+            "format": "date-time",
+            "title": "Refreshed At",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaSampleOut"
+            },
+            "title": "Samples",
+            "type": "array"
+          },
+          "topics": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Topics",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "topics",
+          "articles",
+          "refreshed_at",
+          "samples"
+        ],
+        "title": "PersonaOut",
+        "type": "object"
+      },
+      "PersonaSampleOut": {
+        "properties": {
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "source_name": {
+            "title": "Source Name",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "source_name",
+          "category"
+        ],
+        "title": "PersonaSampleOut",
+        "type": "object"
+      },
+      "PersonasResponse": {
+        "properties": {
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "personas": {
+            "items": {
+              "$ref": "#/components/schemas/PersonaOut"
+            },
+            "title": "Personas",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "request_id",
+          "model_version",
+          "personas"
+        ],
+        "title": "PersonasResponse",
         "type": "object"
       },
       "ReadyResponse": {
@@ -541,6 +748,93 @@
         "title": "RejectedEvent",
         "type": "object"
       },
+      "SimilarRead": {
+        "properties": {
+          "article_id": {
+            "format": "uuid",
+            "title": "Article Id",
+            "type": "string"
+          },
+          "similarity": {
+            "title": "Similarity",
+            "type": "number"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "article_id",
+          "title",
+          "similarity"
+        ],
+        "title": "SimilarRead",
+        "type": "object"
+      },
+      "StatsResponse": {
+        "properties": {
+          "articles_24h": {
+            "title": "Articles 24H",
+            "type": "integer"
+          },
+          "credit": {
+            "$ref": "#/components/schemas/Credit"
+          },
+          "ingestion": {
+            "$ref": "#/components/schemas/IngestionStats"
+          },
+          "instance_uptime_s": {
+            "title": "Instance Uptime S",
+            "type": "number"
+          },
+          "median_freshness_lag_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Median Freshness Lag S"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "personas": {
+            "title": "Personas",
+            "type": "integer"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "sources_24h": {
+            "title": "Sources 24H",
+            "type": "integer"
+          },
+          "trending_stories": {
+            "title": "Trending Stories",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "request_id",
+          "model_version",
+          "ingestion",
+          "articles_24h",
+          "sources_24h",
+          "median_freshness_lag_s",
+          "trending_stories",
+          "personas",
+          "instance_uptime_s",
+          "credit"
+        ],
+        "title": "StatsResponse",
+        "type": "object"
+      },
       "Topic": {
         "properties": {
           "id": {
@@ -602,6 +896,88 @@
         ],
         "title": "TopicsUpdate",
         "type": "object"
+      },
+      "WhyResponse": {
+        "properties": {
+          "age_hours": {
+            "title": "Age Hours",
+            "type": "number"
+          },
+          "article_id": {
+            "format": "uuid",
+            "title": "Article Id",
+            "type": "string"
+          },
+          "category": {
+            "title": "Category",
+            "type": "string"
+          },
+          "components": {
+            "$ref": "#/components/schemas/Components"
+          },
+          "degraded": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Degraded",
+            "type": "array"
+          },
+          "followed_topic": {
+            "title": "Followed Topic",
+            "type": "boolean"
+          },
+          "model_version": {
+            "title": "Model Version",
+            "type": "string"
+          },
+          "outlets": {
+            "title": "Outlets",
+            "type": "integer"
+          },
+          "reasons": {
+            "items": {
+              "$ref": "#/components/schemas/ReasonOut"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "request_id": {
+            "title": "Request Id",
+            "type": "string"
+          },
+          "similar_reads": {
+            "items": {
+              "$ref": "#/components/schemas/SimilarRead"
+            },
+            "title": "Similar Reads",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "topic_weight": {
+            "title": "Topic Weight",
+            "type": "number"
+          }
+        },
+        "required": [
+          "request_id",
+          "model_version",
+          "article_id",
+          "title",
+          "category",
+          "components",
+          "age_hours",
+          "outlets",
+          "followed_topic",
+          "topic_weight",
+          "similar_reads",
+          "reasons",
+          "degraded"
+        ],
+        "title": "WhyResponse",
+        "type": "object"
       }
     }
   },
@@ -662,6 +1038,266 @@
         "summary": "Readyz",
         "tags": [
           "ops"
+        ]
+      }
+    },
+    "/v1/articles/{article_id}/why": {
+      "get": {
+        "description": "The blend's components and reasons for this article, recomputed for the caller\nfrom their own history and topics (no slate needed).",
+        "operationId": "getWhy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "article_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "title": "Article Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WhyResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Why",
+        "tags": [
+          "feed"
+        ]
+      }
+    },
+    "/v1/demo/personas": {
+      "get": {
+        "description": "The demo readers, with their topics and sample headlines. Served from the\nin-process pool snapshot: no database read.",
+        "operationId": "listPersonas",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PersonasResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "List Personas",
+        "tags": [
+          "demo"
+        ]
+      }
+    },
+    "/v1/demo/personas/{persona_id}/activate": {
+      "post": {
+        "description": "Load a demo reader's history and topics into this session.\n\nA reader with their own history or topics (and no persona yet) gets **409\n``history_exists``** unless ``replace=true``: the app asks first. Switching from\none persona to another needs no flag. Hidden sources and articles are kept.",
+        "operationId": "activatePersona",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "persona_id",
+            "required": true,
+            "schema": {
+              "pattern": "^[a-z0-9-]{1,40}$",
+              "title": "Persona Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "replace",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Replace",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Activate Persona",
+        "tags": [
+          "demo"
         ]
       }
     },
@@ -1080,6 +1716,78 @@
         "summary": "Set My Topics",
         "tags": [
           "me"
+        ]
+      }
+    },
+    "/v1/stats": {
+      "get": {
+        "description": "Ingestion health and volumes, freshness and the model version. Served from the\nin-process pool snapshot (published by every ingestion run): no database read.",
+        "operationId": "getStats",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/StatsResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Get Stats",
+        "tags": [
+          "stats"
         ]
       }
     },

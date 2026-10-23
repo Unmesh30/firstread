@@ -43,6 +43,10 @@ class Services:
     ranking: RankingConfig = field(default_factory=load_config)
     # user -> the day this instance last ensured the profile (at most once a day).
     ensured: OrderedDict[uuid.UUID, date] = field(default_factory=OrderedDict)
+    # The ranking clock (article ages, the 72 h window). Only the persona replay report
+    # sets it, to rank the replayed database as it stood at a past time.
+    clock: Callable[[], datetime] = field(default=lambda: datetime.now(UTC))
+    started: float = field(default_factory=time.time)
 
 
 def services(request: Request) -> Services:

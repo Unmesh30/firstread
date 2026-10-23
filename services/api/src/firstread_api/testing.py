@@ -233,6 +233,8 @@ async def publish_pools(
     articles: Sequence[Seeded],
     trending: Sequence[tuple[Seeded, float, int]] = (),
     version: str = "test-1",
+    personas: Sequence[dict[str, Any]] = (),
+    stats: dict[str, Any] | None = None,
 ) -> Any:
     """Publish a pool snapshot built from ``articles`` the way ingestion does (blob, then
     ``pools:ver``); ``trending`` = (representative, score, outlets)."""
@@ -258,8 +260,43 @@ async def publish_pools(
         },
         centroids=pools.topic_centroids(
             np.stack([a.vector for a in articles]), [a.category for a in articles], min_rows=1
-        ),
-    )
+        ) if articles else {},
+        stats=dict(stats or {}),
+        personas=list(personas),
+    )  # fmt: skip
     await redis.set(pools.blob_key(version), pools.encode(snap))
     await redis.set(pools.VER_KEY, version)
     return snap
+
+
+# ---- demo personas (ADR 0018) ----
+
+
+async def insert_persona(
+    conn: Any, persona_id: str, topics: Sequence[str], article_ids: Sequence[uuid.UUID]
+) -> None:
+    """A persona whose history is ``article_ids`` (copied from articles, like ingestion)."""
+    from datetime import UTC, datetime
+
+    await conn.execute(
+        "insert into public.demo_personas (id, name, description, topics, refreshed_at) "
+        "values ($1, $1, 'test persona', $2, $3)",
+        persona_id, list(topics), datetime.now(UTC),
+    )  # fmt: skip
+    await conn.execute(
+        "insert into public.persona_articles (persona_id, position, article_id, title, "
+        "source_name, source_domain, url, category, story_cluster_id, text_source, embedding) "
+        "select $1, p.pos, a.id, a.title, a.source_name, a.source_domain, a.url, a.category, "
+        "a.story_cluster_id, a.text_source, a.embedding "
+        "from unnest($2::uuid[], $3::int[]) as p(id, pos) join public.articles a on a.id = p.id",
+        persona_id, list(article_ids), list(range(len(article_ids))),
+    )  # fmt: skip
+
+
+def persona_summary(persona_id: str, topics: Sequence[str], n: int = 20) -> dict[str, Any]:
+    from firstread_core.personas import PersonaSample, PersonaSummary
+
+    sample = PersonaSample(f"A headline for {persona_id}", "Example News", topics[0])
+    return PersonaSummary(
+        persona_id, persona_id.title(), "test persona", tuple(topics), n, 1_760_000_000, (sample,)
+    ).to_dict()

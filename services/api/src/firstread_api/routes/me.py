@@ -13,7 +13,7 @@ log = structlog.get_logger("firstread_api.me")
 router = APIRouter(tags=["me"], dependencies=[Depends(limit_ip)], responses=ERROR_RESPONSES)
 
 
-async def _me(request: Request, svc: Services, who: Principal) -> MeResponse:
+async def me_response(request: Request, svc: Services, who: Principal) -> MeResponse:
     async with svc.pool.acquire() as conn:
         q = repo.Q(conn)
         await ensure_profile(svc, q, who)
@@ -39,7 +39,7 @@ async def get_me(
     who: Principal = Depends(user("feed")),  # noqa: B008
 ) -> MeResponse:
     """Profile summary: followed topics, hidden sources, persona, recent history."""
-    return await _me(request, svc, who)
+    return await me_response(request, svc, who)
 
 
 @router.put("/v1/me/topics", response_model=MeResponse, operation_id="setMyTopics")
@@ -58,7 +58,7 @@ async def set_my_topics(
         await svc.redis.delete(redis_state.slate_key(who.user_id))  # the next page re-ranks
     except Exception as exc:
         log.warning("topics_slate_delete_failed", error=type(exc).__name__)
-    return await _me(request, svc, who)
+    return await me_response(request, svc, who)
 
 
 @router.delete(

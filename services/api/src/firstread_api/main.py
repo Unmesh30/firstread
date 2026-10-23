@@ -25,7 +25,7 @@ from firstread_api.logging import (
 from firstread_api.pools_cache import PoolsCache
 from firstread_api.ratelimit import RateLimiter
 from firstread_api.redis_state import CountingRedis
-from firstread_api.routes import events, feed, me, ops, topics
+from firstread_api.routes import articles, demo, events, feed, me, ops, stats, topics
 from firstread_core.db import create_pool
 from firstread_core.ranking import load_config
 from firstread_core.release import ENCODER_FILES
@@ -137,7 +137,8 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_age=600,
     )
     app.middleware("http")(request_context_middleware)
-    for r in (ops.router, topics.router, me.router, events.router, feed.router):
+    routers = (ops, topics, me, events, feed, articles, demo, stats)
+    for r in (m.router for m in routers):
         app.include_router(r)
     return app
 

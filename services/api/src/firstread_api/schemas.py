@@ -145,3 +145,80 @@ class FeedResponse(Envelope):
     next_cursor: str | None
     # Parts that failed and were worked around: "redis", "encoder", "ann", "pools".
     degraded: list[str]
+
+
+# ---- demo personas, why, stats (ADR 0018) ----
+
+
+class PersonaSampleOut(BaseModel):
+    title: str
+    source_name: str
+    category: str
+
+
+class PersonaOut(BaseModel):
+    id: str
+    name: str
+    description: str
+    topics: list[str]
+    articles: int  # history items activation gives the reader
+    refreshed_at: datetime
+    samples: list[PersonaSampleOut]
+
+
+class PersonasResponse(Envelope):
+    personas: list[PersonaOut]
+
+
+class Components(BaseModel):
+    """The blend's terms for this item (ADR 0014): ``final = model + fresh + trend``."""
+
+    model: float
+    fresh: float
+    trend: float
+    final: float
+
+
+class SimilarRead(BaseModel):
+    article_id: uuid.UUID
+    title: str
+    similarity: float
+
+
+class WhyResponse(Envelope):
+    article_id: uuid.UUID
+    title: str
+    category: str
+    components: Components
+    age_hours: float
+    outlets: int  # outlets covering the story in 24 h; 0 when it isn't trending
+    followed_topic: bool
+    topic_weight: float  # share of the reader's vector that comes from their topics
+    similar_reads: list[SimilarRead]  # the two nearest items of the reader's history
+    reasons: list[ReasonOut]
+    degraded: list[str]
+
+
+class Credit(BaseModel):
+    text: str
+    url: str
+
+
+class IngestionStats(BaseModel):
+    last_run_finished: datetime | None
+    last_run_status: str | None
+    runs_24h: int
+    runs_ok_24h: int
+    success_rate_24h: float | None  # ok and partial runs over all finished runs
+    snapshot_built_at: datetime
+
+
+class StatsResponse(Envelope):
+    ingestion: IngestionStats
+    articles_24h: int
+    sources_24h: int
+    median_freshness_lag_s: float | None  # stored minus first seen, last 24 h
+    trending_stories: int
+    personas: int
+    instance_uptime_s: float
+    credit: Credit
