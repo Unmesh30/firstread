@@ -12,7 +12,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 from typing import Any
 
@@ -246,19 +246,103 @@ async def save_cursor(conn: Any, source: str, cursor: str, now: datetime) -> Non
 RETENTION_BATCH = 5000
 
 
-async def _delete_batched(conn: Any, table: str, column: str, before: datetime) -> int:
-    """Delete rows with ``column < before`` in batches (by ctid), so no statement runs long."""
+async def _delete_batched(
+    conn: Any, table: str, column: str, before: datetime, extra: str = ""
+) -> int:
+    """Delete rows with ``column < before`` (and ``extra``, a constant SQL condition) in
+    batches (by ctid), so no statement runs long."""
     total = 0
+    cond = f"{column} < $1" + (f" and {extra}" if extra else "")
     while True:
         n = await conn.fetchval(
             f"with gone as (delete from public.{table} where ctid in ("  # noqa: S608 (constants)
-            f"select ctid from public.{table} where {column} < $1 limit {RETENTION_BATCH}) "
+            f"select ctid from public.{table} where {cond} limit {RETENTION_BATCH}) "
             "returning 1) select count(*) from gone",
             before,
         )
         total += int(n)
         if n < RETENTION_BATCH:
             return total
+
+
+# ---- user data retention and the size guard (ADR 0016) ----
+
+MB = 1_000_000
+# Supabase Free goes read-only above 500 MB, and deleted rows free space only after
+# vacuum, so the guard tightens early: each step applies above its size.
+GUARD_STEPS = (350 * MB, 375 * MB, 400 * MB)
+
+
+@dataclass(frozen=True)
+class UserRetention:
+    """How long user data is kept (days). The guard can only shorten these."""
+
+    impressions: float = 7
+    events: float = 30  # every event type except impressions
+    slates: float = 30
+    inactive_anonymous: float = 30  # app rows of anonymous readers not seen for this long
+    articles: float = 14
+
+
+def guard(size_bytes: int, base: UserRetention) -> tuple[UserRetention, int]:
+    """Tighten retention by database size; returns (windows, step 0-3).
+
+    * > 350 MB: impressions 2 days;
+    * > 375 MB: also slates 7 days and other events 14 days;
+    * > 400 MB: also articles 10 days (user_history is never touched: it is small and
+      it is what readers' histories are made of).
+    """
+    step = sum(size_bytes > t for t in GUARD_STEPS)
+    r = base
+    if step >= 1:
+        r = replace(r, impressions=min(r.impressions, 2))
+    if step >= 2:
+        r = replace(r, slates=min(r.slates, 7), events=min(r.events, 14))
+    if step >= 3:
+        r = replace(r, articles=min(r.articles, 10))
+    return r, step
+
+
+async def apply_user_retention(conn: Any, now: datetime, r: UserRetention) -> dict[str, int]:
+    """Expire events, served slates and inactive anonymous readers' app rows."""
+    day = timedelta(days=1)
+    out = {
+        "events_impressions": await _delete_batched(
+            conn, "events", "created_at", now - r.impressions * day, "type = 'impression'"
+        ),
+        "events_other": await _delete_batched(
+            conn, "events", "created_at", now - r.events * day, "type <> 'impression'"
+        ),
+        "served_slates": await _delete_batched(
+            conn, "served_slates", "created_at", now - r.slates * day
+        ),
+    }
+    # Anonymous readers who haven't come back: their app rows go (the auth user itself
+    # is Supabase's to clean up, P5). The cascade from profiles isn't relied on.
+    stale = await conn.fetch(
+        "select user_id from public.profiles where is_anonymous and last_seen_at < $1",
+        now - r.inactive_anonymous * day,
+    )
+    ids = [row["user_id"] for row in stale]
+    if ids:
+        for table in ("served_slates", "events", "user_history", "profiles"):
+            await conn.execute(
+                f"delete from public.{table} where user_id = any($1::uuid[])",  # noqa: S608
+                ids,
+            )
+    out["inactive_anonymous_users"] = len(ids)
+    return out
+
+
+VACUUM_TABLES = ("articles", "story_coverage", "events", "served_slates")
+
+
+async def vacuum(conn: Any, tables: Sequence[str] = VACUUM_TABLES) -> None:
+    """Plain VACUUM (ANALYZE): makes deleted rows' space reusable so files stop growing.
+    It doesn't shrink files (VACUUM FULL does, with a lock; runbook). Must run outside
+    a transaction."""
+    for t in tables:
+        await conn.execute(f"vacuum (analyze) public.{t}")
 
 
 async def apply_retention(
@@ -268,6 +352,7 @@ async def apply_retention(
     coverage: timedelta,
     runs: timedelta,
     feed_ids: Sequence[str] | None = None,
+    users: UserRetention | None = None,
 ) -> dict[str, int]:
     """Delete expired rows; return how many went from each table."""
     out = {
@@ -283,6 +368,8 @@ async def apply_retention(
             list(feed_ids),
         )
         out["feed_state"] = len(gone)
+    if users is not None:
+        out |= await apply_user_retention(conn, now, users)
     return out
 
 

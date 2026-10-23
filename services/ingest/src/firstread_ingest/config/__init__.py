@@ -48,6 +48,11 @@ class Settings(BaseSettings):
     ingest_retention_coverage_hours: int = 48
     ingest_retention_runs_days: int = 30
     ingest_size_warn_mb: int = 350
+    # User data (ADR 0016). The size guard can only shorten these (store.guard).
+    ingest_retention_impressions_days: float = 7
+    ingest_retention_events_days: float = 30
+    ingest_retention_slates_days: float = 30
+    ingest_retention_inactive_anonymous_days: float = 30
     # Runner-side copy of the 72 h window (ADR 0012). GitHub Actions caches this file
     # between runs; it's only a cache (any mismatch -> full reload). Empty: no file,
     # the window is reloaded from Postgres every run (~14 MB of egress).
