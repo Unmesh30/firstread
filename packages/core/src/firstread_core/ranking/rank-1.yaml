@@ -1,0 +1,20 @@
+# Ranking config (ADR 0014). Written by `firstread-ml rank-tune --write-config`
+# from MIND-small holdout; see ml/reports/ranking-mind-small-holdout.md.
+# A new constant means a new version file (the test pins each file's SHA-256).
+version: rank-1
+model_norm: raw
+w_fresh: 0.05
+w_trend: 0.025
+half_life_hours: 3.0
+mmr_lambda: 0.7
+cold_start_k: 0.0
+cold_start_k_source: tuned
+trend_half_life_hours: 6.0
+story_cap: 2
+rerank_size: 150
+slate_size: 100
+page_size: 20
+cold_segment:
+  max_history: 2
+  w_fresh: 0.05
+  w_trend: 0.1

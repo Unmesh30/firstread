@@ -171,8 +171,11 @@ def test_reasons_follow_the_largest_components() -> None:
 
 # ---- config ----
 
-# Each released ranking config's SHA-256: editing a file means a new version.
-PINNED_SHA: dict[str, str] = {}
+# Each released ranking config's SHA-256 (ADR 0014): editing a file means a new version.
+# rank-1: tuned on MIND-small holdout.
+PINNED_SHA: dict[str, str] = {
+    "rank-1": "cd25c71fe10fd0a0d1787dadbda417fb13b6b8c92c86e3dbbbfc7373294e6f23",
+}
 
 
 def test_every_ranking_config_is_pinned_and_valid() -> None:
