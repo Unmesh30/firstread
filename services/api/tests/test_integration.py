@@ -16,11 +16,16 @@ pytestmark = pytest.mark.integration
 
 
 async def test_readyz_against_real_services(tmp_path: Path) -> None:
+    """With the real pinned encoder loaded and verified (the cached release)."""
     await skip_or_fail_if_unreachable_async()
-    async with live_api(tmp_path) as api:
+    async with live_api(tmp_path, api_load_model=True) as api:
         resp = await api.client.get("/readyz")
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"status": "ready", "checks": {"postgres": "ok", "redis": "ok"}}
+    assert resp.json() == {
+        "status": "ready",
+        "checks": {"postgres": "ok", "redis": "ok", "model": "ok"},
+        "model_tag": "v0.2.0",
+    }
 
 
 async def test_pgvector_extension_available(tmp_path: Path) -> None:

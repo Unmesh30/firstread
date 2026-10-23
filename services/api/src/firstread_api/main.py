@@ -9,19 +9,44 @@ from fastapi.routing import APIRoute
 from redis.asyncio import Redis
 
 from firstread_api import __version__, errors
+from firstread_api.articles_cache import ArticlesCache
 from firstread_api.auth import JWKSCache, Verifier
 from firstread_api.config import Settings, get_settings
 from firstread_api.deps import Services
+from firstread_api.encoder import MicroBatcher, UserEncoder
 from firstread_api.logging import (
     REQUEST_ID_HEADER,
     configure_logging,
     log,
     request_context_middleware,
 )
+from firstread_api.pools_cache import PoolsCache
 from firstread_api.ratelimit import RateLimiter
 from firstread_api.redis_state import CountingRedis
-from firstread_api.routes import events, me, ops, topics
+from firstread_api.routes import events, feed, me, ops, topics
 from firstread_core.db import create_pool
+from firstread_core.ranking import load_config
+from firstread_core.release import ENCODER_FILES
+
+
+def load_batcher(settings: Settings) -> MicroBatcher | None:
+    """The pinned encoder, re-verified (hashes + core's feature constants), behind the
+    micro-batcher. The image bakes the files in (``API_MODEL_DIR``); locally and in
+    tests the pinned release is downloaded once into the model cache."""
+    if not settings.api_load_model:
+        return None
+    folder = settings.api_model_dir
+    if folder is None:
+        from firstread_core.release import download_release
+
+        folder = download_release(settings.api_model_tag, ENCODER_FILES)
+    encoder = UserEncoder.load(folder, settings.api_model_tag, settings.api_onnx_threads)
+    return MicroBatcher(
+        encoder,
+        max_batch=settings.api_batch_max,
+        max_wait_ms=settings.api_batch_wait_ms,
+        enabled=settings.api_encoder_batching,
+    )
 
 
 def operation_id(route: APIRoute) -> str:
@@ -48,18 +73,27 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         "events": settings.rl_user_events_per_min,
         "writes": settings.rl_user_writes_per_min,
     }
+    batcher = load_batcher(settings)
     app.state.services = Services(
         settings=settings,
         pool=pool,
         redis=redis,
         verifier=Verifier(settings, JWKSCache(settings)),
         limits={k: RateLimiter(v, settings.rl_max_keys) for k, v in per_min.items()},
+        pools=PoolsCache(redis, settings.api_pools_check_s),
+        articles=ArticlesCache(settings.api_article_cache),
+        batcher=batcher,
+        ranking=load_config(settings.api_ranking_version),
     )
     log.info("startup", app_env=settings.app_env, version=__version__,
-             model_version=settings.model_version)  # fmt: skip
+             model_version=settings.model_version, model_loaded=batcher is not None,
+             encoder_batching=settings.api_encoder_batching,
+             ann_mode=settings.api_ann_mode)  # fmt: skip
     try:
         yield
     finally:
+        if batcher is not None:
+            await batcher.close()  # rejects new work, drains the in-flight batch
         await redis.aclose()
         await pool.close()
         log.info("shutdown")
@@ -86,7 +120,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         max_age=600,
     )
     app.middleware("http")(request_context_middleware)
-    for r in (ops.router, topics.router, me.router, events.router):
+    for r in (ops.router, topics.router, me.router, events.router, feed.router):
         app.include_router(r)
     return app
 

@@ -114,3 +114,34 @@ class EventsResult(Envelope):
     accepted: list[uuid.UUID]
     duplicate: list[uuid.UUID]
     rejected: list[RejectedEvent]
+
+
+# ---- the feed (ADR 0017) ----
+
+MAX_PAGE = 50
+
+
+class ReasonOut(BaseModel):
+    code: str
+    text: str
+
+
+class FeedItem(BaseModel):
+    id: uuid.UUID
+    title: str
+    source_name: str
+    source_domain: str
+    url: str
+    image_url: str | None
+    category: str
+    published_at: datetime | None
+    first_seen_at: datetime
+    score: float
+    reasons: list[ReasonOut]
+
+
+class FeedResponse(Envelope):
+    items: list[FeedItem]
+    next_cursor: str | None
+    # Parts that failed and were worked around: "redis", "encoder", "ann", "pools".
+    degraded: list[str]

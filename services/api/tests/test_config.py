@@ -11,6 +11,7 @@ PROD = {
     "auth_issuer": "https://ref.supabase.co/auth/v1",
     "metrics_token": SecretStr("m"),
     "log_uid_salt": SecretStr("s"),
+    "api_model_dir": Path("/app/models/v0.2.0"),
 }
 
 
@@ -43,6 +44,8 @@ def test_a_complete_prod_config_starts() -> None:
         ({"auth_issuer": ""}, "AUTH_ISSUER"),
         ({"metrics_token": None}, "METRICS_TOKEN"),
         ({"log_uid_salt": SecretStr("local-dev-salt-not-secret")}, "LOG_UID_SALT"),
+        ({"api_model_dir": None}, "API_MODEL_DIR"),
+        ({"api_load_model": False}, "API_LOAD_MODEL"),
     ],
 )
 def test_prod_refuses_local_only_or_missing_settings(override: dict, message: str) -> None:  # type: ignore[type-arg]

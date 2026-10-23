@@ -11,6 +11,7 @@ from firstread_api.health import (
     Check,
     HealthResponse,
     ReadyResponse,
+    model_check,
     postgres_check,
     redis_check,
     run_checks,
@@ -22,7 +23,10 @@ router = APIRouter(tags=["ops"])
 
 def get_readiness_checks(request: Request) -> dict[str, Check]:
     svc: Services = request.app.state.services
-    return {"postgres": postgres_check(svc.pool), "redis": redis_check(svc.redis)}
+    checks = {"postgres": postgres_check(svc.pool), "redis": redis_check(svc.redis)}
+    if svc.settings.api_load_model:  # prod always loads it (config refuses otherwise)
+        checks["model"] = model_check(svc.batcher is not None)
+    return checks
 
 
 @router.get("/healthz", response_model=HealthResponse, operation_id="getHealth")
@@ -42,8 +46,10 @@ async def readyz(
     checks: Annotated[dict[str, Check], Depends(get_readiness_checks)],
     svc: Services = Depends(services),  # noqa: B008
 ) -> ReadyResponse:
-    """Readiness: Postgres and Redis are reachable."""
+    """Readiness: Postgres and Redis are reachable and the encoder is loaded."""
     result = await run_checks(checks, svc.settings.readyz_timeout_s)
+    if svc.batcher is not None:
+        result.model_tag = svc.batcher.encoder.tag
     if result.status != "ready":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return result

@@ -36,6 +36,29 @@ class Settings(BaseSettings):
     api_model_tag: str = "v0.2.0"
     api_ranking_version: str = RANKING_VERSION
 
+    # ---- the feed (ADR 0017) ----
+    # The baked, verified release folder (the image sets /app/models/v0.2.0). Empty:
+    # download the pinned release into the local model cache (local/test only).
+    api_model_dir: Path | None = None
+    api_load_model: bool = True  # local/test only: false skips the encoder (no feed)
+    api_onnx_threads: int = 1  # Cloud Run gives 1 vCPU
+    api_encoder_batching: bool = True  # P6 compares on and off
+    api_batch_max: int = 32
+    api_batch_wait_ms: float = 5.0
+    api_ann_mode: Literal["exact", "hnsw"] = "exact"  # docs/learn/data/03-ann.json
+    api_ann_ef_search: int = 200
+    api_vec_ttl_s: int = 600  # cached user vectors (SPEC: 10 min)
+    api_pools_check_s: float = 60.0
+    api_article_cache: int = 20_000
+    api_page_cache_s: float = 60.0
+    # Stage deadlines (seconds); a stage past its deadline degrades or 503s (ADR 0017).
+    api_feed_timeout_s: float = 1.0
+    api_state_timeout_s: float = 0.03
+    api_encode_timeout_s: float = 0.03
+    api_candidates_timeout_s: float = 0.08
+    api_hydrate_timeout_s: float = 0.06
+    api_persist_timeout_s: float = 0.05
+
     # ---- auth (ADR 0015) ----
     auth_jwks_url: str | None = None  # https://<ref>.supabase.co/auth/v1/.well-known/jwks.json
     auth_issuer: str | None = None  # https://<ref>.supabase.co/auth/v1
@@ -68,7 +91,9 @@ class Settings(BaseSettings):
     metrics_token: SecretStr | None = None  # required outside local
     log_uid_salt: SecretStr = SecretStr(DEV_SALT)  # HMAC key for hashed user ids in logs
 
-    @field_validator("auth_local_jwks_file", "auth_jwks_url", "auth_issuer", mode="before")
+    @field_validator(
+        "auth_local_jwks_file", "auth_jwks_url", "auth_issuer", "api_model_dir", mode="before"
+    )
     @classmethod
     def _empty_is_unset(cls, v: object) -> object:
         return None if v in ("", None) else v
@@ -96,6 +121,12 @@ class Settings(BaseSettings):
                 raise ValueError("METRICS_TOKEN is required in prod")
             if self.log_uid_salt.get_secret_value() == DEV_SALT:
                 raise ValueError("LOG_UID_SALT must be set to a secret in prod")
+            if not self.api_load_model:
+                raise ValueError(
+                    "API_LOAD_MODEL=false is only allowed when APP_ENV is local or test"
+                )
+            if self.api_model_dir is None:
+                raise ValueError("API_MODEL_DIR (the baked release) is required in prod")
         return self
 
     @property
