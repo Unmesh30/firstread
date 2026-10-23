@@ -17,7 +17,17 @@ def test_tau_feed_is_what_the_rule_gives_on_the_committed_labels() -> None:
     ]
     pooled = stories.pool_bins(*docs)
     computed = {pt: stories.threshold_from_bins(b) for pt, b in pooled.items()}
-    assert computed == stories.TAU_FEED_BY_PAIR
+    assert computed == stories.COMPUTED_TAU_FEED
+
+
+def test_the_fallback_raises_only_the_reviewed_pair_types_to_tau_story() -> None:
+    assert stories.TAU_FEED_BY_PAIR == {
+        ("title", "title"): 0.925,  # fallback (P3e persona replay, ADR 0013)
+        ("title", "title_summary"): 0.75,
+        ("title_summary", "title_summary"): 0.875,
+    }
+    for pt in stories.FALLBACK_TO_TAU_STORY:
+        assert stories.TAU_FEED_BY_PAIR[pt] == stories.VALIDATED_BY_PAIR[pt][1]
 
 
 def test_tau_feed_never_exceeds_tau_story() -> None:
@@ -47,10 +57,10 @@ def angle(cos: float) -> np.ndarray:
 
 
 def test_grouping_does_not_chain() -> None:
-    # A~B and B~C at 0.90 (>= 0.875), but A~C at ~0.62: three items, two groups.
+    # A~B and B~C at 0.95 (>= 0.925), but A~C at ~0.81: three items, two groups.
     a = unit(1.0)
-    b = angle(0.90)
-    c_dir = np.arccos(0.90) * 2  # twice the angle from A
+    b = angle(0.95)
+    c_dir = np.arccos(0.95) * 2  # twice the angle from A
     c = unit(np.cos(c_dir), np.sin(c_dir))
     assert float(a @ c) < stories.TAU_FEED_BY_PAIR[("title", "title")]
     ids = [uuid.uuid4() for _ in range(3)]
@@ -62,7 +72,7 @@ def test_same_cluster_always_groups_and_pair_types_have_their_own_threshold() ->
     a, far = unit(1.0), unit(0.0, 1.0)
     cluster = uuid.uuid4()
     assert stories.group(np.stack([a, far]), ["title", "title"], [cluster, cluster]) == [0, 0]
-    mixed = angle(0.78)  # >= 0.75 for title~title_summary, < 0.875 for title~title
+    mixed = angle(0.78)  # >= 0.75 for title~title_summary, < 0.925 for title~title
     src_a = ["title", "title_summary"]
     src_b = ["title", "title"]
     ids = [uuid.uuid4(), uuid.uuid4()]
