@@ -133,7 +133,7 @@ def _rank_report(args: argparse.Namespace) -> None:
     from firstread_ml.eval import rank_tune
 
     r = rank_tune.dev_report(args.release, args.version)
-    print(json.dumps(r["sample"], indent=1, default=float))
+    print(f"wrote ml/reports/ranking-mind-large-dev.{{md,json}} (peak RSS {r['peak_rss_gb']} GB)")
 
 
 def _release(args: argparse.Namespace) -> None:
