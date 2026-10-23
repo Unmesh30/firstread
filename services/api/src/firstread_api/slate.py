@@ -11,9 +11,12 @@ The first page ranks a slate of up to ``slate_size`` items and stores it in
   client that lost the response), not the items after it.
 
 The cursor is opaque to clients: base64url JSON ``{"s": slate_id, "o": offset,
-"v": 1}``. A malformed one is a 400 ``invalid_cursor``; one for a slate this reader
-doesn't have (expired, replaced, or another reader's) is a 400 ``cursor_expired``,
-and the app starts over from the first page.
+"v": 1}``. A malformed one is a 400 ``invalid_cursor``. When the Redis slate is
+gone or can't be trusted (expired, replaced by a newer first page, Redis down, or
+behind the cursor because a slate write was lost), the page continues from the
+served ids in ``served_slates``: nothing is repeated, the rest is re-ranked. Only a
+slate with no ``served_slates`` rows for this reader (unknown, or another reader's)
+is a 400 ``cursor_expired``, and the app starts over from the first page.
 
 The slate is stored zlib-compressed (~6 KB for 100 items): Upstash bandwidth is a
 budget too (ADR 0011).
