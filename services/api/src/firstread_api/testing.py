@@ -75,6 +75,7 @@ def make_settings(**overrides: Any) -> Settings:
         "app_env": "test",
         "auth_issuer": ISSUER,
         "readyz_timeout_s": 0.5,
+        "api_load_model": False,  # feed tests turn it on (it loads the pinned encoder)
         "_env_file": None,
     }
     return Settings(**(base | overrides))
@@ -164,3 +165,101 @@ async def insert_articles(
             f"fp{start + k}-{aid}",
         )
     return ids
+
+
+# ---- feed fixtures (ADR 0017) ----
+
+
+@dataclass
+class Seeded:
+    id: uuid.UUID
+    vector: np.ndarray
+    cluster: uuid.UUID
+    domain: str
+    category: str
+    first_seen: Any  # datetime
+    text_source: str = "title"
+
+
+def topic_vectors(topics: Sequence[str], n: int, seed: int = 0) -> dict[str, list[np.ndarray]]:
+    """``n`` unit vectors per topic around a random topic direction (pairwise cos ≈ 0.4,
+    well below every story threshold, so no two of them group or count as read)."""
+    rng = np.random.default_rng(seed)
+    out: dict[str, list[np.ndarray]] = {}
+    for t in topics:
+        d = rng.normal(size=384)
+        d /= np.linalg.norm(d)
+        vs = []
+        for _ in range(n):
+            e = rng.normal(size=384)
+            e /= np.linalg.norm(e)
+            v = 0.6 * d + 0.8 * e
+            vs.append((v / np.linalg.norm(v)).astype(np.float32))
+        out[t] = vs
+    return out
+
+
+async def insert_article(
+    conn: Any,
+    vector: np.ndarray,
+    *,
+    category: str = "sports",
+    domain: str = "example.com",
+    cluster: uuid.UUID | None = None,
+    age_hours: float = 1.0,
+    text_source: str = "title",
+    title: str | None = None,
+) -> Seeded:
+    from datetime import UTC, datetime, timedelta
+
+    aid = uuid.uuid4()
+    cluster = cluster or aid
+    first_seen = datetime.now(UTC) - timedelta(hours=age_hours)
+    await conn.execute(
+        "insert into public.articles (id, url, url_canonical, title, source_name, "
+        "source_domain, geo, category, category_confidence, category_source, first_seen_at, "
+        "embedding, embedding_model, text_source, title_fingerprint, story_cluster_id, origin) "
+        "values ($1, $2, $2, $3, $4, $4, 'us', $5, 0.9, 'model', $6, "
+        "$7::text::extensions.halfvec(384), 'm', $8, $9, $10, 'gdelt')",
+        aid, f"https://{domain}/{aid}", title or f"Headline {aid.hex[:8]}", domain, category,
+        first_seen, "[" + ",".join(f"{x:.6f}" for x in vector) + "]", text_source,
+        f"fp-{aid}", cluster,
+    )  # fmt: skip
+    return Seeded(aid, vector, cluster, domain, category, first_seen, text_source)
+
+
+async def publish_pools(
+    redis: Any,
+    articles: Sequence[Seeded],
+    trending: Sequence[tuple[Seeded, float, int]] = (),
+    version: str = "test-1",
+) -> Any:
+    """Publish a pool snapshot built from ``articles`` the way ingestion does (blob, then
+    ``pools:ver``); ``trending`` = (representative, score, outlets)."""
+    from datetime import UTC, datetime
+
+    from firstread_core import pools
+
+    newest = sorted(articles, key=lambda a: a.first_seen, reverse=True)
+    topics: dict[str, list[uuid.UUID]] = {}
+    for a in newest:
+        topics.setdefault(a.category, []).append(a.id)
+    snap = pools.PoolSnapshot(
+        version=version,
+        built_at=datetime.now(UTC),
+        fresh=[a.id for a in newest],
+        topics=topics,
+        trending=[pools.TrendingEntry(a.id, s, n, (a.cluster,)) for a, s, n in trending],
+        articles={
+            a.id: pools.ArticleInfo(
+                a.cluster, a.category, int(a.first_seen.timestamp()), a.text_source
+            )
+            for a in articles
+        },
+        centroids=pools.topic_centroids(
+            np.stack([a.vector for a in articles]), [a.category for a in articles], min_rows=1
+        ),
+    )
+    await redis.set(pools.blob_key(version), pools.encode(snap))
+    await redis.set(pools.VER_KEY, version)
+    return snap

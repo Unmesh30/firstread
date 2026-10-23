@@ -1,7 +1,8 @@
 """Liveness and readiness checks.
 
 `/healthz` answers "is the process alive?" and never touches dependencies.
-`/readyz` answers "can this instance serve traffic?" by checking Postgres and Redis.
+`/readyz` answers "can this instance serve traffic?" by checking Postgres, Redis and
+the encoder (loaded and verified at startup).
 """
 
 import asyncio
@@ -24,6 +25,17 @@ class HealthResponse(BaseModel):
 class ReadyResponse(BaseModel):
     status: Literal["ready", "not_ready"]
     checks: dict[str, CheckStatus]
+    model_tag: str | None = None  # the verified encoder release this instance serves
+
+
+def model_check(loaded: bool) -> Check:
+    """The encoder was loaded and verified at startup (it never changes afterwards)."""
+
+    async def check() -> None:
+        if not loaded:
+            raise RuntimeError("model not loaded")
+
+    return check
 
 
 def postgres_check(pool: Any) -> Check:

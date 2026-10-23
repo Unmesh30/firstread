@@ -77,7 +77,7 @@ async def build(dst: object, rows: list, rng: np.random.Generator) -> None:  # t
 async def timed(
     conn: object, mode: str, ef: int, q: np.ndarray, since: object
 ) -> tuple[list, float]:  # type: ignore[type-arg]
-    args = (HalfVector(q), since, [], [], LIMIT)
+    args = (HalfVector(q), since, [], [], LIMIT, [], [])
     t0 = time.perf_counter()
     async with conn.transaction():  # type: ignore[attr-defined]
         if mode == "hnsw":

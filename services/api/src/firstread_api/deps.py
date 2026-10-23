@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import time
 import uuid
 from collections import OrderedDict
 from collections.abc import Awaitable, Callable
@@ -13,12 +14,16 @@ import structlog
 from fastapi import Depends, Request
 
 from firstread_api import repo
+from firstread_api.articles_cache import ArticlesCache
 from firstread_api.auth import Principal, Verifier, authenticate
 from firstread_api.config import Settings
+from firstread_api.encoder import MicroBatcher
 from firstread_api.errors import ApiError
 from firstread_api.logging import uid_hash
+from firstread_api.pools_cache import PoolsCache
 from firstread_api.ratelimit import RateLimiter
 from firstread_api.redis_state import CountingRedis
+from firstread_core.ranking import RankingConfig, load_config
 
 Scope = Literal["feed", "events", "writes"]
 
@@ -30,6 +35,12 @@ class Services:
     redis: CountingRedis
     verifier: Verifier
     limits: dict[str, RateLimiter]
+    pools: PoolsCache
+    articles: ArticlesCache
+    # The pinned user encoder behind the micro-batcher; None only when API_LOAD_MODEL
+    # is false (tests that never rank; prod refuses it).
+    batcher: MicroBatcher | None = None
+    ranking: RankingConfig = field(default_factory=load_config)
     # user -> the day this instance last ensured the profile (at most once a day).
     ensured: OrderedDict[uuid.UUID, date] = field(default_factory=OrderedDict)
 
@@ -51,7 +62,9 @@ def user(scope: Scope) -> Callable[..., Awaitable[Principal]]:
     """Authenticated reader, rate-limited per user for ``scope``."""
 
     async def dep(request: Request, svc: Services = Depends(services)) -> Principal:  # noqa: B008
+        t0 = time.perf_counter()
         principal = await authenticate(request, svc.settings, svc.verifier)
+        request.state.auth_s = time.perf_counter() - t0  # the feed's first stage
         svc.limits[scope].check(str(principal.user_id), scope)
         structlog.contextvars.bind_contextvars(
             uid_hash=uid_hash(principal.user_id, svc.settings.log_uid_salt.get_secret_value())

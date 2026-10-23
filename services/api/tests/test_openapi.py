@@ -10,6 +10,7 @@ EXPECTED_OPERATIONS = {
     ("put", "/v1/me/topics"): "setMyTopics",
     ("delete", "/v1/me"): "deleteMe",
     ("post", "/v1/events"): "postEvents",
+    ("get", "/v1/feed"): "getFeed",
 }
 
 
