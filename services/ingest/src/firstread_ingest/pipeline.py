@@ -42,6 +42,7 @@ from firstread_ingest.sources.gdelt_domains import (
 from firstread_ingest.window import WindowSnapshot
 
 EMBEDDING_MODEL_ID = f"{EMBED_MODEL}#{embedding_cache_key()[0][:12]}"
+VACUUM_AFTER_ROWS = 10_000  # deletes this large get a plain VACUUM (ANALYZE) right away
 EmbedFn = Callable[[Sequence[str]], NDArray[np.float32]]
 SOURCES = ("rss", "gdelt")
 
@@ -500,17 +501,41 @@ async def _run(
             await store.save_feed_states(conn, states, now)
             if gdelt is not None and gdelt.cursor is not None:
                 await store.save_cursor(conn, gkg.SOURCE_ID, gkg.slot_name(gdelt.cursor), now)
+        # The size guard (ADR 0016): measured before retention, it can only shorten the
+        # configured windows. Supabase Free turns read-only at 500 MB.
+        before = await store.database_size(conn)
+        windows, step = store.guard(
+            before["db"],
+            store.UserRetention(
+                impressions=settings.ingest_retention_impressions_days,
+                events=settings.ingest_retention_events_days,
+                slates=settings.ingest_retention_slates_days,
+                inactive_anonymous=settings.ingest_retention_inactive_anonymous_days,
+                articles=settings.ingest_retention_article_days,
+            ),
+        )
         async with conn.transaction():
             summary.retention = await store.apply_retention(
                 conn,
                 now,
-                articles=timedelta(days=settings.ingest_retention_article_days),
+                articles=timedelta(days=windows.articles),
                 coverage=timedelta(hours=settings.ingest_retention_coverage_hours),
                 runs=timedelta(days=settings.ingest_retention_runs_days),
                 # Forget state only for feeds that left the configuration.
                 feed_ids=[f.id for f in (feeds or load_feeds(enabled_only=False))]
                 if "rss" in sources
                 else None,
+                users=windows,
+            )
+        summary.retention["guard_step"] = step
+        deleted = sum(v for k, v in summary.retention.items() if k != "guard_step")
+        if step or deleted >= VACUUM_AFTER_ROWS:
+            await store.vacuum(conn)  # outside the transaction, after big deletes
+            summary.retention["vacuumed"] = 1
+        if step:
+            summary.feed_errors.setdefault(
+                "_size_guard",
+                f"retention_tightened step {step}: database {before['db'] // 1_000_000} MB",
             )
         summary.size = await store.database_size(conn)
         if summary.size["db"] > settings.ingest_size_warn_mb * 1_000_000:
