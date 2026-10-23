@@ -126,7 +126,7 @@ async def stored_slate(api: LiveApi, uid: uuid.UUID) -> Slate:
 # ---- the end-to-end flow ----
 
 
-async def test_anonymous_reader_topics_feed_click_next_page_delete(api: LiveApi) -> None:
+async def test_anonymous_reader_topics_feed_click_next_page_why_delete(api: LiveApi) -> None:
     arts = await seed(api)
     by_id = {str(a.id): a for a in arts}
     uid = uuid.uuid4()
@@ -158,6 +158,15 @@ async def test_anonymous_reader_topics_feed_click_next_page_delete(api: LiveApi)
     vec = await api.redis.hget(rs.user_key(uid), "vec")  # the encoder ran and was cached
     assert vec is not None
     assert len(vec) == 384 * 4
+
+    # "Why this?" for a page-2 item: recomputed for this reader, the click is their history.
+    why = await api.client.get(f"/v1/articles/{ids(second)[0]}/why", headers=api.auth(uid))
+    assert why.status_code == 200
+    w = why.json()
+    assert w["components"]["final"] == pytest.approx(second["items"][0]["score"], abs=2e-3)
+    assert [s["article_id"] for s in w["similar_reads"]] == [str(clicked.id)]
+    assert w["topic_weight"] == pytest.approx(0.75)  # rank-2: k = 3, one click
+    assert w["reasons"]
 
     conn = await api.db()
     try:

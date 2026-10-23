@@ -11,6 +11,10 @@ EXPECTED_OPERATIONS = {
     ("delete", "/v1/me"): "deleteMe",
     ("post", "/v1/events"): "postEvents",
     ("get", "/v1/feed"): "getFeed",
+    ("get", "/v1/articles/{article_id}/why"): "getWhy",
+    ("get", "/v1/demo/personas"): "listPersonas",
+    ("post", "/v1/demo/personas/{persona_id}/activate"): "activatePersona",
+    ("get", "/v1/stats"): "getStats",
 }
 
 

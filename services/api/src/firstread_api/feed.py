@@ -34,7 +34,7 @@ from collections import Counter
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import timedelta
 from typing import Any
 
 import numpy as np
@@ -60,6 +60,7 @@ from firstread_core import pools, stories
 from firstread_core.embedding import l2_normalize
 from firstread_core.features import mean_history_vector, pad_history
 from firstread_core.ranking import (
+    MMRResult,
     ReasonInputs,
     blend,
     cold_start_vector,
@@ -154,6 +155,43 @@ _SERVED = (
 )
 
 
+def pool_picks(
+    snap: pools.PoolSnapshot, topics: Sequence[str]
+) -> list[tuple[str, Sequence[uuid.UUID]]]:
+    """The pool members a reader's candidates come from: fresh, trending and the
+    followed topics (``/why`` ranks an item's trend against the same set)."""
+    return [
+        ("fresh", snap.fresh[:FRESH_TAKE]),
+        ("trending", [t.id for t in snap.trending[:TRENDING_TAKE]]),
+        *((f"topic:{t}", snap.topics.get(t, [])[:TOPIC_TAKE]) for t in topics),
+    ]
+
+
+def trend_map(snap: pools.PoolSnapshot | None) -> dict[uuid.UUID, tuple[float, int]]:
+    """story cluster -> (trend score, outlets): an article in a trending story gets the
+    story's numbers."""
+    out: dict[uuid.UUID, tuple[float, int]] = {}
+    if snap is not None:
+        for t in snap.trending:
+            for c in t.clusters:
+                out.setdefault(c, (t.score, t.outlets))
+    return out
+
+
+@dataclass
+class RankTrace:
+    """What one ranking pass decided, kept for analysis (the persona replay report):
+    candidates after the read-story filters, best first, with their groups and MMR's
+    picks and story-cap drops."""
+
+    ids: list[uuid.UUID]
+    final: NDArray[np.float64]
+    vectors: NDArray[np.float32]
+    text_sources: list[str]
+    groups: list[int]
+    mmr: MMRResult
+
+
 def vec_key(hist_version: int, at: float) -> str:
     return f"{hist_version}:{int(at)}"
 
@@ -185,6 +223,7 @@ class FeedPipeline:
         self.degraded: list[str] = []
         self.redis_ok = True
         self.new_vec: NDArray[np.float32] | None = None
+        self.trace: RankTrace | None = None  # the last ranking pass (persona replay report)
 
     def degrade(self, reason: str, error: BaseException | None = None) -> None:
         if reason not in self.degraded:
@@ -373,7 +412,7 @@ class FeedPipeline:
             clusters=sorted({e.cluster for e in st.history}),
             hidden=sorted(st.hidden),
         )
-        since = datetime.now(UTC) - WINDOW
+        since = self.svc.clock() - WINDOW
         deadline = self.s.api_candidates_timeout_s
 
         async def run_ann() -> list[Candidate]:
@@ -383,12 +422,7 @@ class FeedPipeline:
 
         pool_tags: dict[uuid.UUID, set[str]] = {}
         if snap is not None:
-            picks: list[tuple[str, Sequence[uuid.UUID]]] = [
-                ("fresh", snap.fresh[:FRESH_TAKE]),
-                ("trending", [t.id for t in snap.trending[:TRENDING_TAKE]]),
-                *((f"topic:{t}", snap.topics.get(t, [])[:TOPIC_TAKE]) for t in st.profile.topics),
-            ]
-            for tag, ids in picks:
+            for tag, ids in pool_picks(snap, st.profile.topics):
                 for i in ids:
                     if i not in excl_ids:
                         pool_tags.setdefault(i, set()).add(tag)
@@ -427,12 +461,8 @@ class FeedPipeline:
     def score(
         self, cands: Sequence[Candidate], snap: pools.PoolSnapshot | None, n_history: int
     ) -> dict[str, NDArray[np.float64]]:
-        trend_by_cluster: dict[uuid.UUID, tuple[float, int]] = {}
-        if snap is not None:
-            for t in snap.trending:
-                for c in t.clusters:
-                    trend_by_cluster.setdefault(c, (t.score, t.outlets))
-        now = datetime.now(UTC)
+        trend_by_cluster = trend_map(snap)
+        now = self.svc.clock()
         model = np.array([c.score for c in cands], np.float64)
         age_h = np.array([(now - c.first_seen_at).total_seconds() / 3600 for c in cands])
         raw_trend = np.array([trend_by_cluster.get(c.cluster, (0.0, 0))[0] for c in cands])
@@ -497,6 +527,7 @@ class FeedPipeline:
         final = comp["final"][keep]
         res = mmr(final, vecs, self.cfg.mmr_lambda, groups, cap=self.cfg.story_cap,
                   k=self.cfg.slate_size)  # fmt: skip
+        self.trace = RankTrace([cands[i].id for i in keep], final, vecs, srcs, groups, res)
         order = []
         for k in res.order:
             if used[groups[k]] < self.cfg.story_cap:

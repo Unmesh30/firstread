@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Literal
 
 import numpy as np
 
@@ -308,3 +308,66 @@ async def hidden_for_rebuild(q: Q, uid: uuid.UUID) -> list[uuid.UUID]:
         uid,
     )
     return [r["article_id"] for r in rows]
+
+
+# ---- demo personas (ADR 0018) ----
+
+_PERSONA = """
+select d.topics, (select count(*) from public.persona_articles pa where pa.persona_id = d.id) as n
+from public.demo_personas d where d.id = $1
+"""
+
+_PROFILE_FOR_PERSONA = """
+select active_persona, cardinality(topics) as n_topics,
+       exists(select 1 from public.user_history h where h.user_id = p.user_id) as has_history
+from public.profiles p where user_id = $1
+for update
+"""
+
+# Position 0 (the persona's best article) gets the newest version.
+_COPY_PERSONA = """
+insert into public.user_history (user_id, article_id, version, kind, clicked_at, title,
+  source_name, source_domain, url, category, story_cluster_id, text_source, embedding)
+select $1, pa.article_id, $3::bigint - pa.position, 'persona', now(), pa.title,
+  pa.source_name, pa.source_domain, pa.url, pa.category, pa.story_cluster_id,
+  pa.text_source, pa.embedding
+from public.persona_articles pa where pa.persona_id = $2
+"""
+
+ActivateResult = Literal["ok", "unknown", "empty", "history_exists"]
+
+
+async def activate_persona(q: Q, uid: uuid.UUID, persona_id: str, replace: bool) -> ActivateResult:
+    """Replace the reader's history and topics with the persona's, in one transaction.
+
+    Refused (``history_exists``) when the reader has their own history or topics and
+    no persona yet, unless ``replace``: a real reader's choices are never replaced
+    silently. Switching from one persona to another needs no flag. Hidden sources and
+    hidden articles are the reader's own and stay as they are. The new history gets
+    fresh contiguous versions above the old ``hist_version``, so a stale Redis copy
+    shows up as a gap and is rebuilt (ADR 0016)."""
+    async with q.transaction():
+        persona = await q.fetchrow("persona_row", _PERSONA, persona_id)
+        if persona is None:
+            return "unknown"
+        n = int(persona["n"])
+        if n == 0:
+            return "empty"
+        prof = await q.fetchrow("persona_profile", _PROFILE_FOR_PERSONA, uid)
+        own = prof["has_history"] or prof["n_topics"] > 0
+        if prof["active_persona"] is None and own and not replace:
+            return "history_exists"
+        top = await q.fetchval(
+            "persona_profile_update",
+            "update public.profiles set hist_version = hist_version + $2, topics = $3, "
+            "active_persona = $4, updated_at = now() where user_id = $1 returning hist_version",
+            uid,
+            n,
+            list(persona["topics"]),
+            persona_id,
+        )
+        await q.execute(
+            "persona_history_clear", "delete from public.user_history where user_id = $1", uid
+        )
+        await q.execute("persona_history_copy", _COPY_PERSONA, uid, persona_id, int(top))
+    return "ok"
