@@ -14,7 +14,7 @@ Most recommenders learn from clicks, so a brand-new article is invisible until p
 | Area | Tech |
 |---|---|
 | App | Expo (React Native + TypeScript, Expo Router), web on GitHub Pages |
-| API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run |
+| API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run; a seven-stage feed with per-stage deadlines and tested degraded modes, the user encoder micro-batched across requests, HNSW candidates ([ADR 0017](docs/adr/0017-feed-serving-pipeline.md)) |
 | Ingestion | GDELT GKG files + RSS feeds with explicit publisher permission, every 15 min on GitHub Actions; the 72 h dedupe window stays on the runner (~84 KB of database egress a run) and pools are published as one versioned Redis snapshot ([ADR 0012](docs/adr/0012-runner-window-and-pool-snapshot.md)) |
 | ML | PyTorch (NRMS-lite user encoder), `bge-small-en-v1.5` embeddings, trained/evaluated on MIND |
 | Data | Supabase Postgres + pgvector, Upstash Redis |
@@ -34,6 +34,16 @@ curl localhost:8000/healthz
 curl localhost:8000/readyz
 make lint typecheck test
 cd apps/mobile && npx expo start   # app (press w for web)
+```
+
+Try the feed locally (the dev stack accepts `X-Dev-User` instead of a token):
+
+```bash
+make db-migrate && make ingest     # one live ingestion run into the local database
+U=$(uuidgen | tr A-Z a-z); H="X-Dev-User: $U"
+curl -X PUT localhost:8000/v1/me/topics -H "$H" -H 'Content-Type: application/json' \
+  -d '{"topics": ["world", "business", "tech_science"]}'
+curl -i "localhost:8000/v1/feed?limit=5" -H "$H"    # see the Server-Timing header
 ```
 
 `make help` lists every command. The step-by-step explanation of the tooling is in [docs/learn/00-bootstrap.md](docs/learn/00-bootstrap.md).
