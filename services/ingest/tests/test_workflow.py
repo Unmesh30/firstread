@@ -29,6 +29,7 @@ def test_old_snapshots_are_deleted_only_after_the_new_one_is_saved() -> None:
     step = load()["jobs"]["ingest"]["steps"][delete]
     assert step["if"].startswith("success()")  # a failed save skips the delete
     assert "'.[2:][].id'" in step["run"]  # the newest 2 entries are always kept
+    assert '--ref "$GITHUB_REF"' in step["run"]  # never another branch's (main's) snapshot
 
 
 def test_the_run_uses_the_restored_window_file() -> None:
