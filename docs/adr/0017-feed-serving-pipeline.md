@@ -65,6 +65,7 @@ The whole request has a 1 s deadline (→ 503). Each stage has its own deadline.
   - the hidden signature changed (a hide);
   - fewer than `limit` items remain.
   Only then does it read the other three keys.
+- **A Redis slate behind the cursor is treated as missing.** If a page's slate write was lost (Redis failed during that request's read or write), `u:{uid}:slate` still holds the previous version, which isn't stale by `hist_version` or the hidden signature. A slate whose served count is below `min(offset, 1000)` is therefore ignored and the served ids come from `served_slates`, so the next page can't repeat the lost page (PR #20 review).
 - **The same page asked again within 60 s returns the same items.** It still writes a `served_slates` row, so events from that response join.
 
 **Measured per page** (`test_redis_commands_per_page`, plus the local stack's `/metrics` after a real ingestion run):
@@ -81,9 +82,15 @@ The whole request has a 1 s deadline (→ 503). Each stage has its own deadline.
 
 ### Pools in-process (`pools_cache.py`)
 
+- **The refresh has its own 0.3 s deadline** (`API_POOLS_REFRESH_TIMEOUT_S`, `pools_refresh_total{result="timeout"}`). Without it, a hanging Redis held every request on a cold instance until the 1 s feed deadline (503) instead of serving ANN-only (PR #20 review).
+
 - At most one `GET pools:ver` a minute per instance, inside a request; the blob is fetched only when the version changed. One refresh runs at a time (single-flight).
 - **Warm requests** keep using the current copy during a refresh. **A cold instance** waits for the in-flight refresh.
 - **A bad, mismatched or missing blob** keeps the last good copy. With no copy at all, the feed is ANN-only. There's never a per-request SQL fallback.
+
+### The Redis client fails fast
+
+redis-py 8.1 defaults to a 5 s socket (and connect) timeout and up to 10 retries on connection errors and timeouts, with backoff capped at 1 s (`redis/_defaults.py`), so an un-wrapped call could hang for about a minute. The API's client uses `REDIS_SOCKET_TIMEOUT_S` and `REDIS_CONNECT_TIMEOUT_S` of 0.5 s and `REDIS_RETRIES` = 1 with no backoff; the config refuses larger values. Calls outside the feed's deadlines (events, `/me/topics`) therefore fail within about a second, and their Redis writes are best effort: Postgres holds the truth and the version check heals Redis (PR #20 review).
 
 ### ANN (pgvector 0.8): HNSW iterative scans at ef_search 400
 
@@ -93,10 +100,10 @@ The whole request has a 1 s deadline (→ 503). Each stage has its own deadline.
 
 | Query shape | Exact p95 | HNSW ef400 p95 | HNSW recall@200 | Decision |
 |---|---|---|---|---|
-| Shipped (with the story filters), 4 runs | 5.63–7.25 ms | 5.35–6.52 ms | 0.983 (min 0.935) | **HNSW ef400**, every run |
-| First draft (no story filters), 1 run | 5.28 ms | 5.29 ms | 0.983 | exact, by 0.01 ms |
+| Shipped (with the story filters), 3 runs (`repeats`) | 5.63–5.83 ms | 5.35–5.52 ms | 0.9834–0.984 (lowest single query 0.94, in the run in `results`) | **HNSW ef400**, all 3 runs |
+| First draft (no story filters), 1 run (`previous_query_shape`) | 5.28 ms | 5.29 ms | 0.9831 (in the file as committed in 51fe0cf) | exact, by 0.01 ms |
 
-- The rule is applied to the query that ships. Both shapes are kept in `docs/learn/data/03-ann.json`.
+- The rule is applied to the query that ships. Both shapes are kept in `docs/learn/data/03-ann.json`. An earlier run of the shipped shape crashed at the script's EXPLAIN step before writing its file; it isn't counted.
 - **The cost:** about 1.7% of the exact top 200 is missed, on a candidate set that the pools also feed.
 - **The CI `supabase` job** asserts pgvector ≥ 0.8 and runs both shapes once, as the non-superuser `postgres`. It also checks that `SET LOCAL` doesn't leak into the session.
 
