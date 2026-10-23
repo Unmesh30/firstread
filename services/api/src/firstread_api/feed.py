@@ -30,6 +30,7 @@ import asyncio
 import hashlib
 import time
 import uuid
+from collections import Counter
 from collections.abc import AsyncIterator, Awaitable, Callable, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass, field
@@ -67,6 +68,7 @@ log = structlog.get_logger("firstread_api.feed")
 WINDOW = timedelta(hours=72)  # candidates are at most this old (SPEC §8)
 ANN_LIMIT = 200
 FRESH_TAKE, TRENDING_TAKE, TOPIC_TAKE = 200, 200, 100
+SHOWN_FOR_CAP = 100  # the newest served items that count toward the per-story cap
 STAGES = ("auth", "state", "encode", "cand", "hydrate", "rank", "persist")
 
 
@@ -444,6 +446,7 @@ class FeedPipeline:
         rows: dict[uuid.UUID, Article],
         st: State,
         w_topic: float,
+        served: Sequence[Article] = (),
     ) -> list[SlateItem]:
         read_clusters = {e.cluster for e in st.history}
         keep = [
@@ -465,20 +468,36 @@ class FeedPipeline:
         keep, vecs, srcs = [keep[k] for k in sel], vecs[sel], [srcs[k] for k in sel]
         if not keep:
             return []
-        clusters = [rows[cands[i].id].story_cluster_id for i in keep]
-        groups = stories.group(vecs, srcs, clusters)  # type: ignore[arg-type]
+        # Story groups over what this reader was already shown (leading) + the candidates,
+        # so the 2-per-story cap holds across pages, not only within one ranking pass.
+        shown = [a for a in served if a.story_cluster_id not in read_clusters]
+        clusters = [a.story_cluster_id for a in shown] + [
+            rows[cands[i].id].story_cluster_id for i in keep
+        ]
+        all_vecs = np.concatenate([
+            np.stack([np.asarray(a.vector, np.float32) for a in shown])
+            if shown else np.zeros((0, vecs.shape[1]), np.float32), vecs,
+        ])  # fmt: skip
+        all_groups = stories.group(all_vecs, [a.text_source for a in shown] + srcs, clusters)  # type: ignore[arg-type]
+        groups = all_groups[len(shown) :]
+        used = Counter(all_groups[: len(shown)])
         final = comp["final"][keep]
         res = mmr(final, vecs, self.cfg.mmr_lambda, groups, cap=self.cfg.story_cap,
                   k=self.cfg.slate_size)  # fmt: skip
+        order = []
+        for k in res.order:
+            if used[groups[k]] < self.cfg.story_cap:
+                used[groups[k]] += 1
+                order.append(k)
         nearest: dict[int, uuid.UUID] = {}
         titles: dict[uuid.UUID, str] = {}
         if len(hist_vecs) and w_topic < 0.5:  # only then can "similar to read" show
-            sims = vecs[res.order] @ hist_vecs.T
+            sims = vecs[order] @ hist_vecs.T
             nearest = {k: st.history[int(np.argmax(sims[r]))].article_id
-                       for r, k in enumerate(res.order)}  # fmt: skip
+                       for r, k in enumerate(order)}  # fmt: skip
             titles = await self._titles(set(nearest.values()))
         items = []
-        for k in res.order:
+        for k in order:
             i = keep[k]
             a = rows[cands[i].id]
             why = reasons(ReasonInputs(
@@ -531,12 +550,14 @@ class FeedPipeline:
             return []
         comp = self.score(cands, snap, len(st.history))
         top = np.argsort(-comp["final"], kind="stable")[: self.cfg.rerank_size]
-        async with self.t.stage("hydrate"):
-            rows = await self.hydrate([cands[i].id for i in top])
+        shown = [uuid.UUID(i) for i in served[max(len(served) - SHOWN_FOR_CAP, 0) :]]
+        async with self.t.stage("hydrate"):  # one query for the misses of both
+            rows = await self.hydrate([*(cands[i].id for i in top), *shown])
         async with self.t.stage("rank"):
             sub = [cands[i] for i in top]
             sub_comp = {k: v[top] for k, v in comp.items()}
-            return await self.rank(sub, sub_comp, rows, st, w_topic)
+            shown_rows = [rows[i] for i in shown if i in rows]
+            return await self.rank(sub, sub_comp, rows, st, w_topic, shown_rows)
 
     # -- stage 7 --
 

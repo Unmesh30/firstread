@@ -264,27 +264,46 @@ async def test_clicked_hidden_hidden_source_seen_and_read_stories_are_excluded(
     assert from_source.domain not in {by_id[i].domain for i in got if i in by_id}
 
 
-async def test_at_most_two_items_per_story(api: LiveApi) -> None:
-    arts = await seed(api)
+async def story_with_copies(api: LiveApi, arts: list[Seeded], n: int = 4) -> set[str]:
+    """``n`` more articles of the feed's top story (other outlets, ≈ the same vector)."""
     uid = uuid.uuid4()
     await onboard(api, uid)
     lead = ids(await page(api, uid, limit=1))[0]
     star = next(a for a in arts if str(a.id) == lead)
     rng = np.random.default_rng(3)
     copies = []
-    for k in range(4):  # the same story, other outlets, slightly different vectors
+    for k in range(n):
         e = rng.normal(size=384).astype(np.float32)
         v = star.vector + 0.02 * e / np.linalg.norm(e)
         copies.append(await add(api, v / np.linalg.norm(v), category=star.category,
                                 domain=f"copy{k}.example", age_hours=0.5))  # fmt: skip
     await publish_pools(api.redis, [*arts, *copies], version="t-3")
     svc(api).pools.checked_at = -1e18
-    other = uuid.uuid4()
-    await onboard(api, other)
-    await page(api, other, limit=50)
-    slate = await stored_slate(api, other)
-    story = {str(star.id), *(str(c.id) for c in copies)}
+    return {str(star.id), *(str(c.id) for c in copies)}
+
+
+async def test_at_most_two_items_per_story(api: LiveApi) -> None:
+    story = await story_with_copies(api, await seed(api))
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    await page(api, uid, limit=50)
+    slate = await stored_slate(api, uid)
     assert len([i for i in slate.items if i.id in story]) == 2
+
+
+async def test_the_story_cap_holds_across_pages_and_re_ranks(api: LiveApi) -> None:
+    story = await story_with_copies(api, await seed(api))
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    shown: list[str] = []
+    cursor = None
+    for _ in range(4):  # each page follows a click, so each one re-ranks
+        body = await page(api, uid, cursor, limit=5)
+        shown += ids(body)
+        other = next(i for i in ids(body) if i not in story)
+        await events(api, uid, ev("click", other))
+        cursor = body["next_cursor"]
+    assert len([i for i in shown if i in story]) == 2
 
 
 async def test_ann_rows_carry_first_seen_cluster_and_domain_outside_the_pools(
