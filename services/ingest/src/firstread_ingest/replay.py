@@ -28,7 +28,7 @@ import asyncio
 import hashlib
 import json
 from collections import Counter, defaultdict
-from collections.abc import Callable, Sequence
+from collections.abc import Awaitable, Callable, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -57,6 +57,7 @@ WINDOW_FILE = REPO / "data" / "replay" / "window.npz"  # the same snapshot path 
 # Phase 2's committed copy (02-replay.json) is history; P3 replays write 03-*.
 AGGREGATES = REPO / "docs" / "learn" / "data" / "03-replay.json"
 EQUIVALENCE = REPO / "docs" / "learn" / "data" / "03-replay-equivalence.json"
+AfterRun = Callable[[datetime, datetime], Awaitable[None]]
 RUN_DELAY = timedelta(minutes=20)  # each slot is "processed" 20 min after it starts
 SNAPSHOT_TIME = (23, 45)  # top-10 trending per replayed day, at this slot
 
@@ -231,8 +232,13 @@ async def replay(
     progress: Callable[[str], None] = print,
     window_file: Path | None = WINDOW_FILE,
     compare: bool = False,
+    after_run: AfterRun | None = None,
 ) -> Replay:
-    """Run the pipeline once per slot with the clock set to that slot (GDELT only)."""
+    """Run the pipeline once per slot with the clock set to that slot (GDELT only).
+
+    ``after_run(slot, now)`` is awaited after each run: the database and the published
+    pools then hold exactly what production would have had at ``now`` (the persona
+    replay report ranks feeds there)."""
     result = Replay()
     cursor = await store.load_cursor(conn, gkg.SOURCE_ID)
     start = gkg.parse_slot(cursor) if cursor else None
@@ -287,6 +293,8 @@ async def replay(
                 **({"compare": d["details"]["compare"]} if compare else {}),
             }
         )
+        if after_run is not None:
+            await after_run(slot, now)
         if (slot.hour, slot.minute) == SNAPSHOT_TIME or i == len(todo) - 1:
             result.trending_days[slot.strftime("%Y-%m-%d")] = await snapshot_trending(
                 conn, now, window_file
@@ -453,8 +461,17 @@ async def rss_estimate(
 
 
 async def main(
-    days: int, end: datetime | None, db: str, redis_db: int, fresh: bool, compare: bool = False
+    days: int,
+    end: datetime | None,
+    db: str,
+    redis_db: int,
+    fresh: bool,
+    compare: bool = False,
+    after_run: AfterRun | None = None,
+    write_reports: bool = True,
 ) -> None:
+    """Replay ``days`` of GKG files. ``write_reports=False`` (the persona replay) skips
+    the final state, the live RSS estimate and every report file."""
     from redis.asyncio import Redis
 
     from firstread_core.dbtest import with_database
@@ -501,7 +518,10 @@ async def main(
             lookup,
             embed=embedder.embed,
             compare=compare,
+            after_run=after_run,
         )
+        if not write_reports:
+            return
         state = await final_state(conn, redis)
         rss = await rss_estimate(settings, classifier, embedder.embed)
     finally:
