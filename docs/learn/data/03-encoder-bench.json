@@ -1,0 +1,31 @@
+{
+ "where": "API runtime image (docker run --cpus=1 --memory=512m)",
+ "machine": "aarch64 Linux 7.0.14-linuxkit",
+ "cpus_visible": 10,
+ "onnxruntime": "1.31.0",
+ "model_tag": "v0.2.0",
+ "history_len": 50,
+ "runs": 300,
+ "results": {
+  "threads1_batch1": {
+   "p50_ms": 0.74,
+   "p95_ms": 0.758,
+   "per_user_p50_ms": 0.74
+  },
+  "threads1_batch32": {
+   "p50_ms": 22.437,
+   "p95_ms": 25.172,
+   "per_user_p50_ms": 0.701
+  },
+  "threads2_batch1": {
+   "p50_ms": 0.438,
+   "p95_ms": 0.498,
+   "per_user_p50_ms": 0.438
+  },
+  "threads2_batch32": {
+   "p50_ms": 12.838,
+   "p95_ms": 66.455,
+   "per_user_p50_ms": 0.401
+  }
+ }
+}
