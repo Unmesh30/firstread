@@ -868,7 +868,7 @@
     },
     "/v1/me": {
       "delete": {
-        "description": "Delete this reader's profile, history, events, served slates and cached state.\n\nThe Supabase Auth user itself is removed in P5 (that needs the service key).",
+        "description": "Delete this reader's profile, history, events, served slates and cached state.\n\n204 only when every copy is gone; 503 with ``Retry-After`` if Redis couldn't be\ncleared (the Postgres rows are already gone; retrying is safe).\n\nThe Supabase Auth user itself is removed in P5 (that needs the service key).",
         "operationId": "deleteMe",
         "responses": {
           "204": {
