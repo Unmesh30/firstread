@@ -134,7 +134,7 @@ redis-py 8.1 defaults to a 5 s socket (and connect) timeout and up to 10 retries
 
 - Every degraded row of the stage table has a test (`services/api/tests/test_feed.py`). So do the E2E flow (anonymous reader → topics → feed → click → re-ranked page 2 → delete), cursor validation, no repeats over 5 pages, the 60 s page cache, every filter, the story cap within and across pages, and command counts. They run against CI's Postgres and Redis with the real encoder; the release files are cached in CI by the hash of `release.py`.
 - Tests can't fake `X-Request-ID` into `served_slates`: the id is always server-generated (ADR 0015).
-- **Cloud Run scaling (owner decision, 2026-10-24, after the P3e load test):** P5 starts at **max concurrency 10** per instance (not Cloud Run's default 80) and **max instances 3**, so the autoscaler adds an instance before requests queue into the 1 s deadline. P6 tunes both with k6 against Cloud Run.
+- **Cloud Run scaling (owner decision, 2026-10-23, after the P3e load test):** P5 starts at **max concurrency 10** per instance (not Cloud Run's default 80) and **max instances 3**, so the autoscaler adds an instance before requests queue into the 1 s deadline. P6 tunes both with k6 against Cloud Run.
 - **Local only so far:** Supabase Nano is shared CPU, so HNSW, exact and pooler latencies there may be 2–3× local. P5's smoke tests re-measure, and the rule can be re-run against the live database.
 - P6 compares batching on and off, and caching on and off, under k6. P3e reports the local p95 for the whole feed.
 

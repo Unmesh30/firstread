@@ -177,7 +177,7 @@ def test_reasons_follow_the_largest_components() -> None:
 PINNED_SHA: dict[str, str] = {
     "rank-1": "cd25c71fe10fd0a0d1787dadbda417fb13b6b8c92c86e3dbbbfc7373294e6f23",
     "rank-2": "3befa2936a3f1d5f205a4aee091a0159d173374b8863a0c750d992aab1427b51",
-    "rank-3": "eda190a272086927c56e6260cd93de21d5ad529161dee309b26d81f93b30d412",
+    "rank-3": "9a1fee30535564926b9ff1724d070cc8ed189e30b4a9d60f13caaf740c64a8a2",
 }
 
 

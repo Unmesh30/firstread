@@ -249,7 +249,7 @@ Per persona after the fallback (16 clock times each), under rank-2 → rank-3:
 
 How to read it: a "drop" is an item that would have been in the page (or slate) by MMR alone but was the third copy of a story. Fewer than one drop per page means the cap is a backstop; the story was already represented twice. The thresholds don't depend on the weights, but the candidates do: rank-3 brings more fresh copies of developing stories into the re-rank set, so slates drop a few more and U.S. news once grouped 6. The labelled samples are from the rank-2 run.
 
-**Freshness: rank-2 vs rank-3 (owner decision, 2026-10-24).** Page 1, all personas, 1,600 items each:
+**Freshness: rank-2 vs rank-3 (owner decision, 2026-10-23).** Page 1, all personas, 1,600 items each:
 
 | | rank-2 (`w_fresh` 0.05, `w_trend` 0.025) | **rank-3, the default** (0.1 / 0.05) |
 |---|---:|---:|

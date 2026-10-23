@@ -1,4 +1,4 @@
-# Ranking config (ADR 0014, amendment 2026-10-24). rank-2 with w_fresh 0.1 and
+# Ranking config (ADR 0014, amendment 2026-10-23). rank-2 with w_fresh 0.1 and
 # w_trend 0.05: an owner decision. On the pre-registered holdout objective it ties
 # rank-2 (J 0.42307 vs 0.42309; it lost only the "smallest weights" tie-break), and
 # the P3e persona replay showed page 1 too old under rank-2. The cold segment and
