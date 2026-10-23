@@ -41,6 +41,8 @@ services:
     environment:
       DATABASE_URL: postgresql://${POSTGRES_USER:-firstread}:${POSTGRES_PASSWORD:-firstread}@db:5432/${POSTGRES_DB:-firstread}
       REDIS_URL: redis://redis:6379/0
+      # Local only: `X-Dev-User: <uuid>` instead of a Supabase token (ADR 0015).
+      AUTH_DEV_BYPASS: "true"
     ports:
       - "127.0.0.1:${API_PORT:-8000}:8000"
     volumes:

@@ -78,3 +78,15 @@ def test_feeds_blocked_from_github_runners_are_disabled() -> None:
     ycc = next(f for f in load_feeds(enabled_only=False) if f.id == "yale-climate-connections")
     assert not ycc.enabled
     assert ycc.terms == "website_with_attribution"  # permission is fine; access isn't
+
+
+def test_every_ingest_setting_is_documented_in_env_example() -> None:
+    from pathlib import Path
+
+    from firstread_ingest.config import Settings
+
+    example = (Path(__file__).resolve().parents[3] / ".env.example").read_text()
+    names = {line.split("=", 1)[0] for line in example.splitlines()
+             if "=" in line and not line.startswith("#")}  # fmt: skip
+    missing = sorted(f.upper() for f in Settings.model_fields if f.upper() not in names)
+    assert not missing, f"document these in .env.example: {missing}"
