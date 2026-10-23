@@ -174,7 +174,7 @@ Full table: `ml/reports/ranking-mind-large-dev.md`.
 ## Amendment (2026-10-23): rank-2 sets k = 3 as a product decision
 
 **Decision (owner, PR #17 review):** `rank-2.yaml` is identical to `rank-1` except `cold_start_k: 3.0` and `cold_start_k_source: judgment`.
-- It is the default (`model_version` = `v0.2.0+rank-2`).
+- It was the default (`model_version` = `v0.2.0+rank-2`) until rank-3 (amendment of 2026-10-24, below).
 - `rank-1.yaml` stays for the record; both files' SHA-256s are pinned.
 - The holdout rules and the rank-1 dev report above are unchanged.
 - **Dev is not re-run:** dev was looked at once, for rank-1, and this change isn't tuned on anything.
@@ -210,10 +210,37 @@ Full table: `ml/reports/ranking-mind-large-dev.md`.
 
 | Page 2 items | rank-1 (k = 0) | rank-2 (k = 3) |
 |---|---:|---:|
-| from the 3 followed topics | 11.5% | **51.3%** |
-| from the clicked story's topic | 47.3% | **12.5%** |
+| from the 3 followed topics | 10.5% | **50.8%** |
+| from the clicked story's topic | 48.5% | **13.4%** |
+
+(Re-measured in the rank-3 run on 2026-10-24; the first run gave 11.5 / 47.3 and 51.3 / 12.5.)
 
 - **With k = 0, one off-topic click takes over the feed:** almost half of page 2 comes from the clicked topic and about a tenth from the topics the reader chose.
 - **With k = 3 the chosen topics keep about half of page 2** (75% topic weight after one click), and the click still shows.
 - The rest of page 2 (36% under rank-2, 41% under rank-1) is neither: trending and fresh stories from other topics.
 - This supports the owner's rank-2 decision. It is a behavioural check, not an accuracy measurement (there are no live clicks yet).
+
+## Amendment (2026-10-24): rank-3 raises the shared freshness and trend weights, as an owner decision
+
+**Decision (owner, PR #21 review):** `rank-3.yaml` is rank-2 with **`w_fresh` 0.1 and `w_trend` 0.05**. The cold segment (≤ 2 clicks: 0.05 / 0.1) and every other constant are unchanged.
+- It is the default (`model_version` = `v0.2.0+rank-3`).
+- rank-1 and rank-2 stay for the record, and all three files' SHA-256s are pinned.
+- **Dev is not re-run.** The rules and results above are unchanged.
+
+**Why:**
+- **It ties on the pre-registered objective.** On the MIND-small holdout (`ml/reports/ranking-mind-small-holdout.json`, `step1.top`), raw normalization, h = 3 h, w_fresh 0.1, w_trend 0.05 has J = 0.42307, against 0.42309 for the shipped 0.05 / 0.025. That is inside the rule's 0.001 tie band; the shipped config won only on the "smallest w_fresh + w_trend" tie-break. Its cold-user nDCG@10 (0.3329) passes the rule's guard against model-only (0.3188).
+- **The persona replay showed what that tie-break cost on live news.** Under rank-2 only a third of a persona's page 1 was under 2 h old, with a median age of 4.1 h. The holdout's freshness proxy (MIND's first-seen time) is too coarse to separate the tied configs.
+- **The replay's earlier variant (w_fresh 0.1 with w_trend 0.025) wasn't chosen:** it isn't among the holdout's 15 best configs (J < 0.4214).
+
+**Persona replay, rank-2 vs rank-3** (same replay, same 16 steady clock times, 1,600 page-1 items each; `docs/learn/data/03-personas.json`):
+
+| Page 1, all personas | rank-2 | rank-3 |
+|---|---:|---:|
+| under 2 h old | 33.1% | 65.6% |
+| under 30 min old | 6.3% | 14.8% |
+| median age | 4.1 h | 1.3 h |
+
+- **New readers are identical under rank-2 and rank-3, by construction:** with ≤ 2 clicks the cold segment's weights apply, and rank-3 kept them.
+  - Their page 1 is 29.2% under 2 h (median 3.8 h).
+  - After one off-topic click, page 2 is 50.8% followed topics and 13.4% the clicked topic (rank-1, k = 0: 10.5% and 48.5%).
+- **Story grouping:** page-1 cap drops are about the same (mean 0.20 vs 0.23 per page); the largest group grew from 4 to 6 once (U.S. news), as fresher candidates bring more copies of developing stories into the re-rank set.

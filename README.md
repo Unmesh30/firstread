@@ -57,6 +57,8 @@ curl "localhost:8000/v1/articles/<an id from that feed>/why" -H "$D"
 curl localhost:8000/v1/stats
 ```
 
+**Ranking:** the default `rank-3` blends similarity with freshness and outlet breadth; on three replayed days of live news, two thirds of a demo reader's first page is under 2 hours old (median 1.3 h), and a new reader's chosen topics keep half of their next page after an off-topic click ([ADR 0014](docs/adr/0014-ranking-blend-mmr-cold-start.md)).
+
 **Local performance** (API container at Cloud Run's shape: 1 vCPU, 512 MiB; Postgres and Redis local): p95 server time **21 ms at 50 RPS**, ~70 RPS per instance before it saturates, so SPEC's 100 RPS takes two instances. A feed session costs 30–37 Redis commands and 153–373 KB of database egress, which keeps the demo free up to ~250–300 sessions a day ([learn chapter 03](docs/learn/03-recommendation-api.md), `make loadtest`).
 
 `make help` lists every command. The step-by-step explanation of the tooling is in [docs/learn/00-bootstrap.md](docs/learn/00-bootstrap.md).

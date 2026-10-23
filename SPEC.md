@@ -161,7 +161,7 @@ flowchart LR
 | GET | `/v1/stats` | none | Public stats for the System page, from the pool snapshot (with the GDELT credit) |
 | GET | `/metrics` | internal | Prometheus metrics (bearer token outside local) |
 
-Feed item: `id, title, source_name, source_domain, url, image_url?, category, published_at?, first_seen_at, score, reasons[]`. A feed page also carries `next_cursor` and `degraded` (the parts that failed and were worked around). Every response carries `request_id` (always server-generated) and `model_version` (`<model tag>+<ranking version>`, e.g. `v0.2.0+rank-2`). Errors share one schema. Rate limits are in-process token buckets (ADR 0015).
+Feed item: `id, title, source_name, source_domain, url, image_url?, category, published_at?, first_seen_at, score, reasons[]`. A feed page also carries `next_cursor` and `degraded` (the parts that failed and were worked around). Every response carries `request_id` (always server-generated) and `model_version` (`<model tag>+<ranking version>`, e.g. `v0.2.0+rank-3`). Errors share one schema. Rate limits are in-process token buckets (ADR 0015).
 
 **Demo personas** are synthetic readers built from **live** articles, not from MIND rows: five personas ("Markets & tech", "Sports & health", "World affairs", "Culture & food", "U.S. news"), 20 articles each, selected once a day by ingestion from the last 48 h (ADR 0018).
 
@@ -181,7 +181,7 @@ Impressions are logged by the client through `/v1/events`.
 
 **Real-time personalization:** a click event appends the article to the user's Redis history with a new history version; the next feed page sees the version move, recomputes the user vector and re-ranks the rest of the slate.
 
-**Concurrency settings:** asyncpg pool sizes, ONNX intra-op threads and uvicorn workers are configurable. Cloud Run: concurrency 80, min instances 0, max instances 3, request-based billing, startup CPU boost.
+**Concurrency settings:** asyncpg pool sizes, ONNX intra-op threads and uvicorn workers are configurable. Cloud Run: max concurrency 10 per instance (one 1-vCPU instance saturates at ~75 RPS; ADR 0017), min instances 0, max instances 3, request-based billing, startup CPU boost; P6 tunes concurrency and instances with k6 against Cloud Run.
 
 ---
 
