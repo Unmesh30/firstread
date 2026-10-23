@@ -25,8 +25,13 @@ def per_impression(
     labels: NDArray[np.integer],
     offsets: NDArray[np.int64],
     seed: int = 0,
+    tiebreak: NDArray[np.floating] | None = None,
 ) -> dict[str, NDArray[np.float64]]:
-    """Return ``{metric: values[n_impressions]}``."""
+    """Return ``{metric: values[n_impressions]}``.
+
+    ``tiebreak`` (one key per candidate) replaces the seeded random draw, so a caller
+    that scores data in chunks breaks ties exactly as it would in one call.
+    """
     scores = np.asarray(scores, dtype=np.float64)
     if not np.isfinite(scores).all():
         raise ValueError("scores must be finite")
@@ -41,7 +46,10 @@ def per_impression(
     within = np.arange(len(y)) - offsets[imp]  # 0-based position inside its impression
 
     # Descending by score, random tie-break; candidates stay grouped by impression.
-    tiebreak = np.random.default_rng(seed).random(len(y))
+    if tiebreak is None:
+        tiebreak = np.random.default_rng(seed).random(len(y))
+    elif len(tiebreak) != len(y):
+        raise ValueError("tiebreak needs one key per candidate")
     desc = np.lexsort((tiebreak, -scores, imp))
     rank = within + 1.0
     y_desc = y[desc]

@@ -117,22 +117,12 @@ def trend_scores(
     """
     rows = [click_rows(p) for p in click_parts]
     arts = np.concatenate([p.cand[pos] for p, (_, pos) in zip(click_parts, rows, strict=True)])
-    arts = arts.astype(np.int64)
     times = np.concatenate([p.time[r] for p, (r, _) in zip(click_parts, rows, strict=True)])
-    t0 = int(min(times.min(), test.time.min())) - int(window_h * HOUR) - 1
-    rel = (times - t0).astype(np.int64)
-    span = int(max(rel.max(), (test.time - t0).max())) + 1
-    key = arts * span + rel
-    order = np.argsort(key, kind="stable")
-    key, rel = key[order], rel[order]
-    h = half_life_h * HOUR
-    prefix = np.concatenate([[0.0], np.cumsum(np.power(2.0, rel / h))])
-    cand = test.cand.astype(np.int64)
-    t = (test.time[test.cand_imp] - t0).astype(np.int64)
-    lo = np.searchsorted(key, cand * span + (t - int(window_h * HOUR)), side="right")
-    hi = np.searchsorted(key, cand * span + t, side="left")  # strictly before t
-    out: NDArray[np.float64] = (prefix[hi] - prefix[lo]) * np.power(2.0, -t / h)
-    return out
+    index = TrendIndex.build(
+        arts.astype(np.int64), times, int(test.time.min()), int(test.time.max()),
+        window_h, half_life_h,
+    )  # fmt: skip
+    return index.query(test.cand, test.time[test.cand_imp])
 
 
 def user_vectors(
@@ -637,54 +627,400 @@ def tune(progress: Callable[[str], None] = print, write: bool = False) -> dict[s
     return report
 
 
-def dev_report(
-    release: Path, version: str = "rank-1", progress: Callable[[str], None] = print
+# ---- dev: a streaming report (MIND-large dev, 376K impressions, in < 4 GB) ----
+
+
+@dataclass
+class TrendIndex:
+    """Clicks sorted by (article, time) with decayed prefix sums: trend queries for
+    any chunk of candidates without holding every candidate at once."""
+
+    key: NDArray[np.int64]
+    prefix: NDArray[np.float64]
+    t0: int
+    span: int
+    window_s: int
+    half_life_s: float
+
+    @classmethod
+    def build(
+        cls, arts: NDArray[np.int64], times: NDArray[np.int64], t_min: int, t_max: int,
+        window_h: float = TREND_WINDOW_H, half_life_h: float = TREND_HALF_LIFE_H,
+    ) -> TrendIndex:  # fmt: skip
+        window_s = int(window_h * HOUR)
+        t0 = min(int(times.min()), t_min) - window_s - 1
+        rel = (times - t0).astype(np.int64)
+        span = max(int(rel.max()), t_max - t0) + 1
+        key = arts.astype(np.int64) * span + rel
+        order = np.argsort(key, kind="stable")
+        key, rel = key[order], rel[order]
+        h = half_life_h * HOUR
+        prefix = np.concatenate([[0.0], np.cumsum(np.power(2.0, rel / h))])
+        return cls(key, prefix, t0, span, window_s, h)
+
+    def query(self, cand: NDArray[np.integer[Any]], t: NDArray[np.int64]) -> NDArray[np.float64]:
+        c = cand.astype(np.int64)
+        tr = (t - self.t0).astype(np.int64)
+        lo = np.searchsorted(self.key, c * self.span + (tr - self.window_s), side="right")
+        hi = np.searchsorted(self.key, c * self.span + tr, side="left")  # strictly before t
+        out: NDArray[np.float64] = (self.prefix[hi] - self.prefix[lo]) * np.power(
+            2.0, -tr / self.half_life_s
+        )
+        return out
+
+
+@dataclass
+class DevInputs:
+    """Everything the stream needs besides the dev impressions themselves (small)."""
+
+    emb: NDArray[np.float32]
+    first_seen: NDArray[np.int64]
+    cold_article: NDArray[np.bool_]  # never clicked in train
+    category: NDArray[np.int32]
+    category_names: list[str]
+    trend: TrendIndex
+    population: NDArray[np.float32]
+    centroids: dict[str, NDArray[np.float32]]
+    stated: dict[int, list[str]]  # dev row -> topics (sampled rows only)
+    encode: Callable[[NDArray[np.float32], NDArray[np.bool_]], NDArray[np.float32]]
+
+
+def peak_rss_gb() -> float:
+    import resource
+    import sys
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    return peak / 1e9 if sys.platform == "darwin" else peak / 1e6  # bytes vs KiB
+
+
+def _row_chunks(n: int, size: int) -> list[tuple[int, int]]:
+    return [(s, min(s + size, n)) for s in range(0, n, size)]
+
+
+class _Acc:
+    """Sums of per-impression metrics, per (row, slice), and their counts."""
+
+    def __init__(self) -> None:
+        self.sums: dict[tuple[str, str], dict[str, float]] = {}
+        self.counts: dict[tuple[str, str], int] = {}
+        self.extra: dict[str, list[float]] = {}
+
+    def add(self, row: str, sl: Slice, scores: Any, labels: Any, tiebreak: Any) -> None:
+        if sl.n_impressions == 0:
+            return
+        m = per_impression(scores[sl.idx], labels[sl.idx], sl.offsets, tiebreak=tiebreak[sl.idx])
+        key = (row, sl.name)
+        into = self.sums.setdefault(key, dict.fromkeys(m, 0.0))
+        for k, v in m.items():
+            into[k] += float(v.sum())
+        self.counts[key] = self.counts.get(key, 0) + sl.n_impressions
+
+    def means(self) -> dict[str, dict[str, dict[str, float]]]:
+        out: dict[str, dict[str, dict[str, float]]] = {}
+        for (row, name), sums in sorted(self.sums.items()):
+            n = self.counts[(row, name)]
+            out.setdefault(row, {})[name] = {k: round(v / n, 4) for k, v in sums.items()} | {
+                "impressions": n
+            }
+        return out
+
+
+def _chunk_slices(sub: Impressions, inp: DevInputs) -> list[Slice]:
+    """Overall, cold candidates, cold users and every category, for one chunk."""
+    out = [_masked(sub, mask, name) for name, mask in _slice_masks(sub, inp)]
+    cats = inp.category[sub.cand]
+    out += [
+        restrict(sub, cats == c, f"category:{name}") for c, name in enumerate(inp.category_names)
+    ]
+    return out
+
+
+def stream_dev(
+    test: Impressions,
+    inp: DevInputs,
+    cfg: RankingConfig,
+    sample: NDArray[np.int64],
+    chunk: int = 2048,
+    progress: Callable[[str], None] = print,
 ) -> dict[str, Any]:
-    """The chosen config on MIND-large dev with the shipped encoder, once."""
-    from firstread_core.ranking import load_config
+    """The dev report, ``chunk`` impressions at a time, end to end.
+
+    Per chunk: gather 50-click histories → encoder → cosines, freshness, trend →
+    model-only and blended scores → per-impression metrics on every slice; for the
+    sampled rows also MMR at λ = 1 and the config's λ, and the cold-start vector on
+    stated-topic rows. Only sums and counts survive a chunk, so the result doesn't
+    depend on ``chunk`` (tested) and memory stays flat. Ties are broken by a
+    per-candidate key drawn once, not per call, for the same reason.
+    """
+    from firstread_core.features import HISTORY_LEN, gather_history, history_index_matrix
+
+    tiebreak_all = np.random.default_rng(0).random(len(test.cand)).astype(np.float64)
+    in_sample = np.zeros(test.n, np.bool_)
+    in_sample[sample] = True
+    lams = _lambdas(cfg)
+    acc = _Acc()
+    ild: dict[str, list[float]] = {f"blend+mmr(λ={lam})": [] for lam in lams}
+    t0 = time.perf_counter()
+    chunks = _row_chunks(test.n, chunk)
+    for c, (start, stop) in enumerate(chunks):
+        sub = test.take(np.arange(start, stop))
+        idx, mask = history_index_matrix(sub.histories(), HISTORY_LEN)
+        hist = gather_history(inp.emb, idx, mask)
+        users = l2_normalize(inp.encode(hist, mask))
+        del hist
+        model = cosines(sub, users, inp.emb)
+        t_cand = sub.time[sub.cand_imp]
+        age = (t_cand - inp.first_seen[sub.cand]) / HOUR
+        trend = trend_feature(inp.trend.query(sub.cand, t_cand), sub.cand_offsets)
+        fresh = freshness(age, cfg.half_life_hours)
+        off = sub.cand_offsets
+        model_only = normalize(model, "raw", off)
+        blended = _blend_cfg(model, fresh, trend, cfg, sub)
+        tb = tiebreak_all[test.cand_offsets[start] : test.cand_offsets[stop]]
+        labels = sub.label
+        for sl in _chunk_slices(sub, inp):
+            acc.add("model_only", sl, model_only, labels, tb)
+            acc.add("blend", sl, blended, labels, tb)
+        local = np.flatnonzero(in_sample[start:stop])
+        if len(local):
+            keep = np.zeros(sub.n, np.bool_)
+            keep[local] = True
+            in_rows = keep[sub.cand_imp]
+            s_sl = [_masked(sub, m & in_rows, name) for name, m in _slice_masks(sub, inp)]
+            for sl in s_sl:
+                acc.add("sample:model_only", sl, model_only, labels, tb)
+                acc.add("sample:blend", sl, blended, labels, tb)
+            for lam in lams:
+                ranks, ilds = _mmr_ranks(sub, inp.emb, blended, lam, local)
+                name = f"blend+mmr(λ={lam})"
+                ild[name] += ilds
+                for sl in s_sl:
+                    acc.add(f"sample:{name}", sl, ranks, labels, tb)
+            stated_local = np.array(
+                [i for i in local.tolist() if start + i in inp.stated], np.int64
+            )
+            if len(stated_local):
+                cs_model = model.copy()
+                for i in stated_local.tolist():
+                    n = int(sub.hist_len[i])
+                    u = cold_start_vector(
+                        inp.centroids, inp.stated[start + i], users[i] if n > 0 else None,
+                        n, cfg.cold_start_k, inp.population,
+                    )  # fmt: skip
+                    a, b = off[i], off[i + 1]
+                    cs_model[a:b] = inp.emb[sub.cand[a:b]] @ u
+                cs_blend = _blend_cfg(cs_model, fresh, trend, cfg, sub)
+                ranks, _ = _mmr_ranks(sub, inp.emb, cs_blend, cfg.mmr_lambda, stated_local)
+                base, _ = _mmr_ranks(sub, inp.emb, blended, cfg.mmr_lambda, stated_local)
+                keep = np.zeros(sub.n, np.bool_)
+                keep[stated_local] = True
+                for sl_name, sl_mask in _slice_masks(sub, inp):
+                    sl = _masked(sub, sl_mask & keep[sub.cand_imp], f"stated_{sl_name}")
+                    acc.add(f"stated:k={cfg.cold_start_k}", sl, ranks, labels, tb)
+                    acc.add("stated:no_topics", sl, base, labels, tb)
+        if c % 20 == 0 or c == len(chunks) - 1:
+            progress(
+                f"  chunk {c + 1}/{len(chunks)} ({time.perf_counter() - t0:.0f}s, "
+                f"peak RSS {peak_rss_gb():.2f} GB)"
+            )
+    means = acc.means()
+    for name, vals in ild.items():
+        if vals:
+            means.setdefault(f"sample:{name}", {})["ild@10"] = {
+                "mean": round(float(np.mean(vals)), 4),
+                "impressions": len(vals),
+            }
+    return means
+
+
+def _lambdas(cfg: RankingConfig) -> list[float]:
+    return sorted({1.0, cfg.mmr_lambda}, reverse=True)
+
+
+def _blend_cfg(
+    model: NDArray[np.float64],
+    fresh: NDArray[np.float64],
+    trend: NDArray[np.float64],
+    cfg: RankingConfig,
+    sub: Impressions,
+) -> NDArray[np.float64]:
+    off = sub.cand_offsets
+    out = blend(model, fresh, trend, cfg.model_norm, cfg.w_fresh, cfg.w_trend, off)
+    if cfg.cold_segment is not None:
+        seg = cfg.cold_segment
+        cold = sub.hist_len[sub.cand_imp] <= seg.max_history
+        alt = blend(model, fresh, trend, cfg.model_norm, seg.w_fresh, seg.w_trend, off)
+        out = np.where(cold, alt, out)
+    return out
+
+
+def _slice_masks(sub: Impressions, inp: DevInputs) -> list[tuple[str, NDArray[np.bool_]]]:
+    return [
+        ("overall", np.ones(len(sub.cand), np.bool_)),
+        ("cold_candidates", inp.cold_article[sub.cand]),
+        ("cold_users", sub.hist_len[sub.cand_imp] <= COLD_USER_MAX_HISTORY),
+    ]
+
+
+def _masked(sub: Impressions, mask: NDArray[np.bool_], name: str) -> Slice:
+    return restrict(sub, mask, name)
+
+
+def _mmr_ranks(
+    sub: Impressions,
+    emb: NDArray[np.float32],
+    rel: NDArray[np.float64],
+    lam: float,
+    rows: NDArray[np.int64],
+) -> tuple[NDArray[np.float64], list[float]]:
+    """MMR rank positions as scores for ``rows`` (others -1e9) and their ILD@10."""
+    out = np.full(len(rel), -1e9)
+    off = sub.cand_offsets
+    ilds = []
+    for i in rows.tolist():
+        a, b = off[i], off[i + 1]
+        order = np.argsort(-rel[a:b], kind="stable")
+        vecs_sorted = emb[sub.cand[a:b][order]]
+        ids = [uuid.UUID(int=int(x) + 1) for x in sub.cand[a:b][order]]
+        g_sorted = stories.group(vecs_sorted, ["title_summary"] * len(order), ids)
+        groups = [0] * len(order)
+        for pos, item in enumerate(order.tolist()):
+            groups[item] = g_sorted[pos]
+        vecs = emb[sub.cand[a:b]]
+        res = mmr(rel[a:b], vecs, lam, groups, cap=STORY_CAP)
+        ranking = res.order + res.capped
+        out[a + np.asarray(ranking)] = -np.arange(len(ranking), dtype=np.float64)
+        top = vecs[ranking[:10]]
+        if len(top) > 1:
+            sims = top @ top.T
+            ilds.append(float((1 - sims)[~np.eye(len(top), dtype=np.bool_)].mean()))
+    return out, ilds
+
+
+def load_dev_inputs(
+    release: Path,
+    sample: NDArray[np.int64],
+    test: Impressions,
+    progress: Callable[[str], None] = print,
+    train_chunk: int = 200_000,
+) -> DevInputs:
+    """Derive everything from MIND-large train in row chunks, then free it."""
+    from firstread_ml.mind.load import load_impressions
     from firstread_ml.models.onnx_scorer import ORTUserEncoderScorer
+
+    news = load_news("large")
+    emb = load_or_build("large", news).astype(np.float32, copy=False)
+    n_news = len(emb)
+    names = sorted(news["category"].unique().to_list())
+    code = {c: i for i, c in enumerate(names)}
+    category = np.array([code[c] for c in news["category"].to_list()], np.int32)
+    article_topic = np.array(map_topics(news, load_topic_map()))
+    big = np.iinfo(np.int64).max
+    first_seen = np.full(n_news, big, np.int64)
+    clicked = np.zeros(n_news, np.bool_)
+    seen = np.zeros(n_news, np.bool_)
+    counts = np.zeros(n_news, np.float64)
+    click_arts, click_times, click_rows_g = [], [], []
+    train = load_impressions("large", "train")
+    progress(f"  train loaded: {train.n} impressions (peak RSS {peak_rss_gb():.2f} GB)")
+    for start, stop in _row_chunks(train.n, train_chunk):
+        part = train.take(np.arange(start, stop))
+        np.minimum.at(first_seen, part.cand, part.time[part.cand_imp])
+        rows, pos = click_rows(part)
+        arts = part.cand[pos].astype(np.int64)
+        clicked[arts] = True
+        clicked[part.hist] = True
+        seen[part.cand] = True
+        seen[part.hist] = True
+        np.add.at(counts, arts, 1.0)
+        click_arts.append(arts)
+        click_times.append(part.time[rows])
+        click_rows_g.append(rows + start)
+    train_ids = train.imp_id
+    del train
+    np.minimum.at(first_seen, test.cand, test.time[test.cand_imp])
+    never = first_seen == big
+    first_seen[never] = int(first_seen[~never].min()) - 86_400  # as splits.first_seen
+    d_rows, d_pos = click_rows(test)
+    trend = TrendIndex.build(
+        np.concatenate([*click_arts, test.cand[d_pos].astype(np.int64)]),
+        np.concatenate([*click_times, test.time[d_rows]]),
+        int(test.time.min()), int(test.time.max()),
+    )  # fmt: skip
+    population = l2_normalize((counts @ emb.astype(np.float64)) / counts.sum())
+    centroids = pools.topic_centroids(emb[seen], article_topic[seen].tolist())
+    del seen
+    # Stated topics for the sampled dev rows only: their users' train clicks.
+    train_users = load_user_ids("large", "train")
+    dev_users = load_user_ids("large", "dev")
+    sample_ids = pl.DataFrame({"imp_id": test.imp_id[sample], "row": sample})
+    wanted = sample_ids.join(dev_users, on="imp_id")
+    train_map = pl.DataFrame({"imp_id": train_ids, "g": np.arange(len(train_ids))}).join(
+        train_users, on="imp_id"
+    )
+    users_wanted = set(wanted["user"].to_list())
+    train_map = train_map.filter(pl.col("user").is_in(list(users_wanted)))
+    row_user = dict(zip(train_map["g"].to_list(), train_map["user"].to_list(), strict=True))
+    per_user: dict[str, Counter[str]] = {}
+    for g_rows, arts in zip(click_rows_g, click_arts, strict=True):
+        for g, a in zip(g_rows.tolist(), arts.tolist(), strict=True):
+            u = row_user.get(g)
+            if u is not None:
+                t = str(article_topic[a])
+                if t in TOPIC_IDS:
+                    per_user.setdefault(u, Counter())[t] += 1
+    order = {t: i for i, t in enumerate(TOPIC_IDS)}
+    stated: dict[int, list[str]] = {}
+    for row, u in zip(wanted["row"].to_list(), wanted["user"].to_list(), strict=True):
+        cnt = per_user.get(u)
+        if cnt is not None and sum(cnt.values()) >= MIN_STATED_CLICKS:
+            ranked = sorted(cnt.items(), key=lambda kv: (-kv[1], order[kv[0]]))
+            stated[int(row)] = [t for t, _ in ranked[:STATED_TOPICS]]
+    del click_arts, click_times, click_rows_g, row_user, per_user
+    scorer = ORTUserEncoderScorer(release / "user_encoder.onnx")
+
+    def encode(hist: NDArray[np.float32], mask: NDArray[np.bool_]) -> NDArray[np.float32]:
+        out = scorer.sess.run(None, {"hist": hist, "mask": mask})[0]
+        return np.asarray(out, np.float32)
+
+    progress(f"  inputs ready (peak RSS {peak_rss_gb():.2f} GB)")
+    return DevInputs(
+        emb, first_seen, ~clicked, category, names, trend, population, centroids, stated, encode
+    )
+
+
+def dev_report(
+    release: Path,
+    version: str = "rank-1",
+    progress: Callable[[str], None] = print,
+    chunk: int = 2048,
+) -> dict[str, Any]:
+    """The chosen config on MIND-large dev with the shipped encoder, once (streaming)."""
+    from firstread_core.ranking import load_config
+    from firstread_ml.mind.load import load_impressions
 
     t0 = time.perf_counter()
     cfg = load_config(version)
-    f = build_features("large", "dev", ORTUserEncoderScorer(release / "user_encoder.onnx"))
-    progress(f"features ready ({time.perf_counter() - t0:.0f}s): {f.test.n} impressions")
-    names = ["overall", "cold_candidates", "cold_users"] + [
-        s.name for s in f.slices if s.name.startswith("category:")
-    ]
-    model_only = final_scores(f, "raw", cfg.half_life_hours, 0.0, 0.0)
-    blended = final_scores(f, cfg.model_norm, cfg.half_life_hours, cfg.w_fresh, cfg.w_trend)
-    if cfg.cold_segment is not None:
-        seg = final_scores(f, cfg.model_norm, cfg.half_life_hours, cfg.cold_segment.w_fresh,
-                           cfg.cold_segment.w_trend)  # fmt: skip
-        cold = f.test.hist_len[f.test.cand_imp] <= cfg.cold_segment.max_history
-        blended = np.where(cold, seg, blended)
-    full = {"model_only": metrics(model_only, f, names), "blend": metrics(blended, f, names)}
+    test = load_impressions("large", "dev")
     rng = np.random.default_rng(0)
-    rows = np.sort(rng.choice(f.test.n, size=min(DEV_SAMPLE, f.test.n), replace=False))
-    sl = subset_slices(f, rows)
-    sample = {"model_only": eval_on(model_only, f, sl), "blend": eval_on(blended, f, sl)}
-    for lam in sorted({1.0, cfg.mmr_lambda}, reverse=True):
-        s, ild = mmr_scores(f, blended, lam, rows.tolist(), groups_for(f, rows, blended))
-        sample[f"blend+mmr(λ={lam})"] = {**eval_on(s, f, sl), "ild@10": ild}
-        progress(f"  dev mmr λ={lam} done")
-    stated_rows = np.array([r for r in rows.tolist() if r in f.stated], np.int64)
-    choice = {"norm": cfg.model_norm, "half_life": cfg.half_life_hours,
-              "w_fresh": cfg.w_fresh, "w_trend": cfg.w_trend}  # fmt: skip
-    ks, n_cold = k_sweep(f, choice, cfg.mmr_lambda, sorted({0.0, cfg.cold_start_k}),
-                         stated_rows, progress)  # fmt: skip
+    sample = np.sort(rng.choice(test.n, size=min(DEV_SAMPLE, test.n), replace=False))
+    inp = load_dev_inputs(release, sample, test, progress)
+    rows = stream_dev(test, inp, cfg, sample, chunk, progress)
     report = {
         "split": "dev",
         "variant": "large",
         "encoder": str(release.name),
         "config": cfg.version,
-        "impressions": f.test.n,
-        "slices": {n: f.slice(n).n_impressions for n in names},
-        "full": full,
-        "sample": {"impressions": len(rows), "rows": sample},
-        "cold_start": {"stated_impressions": len(stated_rows), "cold": n_cold, "sweep": ks},
+        "impressions": test.n,
+        "sample_impressions": len(sample),
+        "stated_sample_impressions": len(inp.stated),
+        "chunk": chunk,
+        "peak_rss_gb": round(peak_rss_gb(), 2),
+        "rows": rows,
         "seconds": round(time.perf_counter() - t0),
     }
     write_report(report, "ranking-mind-large-dev")
+    progress(f"done: peak RSS {report['peak_rss_gb']} GB, {report['seconds']} s")
     return report
 
 
@@ -765,33 +1101,37 @@ def markdown(r: dict[str, Any]) -> str:
             *(f"{k}: {v}" for k, v in r["config"].items()), "```",
         ]  # fmt: skip
     else:
+        rows = r["rows"]
         lines += [
             f"Encoder: {r['encoder']} (shipped); config: {r['config']}; "
-            f"{r['impressions']} impressions.",
+            f"{r['impressions']} impressions, streamed {r['chunk']} at a time "
+            f"(peak RSS {r['peak_rss_gb']} GB).",
             "", "## Full dev set (nDCG@10)", "",
-            "| Slice | model only | blend |", "|---|---:|---:|",
+            "| Slice | impressions | model only | blend |", "|---|---:|---:|---:|",
         ]  # fmt: skip
-        for n in r["full"]["blend"]:
-            a, b = r["full"]["model_only"][n]["ndcg@10"], r["full"]["blend"][n]["ndcg@10"]
-            lines.append(f"| {n} | {_f(a)} | {_f(b)} |")
+        for name, v in rows["blend"].items():
+            mo = rows["model_only"][name]["ndcg@10"]
+            lines.append(f"| {name} | {v['impressions']} | {_f(mo)} | {_f(v['ndcg@10'])} |")
+        sample_rows = [k for k in rows if k.startswith("sample:")]
         lines += [
-            "", f"## Fixed sample ({r['sample']['impressions']} impressions, seed 0)", "",
+            "", f"## Fixed sample ({r['sample_impressions']} impressions, seed 0; nDCG@10)", "",
             "| Row | overall | cold candidates | cold users | ILD@10 |",
             "|---|---:|---:|---:|---:|",
         ]  # fmt: skip
-        for name, row in r["sample"]["rows"].items():
-            lines.append(
-                f"| {name} | {_f(row.get('overall'))} | {_f(row.get('cold_candidates'))} | "
-                f"{_f(row.get('cold_users'))} | {_f(row.get('ild@10', ''))} |"
-            )
-        cs = r["cold_start"]
+        for k in sample_rows:
+            v = rows[k]
+            cells = [_f(v.get(n, {}).get("ndcg@10", "")) for n in MAIN_SLICES]
+            ild = v.get("ild@10", {}).get("mean", "")
+            lines.append(f"| {k.split(':', 1)[1]} | " + " | ".join(cells) + f" | {_f(ild)} |")
+        stated_rows = [k for k in rows if k.startswith("stated:")]
         lines += [
-            "", f"## Cold start (stated-topic users in the sample: {cs['stated_impressions']}, "
-            f"cold: {cs['cold']})", "",
+            "", f"## Cold start: stated-topic users in the sample "
+            f"({r['stated_sample_impressions']} impressions; blend + MMR; nDCG@10)", "",
+            "| Row | overall | cold candidates | cold users |", "|---|---:|---:|---:|",
         ]  # fmt: skip
-        keys = [k for k in cs["sweep"][0] if k != "k"]
-        lines += ["| k | " + " | ".join(keys) + " |", "|---:|" + "---:|" * len(keys)]
-        for row in cs["sweep"]:
-            lines.append(f"| {row['k']} | " + " | ".join(_f(row.get(k)) for k in keys) + " |")
+        for k in stated_rows:
+            v = rows[k]
+            cells = [_f(v.get(f"stated_{n}", {}).get("ndcg@10", "")) for n in MAIN_SLICES]
+            lines.append(f"| {k.split(':', 1)[1]} | " + " | ".join(cells) + " |")
     lines.append(f"\nRun time: {r['seconds']} s.")
     return "\n".join(lines)
