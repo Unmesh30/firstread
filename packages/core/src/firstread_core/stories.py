@@ -52,10 +52,20 @@ FEED_PRECISION = 0.90
 FEED_MIN_BIN = 3
 # Computed by threshold_from_bins on docs/learn/data/02-thresholds{,-2b}.json pooled;
 # test_stories.py recomputes them from the committed files.
-TAU_FEED_BY_PAIR: dict[PairType, float] = {
+COMPUTED_TAU_FEED: dict[PairType, float] = {
     ("title", "title"): 0.875,
     ("title", "title_summary"): 0.75,
     ("title_summary", "title_summary"): 0.875,
+}
+# ADR 0013's pre-registered fallback: a pair type whose reviewed merges included two
+# different stories uses its tau_story instead. title-title: the P3e persona replay's
+# sampled story-cap drops held three different AP news-digest pages (templated
+# "summary at <time>" headlines, different content) at cos 0.89-0.92
+# (docs/learn/data/03-personas.json; examples in the P3e PR, not in the repo).
+FALLBACK_TO_TAU_STORY: frozenset[PairType] = frozenset({("title", "title")})
+TAU_FEED_BY_PAIR: dict[PairType, float] = {
+    pt: VALIDATED_BY_PAIR[pt][1] if pt in FALLBACK_TO_TAU_STORY else tau
+    for pt, tau in COMPUTED_TAU_FEED.items()
 }
 
 BIN_KEYS: dict[str, PairType] = {
