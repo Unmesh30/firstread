@@ -1,5 +1,6 @@
 """The reader's own profile: GET/DELETE /v1/me, PUT /v1/me/topics."""
 
+import structlog
 from fastapi import APIRouter, Depends, Request, Response
 
 from firstread_api import redis_state, repo
@@ -8,6 +9,7 @@ from firstread_api.deps import Services, ensure_profile, forget_profile, limit_i
 from firstread_api.errors import ERROR_RESPONSES, request_id_of
 from firstread_api.schemas import HistoryItem, MeResponse, TopicsUpdate
 
+log = structlog.get_logger("firstread_api.me")
 router = APIRouter(tags=["me"], dependencies=[Depends(limit_ip)], responses=ERROR_RESPONSES)
 
 
@@ -52,7 +54,10 @@ async def set_my_topics(
         q = repo.Q(conn)
         await ensure_profile(svc, q, who)
         await repo.set_topics(q, who.user_id, body.topics)
-    await svc.redis.delete(redis_state.slate_key(who.user_id))  # the next page re-ranks
+    try:  # best effort, like the events route: topics are saved in Postgres already
+        await svc.redis.delete(redis_state.slate_key(who.user_id))  # the next page re-ranks
+    except Exception as exc:
+        log.warning("topics_slate_delete_failed", error=type(exc).__name__)
     return await _me(request, svc, who)
 
 

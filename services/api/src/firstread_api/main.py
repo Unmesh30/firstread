@@ -7,6 +7,8 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.routing import APIRoute
 from redis.asyncio import Redis
+from redis.asyncio.retry import Retry
+from redis.backoff import NoBackoff
 
 from firstread_api import __version__, errors
 from firstread_api.articles_cache import ArticlesCache
@@ -27,6 +29,17 @@ from firstread_api.routes import events, feed, me, ops, topics
 from firstread_core.db import create_pool
 from firstread_core.ranking import load_config
 from firstread_core.release import ENCODER_FILES
+
+
+def redis_client(settings: Settings) -> Redis:
+    """Fail fast: short socket and connect timeouts, at most one immediate retry, so a
+    hanging Redis costs a request well under its deadline (ADR 0017)."""
+    return Redis.from_url(
+        settings.redis_url.get_secret_value(),
+        socket_timeout=settings.redis_socket_timeout_s,
+        socket_connect_timeout=settings.redis_connect_timeout_s,
+        retry=Retry(NoBackoff(), settings.redis_retries),
+    )
 
 
 def load_batcher(settings: Settings) -> MicroBatcher | None:
@@ -66,7 +79,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         min_size=0,
         max_size=settings.db_pool_max,
     )
-    redis = CountingRedis(Redis.from_url(settings.redis_url.get_secret_value()))
+    redis = CountingRedis(redis_client(settings))
     per_min = {
         "ip": settings.rl_ip_per_min,
         "feed": settings.rl_user_feed_per_min,
@@ -80,7 +93,11 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         redis=redis,
         verifier=Verifier(settings, JWKSCache(settings)),
         limits={k: RateLimiter(v, settings.rl_max_keys) for k, v in per_min.items()},
-        pools=PoolsCache(redis, settings.api_pools_check_s),
+        pools=PoolsCache(
+            redis,
+            settings.api_pools_check_s,
+            refresh_timeout_s=settings.api_pools_refresh_timeout_s,
+        ),
         articles=ArticlesCache(settings.api_article_cache),
         batcher=batcher,
         ranking=load_config(settings.api_ranking_version),

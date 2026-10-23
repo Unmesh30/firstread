@@ -6,6 +6,9 @@
 * Single-flight: one refresh at a time. The request that triggers it awaits it (a
   couple of Redis round trips), so no work outlives a response (Cloud Run's
   request-based billing); concurrent requests keep using the current copy.
+* The refresh (both GETs) has its own deadline (``API_POOLS_REFRESH_TIMEOUT_S``,
+  0.3 s): a hanging Redis must not hold every cold-instance request until the feed's
+  1 s deadline. Past it, the refresh counts as ``timeout`` and changes nothing.
 * A blob whose internal version differs from ``pools:ver``, of an unknown schema, or
   missing keeps the last good copy until the next publish. A cold instance with no
   copy yet serves ANN-only. There's never a per-request SQL fallback (egress).
@@ -28,10 +31,15 @@ log = structlog.get_logger("firstread_api.pools")
 
 class PoolsCache:
     def __init__(
-        self, redis: Any, check_every_s: float = 60.0, clock: Callable[[], float] = time.monotonic
+        self,
+        redis: Any,
+        check_every_s: float = 60.0,
+        clock: Callable[[], float] = time.monotonic,
+        refresh_timeout_s: float = 0.3,
     ) -> None:
         self.redis = redis
         self.check_every_s = check_every_s
+        self.refresh_timeout_s = refresh_timeout_s
         self.clock = clock
         self.snapshot: pools.PoolSnapshot | None = None
         self.checked_at = -1e18
@@ -56,6 +64,14 @@ class PoolsCache:
         self._refreshing = None
 
     async def _refresh(self) -> None:
+        try:
+            async with asyncio.timeout(self.refresh_timeout_s):
+                await self._fetch()
+        except TimeoutError:
+            POOLS_REFRESH.labels("timeout").inc()
+            log.warning("pool_snapshot_refresh_timeout", timeout_s=self.refresh_timeout_s)
+
+    async def _fetch(self) -> None:
         try:
             raw = await self.redis.get(pools.VER_KEY)
             if raw is None:
