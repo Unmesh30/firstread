@@ -170,3 +170,36 @@ Full table: `ml/reports/ranking-mind-large-dev.md`.
 - **Cold start,** on the 32,284 sampled impressions whose users have stated-topic proxies (blend + MMR): giving zero-click readers the topic vector instead of the population vector raises cold-user nDCG@10 from 0.3628 to 0.3700 (+2.0%), with overall 0.4099 → 0.4102. With k = 0 that is the only place topics act.
 
 **Against SPEC §11's quality target:** the shipped model already beats the best baseline (ADR 0003/model card), and the blend keeps it ahead overall and on cold candidates.
+
+## Amendment (2026-10-23): rank-2 sets k = 3 as a product decision
+
+**Decision (owner, PR #17 review):** `rank-2.yaml` is identical to `rank-1` except `cold_start_k: 3.0` and `cold_start_k_source: judgment`.
+- It is the default (`model_version` = `v0.2.0+rank-2`).
+- `rank-1.yaml` stays for the record; both files' SHA-256s are pinned.
+- The holdout rules and the rank-1 dev report above are unchanged.
+- **Dev is not re-run:** dev was looked at once, for rank-1, and this change isn't tuned on anything.
+
+**Why k = 3:**
+- **With k = 0, one click replaces a new reader's chosen topics entirely.** NRMS-lite's residual weight α is about 0.02 (model card), so after one click the user vector is essentially that article.
+- SPEC §7.4 asks for the topic vector to be *blended* with the click vector as clicks arrive.
+- **rank-1's rule looked only at readers with ≤ 2 clicks,** where k barely matters (1–2 clicks: 0.3262 at k = 0 vs 0.3255 at k = 3, within noise).
+- **On the same holdout, k = 2–3 helps readers with 3–10 clicks** by about 3–4% (3–5 clicks: 0.3685 → 0.3838; 6–10 clicks: 0.3958 → 0.4117).
+- **A new MIND study wouldn't settle it,** because the stated-topic proxy is revealed interest, not stated.
+- **k = 3 is the plan's pre-registered judgment value** (step 3's fallback): topics dominate until about 3 clicks, then half weight.
+
+**Holdout k sweep** (stated-topic users, blend + MMR, nDCG@10; from `ml/reports/ranking-mind-small-holdout.md`):
+
+| k | stated_overall | history_0-0 | history_1-2 | history_3-5 | history_6-10 | history_11-50 | stated_cold_users |
+|---:|---:|---:|---:|---:|---:|---:|---:|
+| 0.0 | 0.3787 | 0.3065 | 0.3262 | 0.3685 | 0.3958 | 0.3846 | 0.3151 |
+| 0.5 | 0.3796 | 0.3065 | 0.3227 | 0.3806 | 0.3979 | 0.3852 | 0.3135 |
+| 1.0 | 0.3807 | 0.3065 | 0.3249 | 0.3825 | 0.4017 | 0.3863 | 0.3145 |
+| 2.0 | 0.3820 | 0.3065 | 0.3247 | 0.3844 | 0.4067 | 0.3878 | 0.3144 |
+| 3.0 | 0.3833 | 0.3065 | 0.3255 | 0.3838 | 0.4117 | 0.3891 | 0.3148 |
+| 5.0 | 0.3832 | 0.3065 | 0.3198 | 0.3782 | 0.4055 | 0.3903 | 0.3123 |
+| 10.0 | 0.3816 | 0.3065 | 0.3127 | 0.3660 | 0.3990 | 0.3888 | 0.3092 |
+| 20.0 | 0.3761 | 0.3065 | 0.3147 | 0.3484 | 0.3821 | 0.3819 | 0.3101 |
+
+- The zero-click column is identical by construction: with no clicks, the topic vector is used whatever k is.
+
+**Follow-up check, P3e persona replay ("new reader"):** a reader follows 3 topics, then clicks one off-topic story. Report the share of page-2 items from the followed topics vs the clicked story's topic, under rank-1 and rank-2.
