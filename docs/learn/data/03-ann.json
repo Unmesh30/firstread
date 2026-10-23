@@ -3,34 +3,88 @@
  "postgres": "local Docker (pgvector/pgvector:0.8.7-pg17, Docker Desktop 4 GB)",
  "rows": 72000,
  "rows_in_72h_window": 14400,
- "build_seconds": 55.4,
+ "build_seconds": 56.6,
  "queries": 200,
  "runs_per_query": 3,
  "limit": 200,
  "results": {
   "exact": {
-   "p50_ms": 4.9,
-   "p95_ms": 5.28,
+   "p50_ms": 5.19,
+   "p95_ms": 5.83,
    "recall_at_200": 1.0,
    "min_recall": 1.0,
    "mean_results": 200.0
   },
   "hnsw_ef200": {
-   "p50_ms": 4.74,
-   "p95_ms": 5.57,
-   "recall_at_200": 0.9828,
-   "min_recall": 0.935,
+   "p50_ms": 4.83,
+   "p95_ms": 5.51,
+   "recall_at_200": 0.9836,
+   "min_recall": 0.94,
    "mean_results": 200.0
   },
   "hnsw_ef400": {
-   "p50_ms": 4.53,
-   "p95_ms": 5.29,
-   "recall_at_200": 0.9831,
-   "min_recall": 0.935,
+   "p50_ms": 4.59,
+   "p95_ms": 5.35,
+   "recall_at_200": 0.984,
+   "min_recall": 0.94,
    "mean_results": 200.0
   }
  },
  "rule": "HNSW if recall@200 >= 0.95 and p95 <= exact p95; otherwise exact",
- "decision": "exact",
- "hnsw_plan_uses_index": true
+ "decision": "hnsw_ef400",
+ "hnsw_plan_uses_index": true,
+ "query": "the shipped shape: 72 h window + excluded ids, sources, read clusters and hidden articles' clusters (empty here)",
+ "repeats": [
+  {
+   "exact": {
+    "p95_ms": 5.75,
+    "recall_at_200": 1.0
+   },
+   "hnsw_ef200": {
+    "p95_ms": 5.61,
+    "recall_at_200": 0.9832
+   },
+   "hnsw_ef400": {
+    "p95_ms": 5.36,
+    "recall_at_200": 0.9834
+   },
+   "decision": "hnsw_ef400"
+  },
+  {
+   "exact": {
+    "p95_ms": 5.63,
+    "recall_at_200": 1.0
+   },
+   "hnsw_ef200": {
+    "p95_ms": 5.59,
+    "recall_at_200": 0.9831
+   },
+   "hnsw_ef400": {
+    "p95_ms": 5.52,
+    "recall_at_200": 0.9834
+   },
+   "decision": "hnsw_ef400"
+  },
+  {
+   "exact": {
+    "p95_ms": 5.83,
+    "recall_at_200": 1.0
+   },
+   "hnsw_ef200": {
+    "p95_ms": 5.51,
+    "recall_at_200": 0.9836
+   },
+   "hnsw_ef400": {
+    "p95_ms": 5.35,
+    "recall_at_200": 0.984
+   },
+   "decision": "hnsw_ef400"
+  }
+ ],
+ "previous_query_shape": {
+  "note": "before the story filters (commit 51fe0cf): exact won by 0.01 ms p95",
+  "exact_p95_ms": 5.28,
+  "hnsw_ef400_p95_ms": 5.29,
+  "decision": "exact"
+ }
 }

@@ -45,8 +45,8 @@ class Settings(BaseSettings):
     api_encoder_batching: bool = True  # P6 compares on and off
     api_batch_max: int = 32
     api_batch_wait_ms: float = 5.0
-    api_ann_mode: Literal["exact", "hnsw"] = "exact"  # docs/learn/data/03-ann.json
-    api_ann_ef_search: int = 200
+    api_ann_mode: Literal["exact", "hnsw"] = "hnsw"  # docs/learn/data/03-ann.json
+    api_ann_ef_search: int = 400  # the benchmark's winner (03-ann.json)
     api_vec_ttl_s: int = 600  # cached user vectors (SPEC: 10 min)
     api_pools_check_s: float = 60.0
     api_article_cache: int = 20_000
