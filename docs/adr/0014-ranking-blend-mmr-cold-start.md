@@ -203,3 +203,17 @@ Full table: `ml/reports/ranking-mind-large-dev.md`.
 - The zero-click column is identical by construction: with no clicks, the topic vector is used whatever k is.
 
 **Follow-up check, P3e persona replay ("new reader"):** a reader follows 3 topics, then clicks one off-topic story. Report the share of page-2 items from the followed topics vs the clicked story's topic, under rank-1 and rank-2.
+
+### Result of the new-reader check (P3e persona replay, 2026-10-23)
+
+**Setup:** a reader follows 3 topics, reads page 1, clicks the top trending story outside those topics, then reads page 2. Run with the real API at the 16 steady clock times of the replay (≥ 24 h of news), for 3 topic sets (sports/health/entertainment, business/tech/politics, world/travel/food), under rank-1 and rank-2. 48 readers each, 960 page-2 items each. `docs/learn/data/03-personas.json`, `new_reader_check`.
+
+| Page 2 items | rank-1 (k = 0) | rank-2 (k = 3) |
+|---|---:|---:|
+| from the 3 followed topics | 11.5% | **51.3%** |
+| from the clicked story's topic | 47.3% | **12.5%** |
+
+- **With k = 0, one off-topic click takes over the feed:** almost half of page 2 comes from the clicked topic and about a tenth from the topics the reader chose.
+- **With k = 3 the chosen topics keep about half of page 2** (75% topic weight after one click), and the click still shows.
+- The rest of page 2 (36% under rank-2, 41% under rank-1) is neither: trending and fresh stories from other topics.
+- This supports the owner's rank-2 decision. It is a behavioural check, not an accuracy measurement (there are no live clicks yet).

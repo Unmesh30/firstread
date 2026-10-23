@@ -1,6 +1,6 @@
 # ADR 0011: Free-tier budgets as hard constraints
 
-- Status: Accepted (ingestion measured on the replay; sessions estimated, re-measured in P3e and against the real usage pages in P5)
+- Status: Accepted (ingestion measured on the replay; sessions measured on the local stack in P3e, 2026-10-23; P5 checks both against the real usage pages)
 - Date: 2026-10-18
 
 ## Context
@@ -33,17 +33,34 @@ Every design choice in Phase 3 is costed per ingestion run and per feed session 
 
 **Demo traffic level:** 100 feed sessions a day (3,000 a month).
 
-| Resource | Quota | Per ingestion run | Per feed session | At 100 sessions/day | Sessions/day the budget allows |
-|---|---|---|---|---|---|
-| Supabase egress | 5 GB | **84 KB measured** (replay median; p95 86 KB): window delta, check, trending aggregates, bookkeeping → 0.24 GB/month, plus ~4 full window reloads × 14 MB | ~200 KB (2 computed pages × ~96 KB, plus events and profile) | ~0.9 GB (18%) | ~790 |
-| Supabase DB size | 500 MB (target 400; guard from 350) | articles ~227 MB and coverage ~13 MB at steady state | events (impressions kept 7 days), history ≤ 50 rows/user, slates | ~280 MB | ~400 before the 350 MB guard |
-| Upstash commands | 300K (SPEC) / 500K | **3** (blob, version, expire previous) → 8.6K/month | ~28 | ~108K (36%) | **~330 (binding)**; ~570 against 500K |
-| Upstash bandwidth | 10 GB | one blob write, **192 KB measured** → 0.55 GB/month | ~160 KB | 0.5 GB + blob writes 0.55 GB + blob reads 0.55–1.7 GB (1–3 instances) = ≤ 2.7 GB | ~1,500 |
-| Upstash memory | 250 MB | 1 live blob (2 briefly) | ~60 KB per active reader (7-day TTL) | ~30 MB | ~4,000 weekly-active readers |
-| Cloud Run requests | 2M | — | ~10 | 30K (1.5%) | ~6,600 |
-| Cloud Run vCPU-s | 180K | — | ~1 (100 ms rounding, 1 vCPU), plus cold starts | ~6K (3%) | ~5,600 |
+### Measured per session (P3e, 2026-10-23)
 
-**Binding constraint: Upstash commands**, at ~330 sessions a day under SPEC's 300K cap.
+`loadtest/session_cost.py` runs ADR 0011's session against the API image at Cloud Run's shape (1 vCPU, 512 MiB) on the local stack and reads the API's own counters (`redis_commands_total`, `db_bytes_estimated_total`) and Redis' `INFO` network bytes around it. The session: `GET /v1/me`; page 1; 20 impressions + a click; page 2 (re-ranked); 20 impressions; page 3 (from the slate); a click; one `/why`. That is 8 requests (estimated: ~10). Results in `loadtest/results/session-*.json`.
+
+| Instance and reader | Redis commands | Postgres egress (est.) | Redis bytes (both ways) | Billable time |
+|---|---:|---:|---:|---:|
+| **Cold instance** (just restarted: no snapshot, empty article cache), reader with no Redis state | 37 | 373 KB | 289 KB (incl. the 193 KB blob) | 0.8 s |
+| Warm instance, reader's first session (Redis state rebuilt: +5 commands) | 35 | 178 KB (median of 20) | 96 KB | 0.8 s |
+| **Warm instance, returning reader** | **30** | **153 KB** (median of 20) | **106 KB** | 0.8 s |
+
+- **Commands, returning reader:** page 1: 4 reads + slate `SET` + vector cache `HSET`/`EXPIRE` = 7; click batch 5 (impressions 2, click 3); page 2 re-rank 8; impression batch 2; page 3 from the slate 3; click 3; `/why` 2. The estimate was 28; ADR 0017's per-page counts were right, the vector-cache writes were not in the estimate.
+- **Egress:** per computed page, the pool cosines (~600 rows × ~70 B) are the largest part, then ANN (200 × 70 B). The estimates were ~115 KB warm and ~290 KB cold; the measured 153 KB and 373 KB are higher because `/why`, the history titles and the first page's history rebuild were not in them.
+- The egress column is the API's estimate from result sizes (`rows_bytes`), not wire bytes; P5 compares it with Supabase's usage page.
+
+### The table, with measured sessions
+
+| Resource | Quota | Per ingestion run | Per feed session (measured) | At 100 sessions/day | Sessions/day the budget allows |
+|---|---|---|---|---|---|
+| Supabase egress | 5 GB | **84 KB measured** (replay median; p95 86 KB): window delta, check, trending aggregates, persona summaries (~2 KB), bookkeeping → 0.25 GB/month, plus ~4 full window reloads × 14 MB | **153 KB warm, 373 KB cold** | 0.3 GB + 0.46–1.1 GB = 0.8–1.4 GB (15–28%) | **~1,000 warm, ~420 cold** |
+| Supabase DB size | 500 MB (target 400; guard from 350) | articles ~227 MB and coverage ~13 MB at steady state; personas ~0.1 MB | events (impressions kept 7 days), history ≤ 50 rows/user, slates | ~280 MB | ~400 before the 350 MB guard |
+| Upstash commands | 300K (SPEC) / 500K | **3** (blob, version, expire previous) → 8.6K/month | **30 returning, 35 first visit, 37 cold** | 8.6K + pool checks ~15K + 90–111K = 114–135K (38–45%) | **~250–310 (binding)**; ~430–530 against 500K |
+| Upstash bandwidth | 10 GB | one blob write, **193 KB measured** (with personas) → 0.56 GB/month | **106 KB warm, 289 KB cold** | 0.32–0.87 GB + blob writes 0.56 GB + blob reads 0.56–1.7 GB (1–3 instances) ≤ 3.1 GB | ~2,400–2,800 warm, ~900 cold |
+| Upstash memory | 250 MB | 1 live blob (2 briefly) | ~60 KB per active reader (7-day TTL) | ~30 MB | ~4,000 weekly-active readers |
+| Cloud Run requests | 2M | — | 8 | 24K (1.2%) | ~8,300 |
+| Cloud Run vCPU-s | 180K | — | ≤ 0.8 (8 requests, 100 ms rounding, sequential), plus cold starts (~0.8 s each) | ~2.4K (1.3%) | ~7,500 |
+| Cloud Run GiB-s | 360K | — | ≤ 0.4 (512 MiB) | ~1.2K | ~30,000 |
+
+**Binding constraint: still Upstash commands,** at about 250–310 sessions a day under SPEC's 300K cap (estimated: ~330). Supabase egress comes next on cold instances (~420 a day if every session hit a cold instance).
 
 **Design rules that follow:**
 - Ingestion keeps the 72 h window on the runner and publishes pools as one blob ([ADR 0012](0012-runner-window-and-pool-snapshot.md)).
@@ -62,6 +79,6 @@ Every design choice in Phase 3 is costed per ingestion run and per feed session 
 
 ## Consequences
 
-- Each Phase 3 PR states its cost against this table, and P3e replaces the session estimates with numbers measured in the load test.
-- Above ~330 sessions a day the first thing to give is Redis commands: the next levers are fewer impression batches per session and a longer user-vector cache.
+- Each Phase 3 PR states its cost against this table; P3e replaced the session estimates with measured numbers (above).
+- Above ~250–300 sessions a day the first thing to give is Redis commands. The levers, in order of commands saved per session: skip the user-vector cache write when the encoder is cheap (it costs 2 per computed page and saves at most an encode, 0.7 ms), batch impressions less often (2 per batch), and a longer page cache.
 - P5 compares the estimates with Supabase's and Upstash's usage pages.

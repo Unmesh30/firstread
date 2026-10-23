@@ -53,3 +53,8 @@ Also:
 - pgvector lives in the `extensions` schema (Supabase convention, also locally), which isn't on the local `search_path`: write `extensions.halfvec(384)` and `OPERATOR(extensions.<#>)` explicitly in SQL.
 - Supabase egress (5 GB/month, pooler egress included) and Upstash commands (every pipelined command billed) are budgets, not afterthoughts: never select vectors in bulk per run or per request. Ingestion keeps the 72 h window on the runner (ADR 0012); cost every new query against ADR 0011.
 - The `auth` schema belongs to Supabase: never create tables or functions in it. Migration 0007 shims `auth.users`/`auth.uid()` only where `auth` doesn't exist (local); user tables reference `auth.users` with cascade delete and get owner-only `select` policies (ADR 0016).
+- Session settings don't survive the transaction pooler: set per-query planner options (`hnsw.ef_search`, `hnsw.iterative_scan`) with `SET LOCAL` inside the query's transaction (ADR 0017).
+- On Postgres 17 an HNSW iterative scan must be re-sorted in a `MATERIALIZED` CTE with `ORDER BY d + 0`; without the `+ 0` the planner skips the re-sort (pgvector README).
+- Cloud Run bills CPU only during requests: no background tasks, timers or work after the response. Refresh caches lazily inside requests and write everything before responding.
+- `halfvec` has no `=` operator: compare stored vectors as `::text` in SQL tests.
+- Public endpoints (`/v1/stats`, `/v1/demo/personas`) are served from the pool snapshot: never add a Postgres read to them (most anonymous traffic lands there; ADR 0018).

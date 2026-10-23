@@ -14,7 +14,7 @@ Most recommenders learn from clicks, so a brand-new article is invisible until p
 | Area | Tech |
 |---|---|
 | App | Expo (React Native + TypeScript, Expo Router), web on GitHub Pages |
-| API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run; a seven-stage feed with per-stage deadlines and tested degraded modes, the user encoder micro-batched across requests, HNSW candidates ([ADR 0017](docs/adr/0017-feed-serving-pipeline.md)) |
+| API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run; a seven-stage feed with per-stage deadlines and tested degraded modes, the user encoder micro-batched across requests, HNSW candidates ([ADR 0017](docs/adr/0017-feed-serving-pipeline.md)); demo personas from live news, "Why this?" and public stats ([ADR 0018](docs/adr/0018-personas-why-stats.md)) |
 | Ingestion | GDELT GKG files + RSS feeds with explicit publisher permission, every 15 min on GitHub Actions; the 72 h dedupe window stays on the runner (~84 KB of database egress a run) and pools are published as one versioned Redis snapshot ([ADR 0012](docs/adr/0012-runner-window-and-pool-snapshot.md)) |
 | ML | PyTorch (NRMS-lite user encoder), `bge-small-en-v1.5` embeddings, trained/evaluated on MIND |
 | Data | Supabase Postgres + pgvector, Upstash Redis |
@@ -45,6 +45,19 @@ curl -X PUT localhost:8000/v1/me/topics -H "$H" -H 'Content-Type: application/js
   -d '{"topics": ["world", "business", "tech_science"]}'
 curl -i "localhost:8000/v1/feed?limit=5" -H "$H"    # see the Server-Timing header
 ```
+
+Or try a demo reader built from live news, and ask why an item was shown:
+
+```bash
+curl localhost:8000/v1/demo/personas
+D="X-Dev-User: $(uuidgen | tr A-Z a-z)"     # a new reader (one with topics gets 409 unless ?replace=true)
+curl -X POST localhost:8000/v1/demo/personas/markets-tech/activate -H "$D"
+curl "localhost:8000/v1/feed?limit=5" -H "$D"
+curl "localhost:8000/v1/articles/<an id from that feed>/why" -H "$D"
+curl localhost:8000/v1/stats
+```
+
+**Local performance** (API container at Cloud Run's shape: 1 vCPU, 512 MiB; Postgres and Redis local): p95 server time **21 ms at 50 RPS**, ~70 RPS per instance before it saturates, so SPEC's 100 RPS takes two instances. A feed session costs 30–37 Redis commands and 153–373 KB of database egress, which keeps the demo free up to ~250–300 sessions a day ([learn chapter 03](docs/learn/03-recommendation-api.md), `make loadtest`).
 
 `make help` lists every command. The step-by-step explanation of the tooling is in [docs/learn/00-bootstrap.md](docs/learn/00-bootstrap.md).
 
