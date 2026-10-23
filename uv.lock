@@ -573,6 +573,7 @@ version = "0.1.0"
 source = { editable = "packages/core" }
 dependencies = [
     { name = "numpy" },
+    { name = "pyyaml" },
 ]
 
 [package.optional-dependencies]
@@ -588,6 +589,7 @@ requires-dist = [
     { name = "asyncpg", marker = "extra == 'db'", specifier = "==0.32.0" },
     { name = "fastembed", marker = "extra == 'embed'", specifier = "==0.9.0" },
     { name = "numpy", specifier = ">=2.5.4" },
+    { name = "pyyaml", specifier = ">=6.0.3" },
 ]
 provides-extras = ["embed", "db"]
 

@@ -3,7 +3,7 @@ name = "firstread-core"
 version = "0.1.0"
 description = "Shared code for FirstRead: text, embeddings, features, schemas."
 requires-python = ">=3.12,<3.13"
-dependencies = ["numpy>=2.5.4"]
+dependencies = ["numpy>=2.5.4", "pyyaml>=6.0.3"]
 
 [project.optional-dependencies]
 # The embedding backend (ONNX Runtime + tokenizers). ml and ingest install it;
