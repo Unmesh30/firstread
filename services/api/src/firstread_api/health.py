@@ -10,7 +10,6 @@ from typing import Any, Literal
 
 import structlog
 from pydantic import BaseModel
-from redis.asyncio import Redis
 
 log = structlog.get_logger("firstread_api.health")
 
@@ -37,7 +36,7 @@ def postgres_check(pool: Any) -> Check:
     return check
 
 
-def redis_check(client: "Redis") -> Check:
+def redis_check(client: Any) -> Check:
     """Send `PING` to Redis."""
 
     async def check() -> None:

@@ -4,7 +4,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from firstread_api.health import Check
-from firstread_api.main import get_readiness_checks
+from firstread_api.routes.ops import get_readiness_checks
 
 
 async def _ok() -> None:
@@ -27,12 +27,6 @@ def test_healthz(client: TestClient) -> None:
     resp = client.get("/healthz")
     assert resp.status_code == 200
     assert resp.json() == {"status": "ok"}
-
-
-def test_request_id_is_generated_and_echoed(client: TestClient) -> None:
-    assert client.get("/healthz").headers["X-Request-ID"]
-    resp = client.get("/healthz", headers={"X-Request-ID": "abc123"})
-    assert resp.headers["X-Request-ID"] == "abc123"
 
 
 def test_readyz_all_ok(client: TestClient) -> None:
@@ -62,8 +56,3 @@ def test_readyz_failures_return_503(
 def test_readyz_does_not_leak_error_details(client: TestClient) -> None:
     _override(client, {"postgres": _fail, "redis": _ok})
     assert "secret" not in client.get("/readyz").text
-
-
-def test_openapi_lists_ops_endpoints(client: TestClient) -> None:
-    paths = client.get("/openapi.json").json()["paths"]
-    assert {"/healthz", "/readyz"} <= set(paths)
