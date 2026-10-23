@@ -48,7 +48,14 @@ from firstread_api.candidates import Candidate, Exclusions, ann, pool_scores
 from firstread_api.deps import Services
 from firstread_api.errors import ApiError
 from firstread_api.metrics import DEGRADED, FEED_STAGE, HISTORY_REBUILDS
-from firstread_api.slate import Cursor, Slate, SlateItem, cursor_expired, new_slate_id
+from firstread_api.slate import (
+    MAX_SERVED,
+    Cursor,
+    Slate,
+    SlateItem,
+    cursor_expired,
+    new_slate_id,
+)
 from firstread_core import pools, stories
 from firstread_core.embedding import l2_normalize
 from firstread_core.features import mean_history_vector, pad_history
@@ -230,6 +237,11 @@ class FeedPipeline:
                     slate = None
         if slate is not None and slate.id != cursor.slate_id:
             slate = None  # a newer first page replaced it
+        if slate is not None and len(slate.served) < min(cursor.offset, MAX_SERVED):
+            # Behind the cursor: a page was served and recorded in served_slates but
+            # its slate write was lost (Redis failed then). Served ids come from
+            # Postgres, or the next page would repeat what the reader just saw.
+            slate = None
         if slate is None:
             slate = await self._slate_from_postgres(cursor)
         if hidden is None:
@@ -306,7 +318,8 @@ class FeedPipeline:
             )
         if not rows:
             raise cursor_expired()
-        served = [str(a) for r in rows for a in r["article_ids"]]
+        # Once each (a repeat within 60 s records the same ids again), oldest first.
+        served = list(dict.fromkeys(str(a) for r in rows for a in r["article_ids"]))
         return Slate(cursor.slate_id, -1, "", [], served, {}, int(rows[-1]["page"]) + 1)
 
     async def _quiet(self, aw: Awaitable[Any]) -> None:
