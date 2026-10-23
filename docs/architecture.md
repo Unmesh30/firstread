@@ -45,7 +45,7 @@ flowchart LR
 | Component | Tech | Runs on |
 |---|---|---|
 | `apps/mobile` | Expo SDK 57 (React Native + TypeScript strict + Expo Router) | GitHub Pages (web) now; EAS builds later |
-| `services/api` | Python 3.12, FastAPI, uvicorn, asyncpg, redis-py, pydantic-settings, structlog | Google Cloud Run (us-east1) |
+| `services/api` | Python 3.12, FastAPI, uvicorn, asyncpg, redis-py, ONNX Runtime (user encoder only, files baked and verified at build), pydantic-settings, structlog | Google Cloud Run (us-east1) |
 | `services/ingest` | Python 3.12, httpx, feedparser, fastembed, asyncpg | GitHub Actions scheduled workflow |
 | `ml` | Python 3.12, PyTorch, scikit-learn, MLflow, ONNX export (onnx, onnxscript, skl2onnx, onnxruntime) | Local Mac; Kaggle/Colab fallback |
 | `packages/core` | Shared Python: text cleaning, URL canonicalization, embeddings, features, schemas | Imported by ml, ingest, api |
@@ -95,7 +95,7 @@ flowchart LR
   DIR -->|make release-upload<br/>clean main == origin/main| HUB[(HF Hub Unmesh30/firstread-models<br/>tag vX.Y.Z)]
   HUB -->|re-download + verify hashes| OK[git tag vX.Y.Z = manifest git_commit<br/>+ GitHub release linking the Hub]
   HUB -.->|P2 pins v0.2.0| ING[ingest: topic classifier]
-  HUB -.->|P3 pins tag| API2[API: user encoder]
+  HUB -.->|P3: Docker models stage<br/>downloads + verifies v0.2.0| API2[API: user encoder]
 ```
 
 - Hub repo: [Unmesh30/firstread-models](https://huggingface.co/Unmesh30/firstread-models), releases [`v0.1.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.1.0) and [`v0.2.0`](https://huggingface.co/Unmesh30/firstread-models/tree/v0.2.0) (topic classifier; user encoder inherited from v0.1.0 by hash, ADR 0006).
@@ -128,6 +128,25 @@ flowchart LR
   PG -->|story_coverage aggregate| POOLS
 ```
 
+## Feed serving (Phase 3d)
+
+```mermaid
+flowchart LR
+  REQ[GET /v1/feed] --> AU[1 auth<br/>cached JWKS]
+  AU --> ST[2 state<br/>Redis reads ∥ profile row<br/>version check, rebuild]
+  ST -->|cursor page, nothing changed| SL[(slate in Redis<br/>next items, no re-rank)]
+  ST -->|first page, click, hide, slate low| EN[3 encode<br/>cached vec or micro-batched ONNX<br/>+ cold-start topic blend]
+  EN --> CA[4 candidates ∥<br/>ANN HNSW top-200 · pool cosines<br/>exclusions in SQL]
+  PC[(in-process pool snapshot<br/>refreshed ≤ 1/min)] --> CA
+  CA --> HY[5 hydrate top 150<br/>article LRU, misses in 1 query]
+  HY --> RK[6 rank<br/>τ_story read filter · story groups<br/>MMR, 2 per story across pages · reasons]
+  RK --> PE[7 persist<br/>served_slates, then Redis slate]
+  SL --> PE
+  PE --> RES[page + next_cursor<br/>Server-Timing, degraded]
+```
+
+Each stage has a deadline and a tested way to fail; the table is in [ADR 0017](adr/0017-feed-serving-pipeline.md). Measured locally, a page costs 3–8 Redis commands and 0.1–77 KB of Postgres egress depending on whether it re-ranks; a first page on a cold instance costs ~209 KB (the article cache is empty).
+
 ## Status by phase
 
 | Phase | What exists |
@@ -135,7 +154,7 @@ flowchart LR
 | **P0 Bootstrap** ✅ | uv workspace (4 members), FastAPI `/healthz` + `/readyz`, structlog JSON logs, Expo app placeholder with web export under `/firstread`, Docker Compose stack, Makefile, pre-commit, CI (`python`, `mobile`, `docker`, `secrets`), Dependabot, docs |
 | **P1 Offline ML** ✅ | **1a:** license-gated, SHA-pinned MIND download; parquet loader; shared embedder (`packages/core`, pinned bge-small revision, golden test, cache key); eval harness (AUC/MRR/nDCG, cold-candidate/cold-user/category slices, time-based holdout); baselines (random, popularity, recency, mean-history); EDA; synthetic CI eval gate. **1b:** NRMS-lite user encoder (identity item tower, ADR 0004), 3-seed results with paired bootstrap CIs, category classifier, MLflow (sqlite) tracking, `make reproduce`; beats every baseline on MIND-large dev overall and on cold-start. **1c:** ONNX export (user encoder, classifier) with parity tests, ONNX-based real-data eval gate, release builder with SHA256 manifest, model card, HF Hub release `v0.1.0`. |
 | P2 Ingestion | **2a-ml:** title-only skew study (titles alone cost the user encoder 2.1% relative nDCG@10), 13 app topics in `packages/core` with the shared `resolve_topic` rule, reviewed MIND subcategory → topic map, topic classifier trained on title+abstract and title-only embeddings, release builder that inherits the v0.1.0 user encoder byte for byte (release `v0.2.0`, ADR 0006). **2a:** Postgres schema as SQL migrations with RLS on every table, checked on the Supabase image in CI (ADR 0008); RSS adapter (conditional GET, per-host serial, only feeds with explicit website permission) and GDELT GKG adapter (catch-up cursor, domain placement, blocklist, breadth-ranked topic-aware cap) (ADR 0007); URL canonicalization, title fingerprints, validated per-pair-type near-duplicate and story-clustering thresholds (ADR 0009); topic classification with the v0.2.0 classifier; idempotent upsert. A run inserts about 220 articles from a cold start (169 RSS + 50 GDELT) and 0 when repeated. **2b:** press-release filter (press-wire domains, PR-shaped titles); retention (articles 14 d, coverage 48 h); Redis pools (fresh, 13 topics, trending by outlet breadth with a 6 h half-life) rebuilt from Postgres within 30 commands per run (ADR 0010); per-story cap in GDELT selection; replay of archived GKG files with a stepped clock (steady state: 4,800 articles/day, ~227 MB for 14 days, all pools full); GDELT↔GDELT story threshold raised to 0.925 after a replay-based re-check; manual-dispatch `ingest.yml` with a Markdown job summary. Live topic accuracy 0.79 (LLM-labeled, independently spot-checked). |
-| P3 API (in progress) | **3a:** runner-side 72 h window snapshot in the Actions cache (delta + count/max/id-checksum, any mismatch reloads), cutting ingestion egress from ~14 MB to 84 KB a run with identical dedupe decisions (0 of 267,877 changed on the replay) (ADR 0012); pools published as one versioned blob in 3 commands a run (ADR 0012); trending v2: split stories merged by complete linkage at τ_feed, syndication networks counted once, representatives by quality (ADR 0013); free-tier budget table (ADR 0011). **3b:** ranking in `packages/core` (freshness, per-request normalization, rank-only trend feature, blend, MMR with a 2-per-story cap, cold-start vector, reasons, versioned configs), tuned on MIND-small holdout by pre-registered rules (`rank-1`) and reported once on MIND-large dev: nDCG@10 0.4149 → 0.4199 overall, cold users 0.3625 → 0.3811; the default `rank-2` adds the owner's cold-start k = 3 (ADR 0014). **3c:** Supabase JWT auth against a cached JWKS (ES256 allowlist, local dev bypass only) (ADR 0015); profiles, durable history, events and served slates with owner-only RLS and a local-only auth shim; idempotent events whose Redis side effects are append-only and versioned, rebuilt from Postgres on any gap; user-data retention with a size guard (ADR 0016); one error schema, rate limits, metrics, committed OpenAPI spec. |
+| P3 API (in progress) | **3a:** runner-side 72 h window snapshot in the Actions cache (delta + count/max/id-checksum, any mismatch reloads), cutting ingestion egress from ~14 MB to 84 KB a run with identical dedupe decisions (0 of 267,877 changed on the replay) (ADR 0012); pools published as one versioned blob in 3 commands a run (ADR 0012); trending v2: split stories merged by complete linkage at τ_feed, syndication networks counted once, representatives by quality (ADR 0013); free-tier budget table (ADR 0011). **3b:** ranking in `packages/core` (freshness, per-request normalization, rank-only trend feature, blend, MMR with a 2-per-story cap, cold-start vector, reasons, versioned configs), tuned on MIND-small holdout by pre-registered rules (`rank-1`) and reported once on MIND-large dev: nDCG@10 0.4149 → 0.4199 overall, cold users 0.3625 → 0.3811; the default `rank-2` adds the owner's cold-start k = 3 (ADR 0014). **3c:** Supabase JWT auth against a cached JWKS (ES256 allowlist, local dev bypass only) (ADR 0015); profiles, durable history, events and served slates with owner-only RLS and a local-only auth shim; idempotent events whose Redis side effects are append-only and versioned, rebuilt from Postgres on any gap; user-data retention with a size guard (ADR 0016); one error schema, rate limits, metrics, committed OpenAPI spec. **3d:** `GET /v1/feed` as seven stages with deadlines and a tested degraded mode each (Redis → Postgres copies, encoder → mean of history, ANN → pools, no snapshot → ANN only); the pinned encoder baked into the image by a verifying `models` stage and micro-batched across requests; candidates as ANN (HNSW iterative scans, ef_search 400, chosen by the pre-registered 14-day benchmark) ∥ pool cosines, both in SQL with read/hidden stories excluded server-side; 100-item slates with opaque cursors, no repeats, a 60 s page cache, and a re-rank after a click or hide; the 2-per-story cap held across pages; `Server-Timing` and per-stage metrics; 3–8 Redis commands a page (ADR 0017). |
 | P4 App | — |
 | P5 Cloud | — |
 | P6 Performance | — |
@@ -144,6 +163,6 @@ flowchart LR
 
 ## Related
 
-- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md), [0006 topic taxonomy and classifier](adr/0006-topic-taxonomy-and-classifier.md), [0007 live sources](adr/0007-live-sources-gdelt-gkg-and-rss.md), [0008 Postgres schema](adr/0008-postgres-schema-and-migrations.md), [0009 dedupe and clustering](adr/0009-dedupe-and-story-clustering.md), [0010 Redis pools and trending](adr/0010-redis-pools-and-trending.md), [0011 free-tier budgets](adr/0011-free-tier-budgets.md), [0012 runner window and pool snapshot](adr/0012-runner-window-and-pool-snapshot.md), [0013 trending v2](adr/0013-trending-v2.md), [0014 ranking](adr/0014-ranking-blend-mmr-cold-start.md), [0015 auth](adr/0015-auth-supabase-jwt.md), [0016 user data](adr/0016-user-data-rls-retention.md)
+- ADRs: [0001 monorepo and tech stack](adr/0001-monorepo-and-tech-stack.md), [0002 free-tier hosting](adr/0002-free-tier-hosting.md), [0003 MIND data and eval protocol](adr/0003-mind-data-and-eval-protocol.md), [0004 identity item tower](adr/0004-identity-item-tower.md), [0005 model artifacts on the HF Hub](adr/0005-model-artifacts-on-hf-hub.md), [0006 topic taxonomy and classifier](adr/0006-topic-taxonomy-and-classifier.md), [0007 live sources](adr/0007-live-sources-gdelt-gkg-and-rss.md), [0008 Postgres schema](adr/0008-postgres-schema-and-migrations.md), [0009 dedupe and clustering](adr/0009-dedupe-and-story-clustering.md), [0010 Redis pools and trending](adr/0010-redis-pools-and-trending.md), [0011 free-tier budgets](adr/0011-free-tier-budgets.md), [0012 runner window and pool snapshot](adr/0012-runner-window-and-pool-snapshot.md), [0013 trending v2](adr/0013-trending-v2.md), [0014 ranking](adr/0014-ranking-blend-mmr-cold-start.md), [0015 auth](adr/0015-auth-supabase-jwt.md), [0016 user data](adr/0016-user-data-rls-retention.md), [0017 feed serving](adr/0017-feed-serving-pipeline.md)
 - Learn chapters: [00 bootstrap](learn/00-bootstrap.md), [01 offline ML](learn/01-offline-ml.md), [02 live ingestion](learn/02-live-ingestion.md)
 - [Model card](model-card.md), [data card](data-card.md)
