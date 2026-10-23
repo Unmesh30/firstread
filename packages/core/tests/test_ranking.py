@@ -172,10 +172,25 @@ def test_reasons_follow_the_largest_components() -> None:
 # ---- config ----
 
 # Each released ranking config's SHA-256 (ADR 0014): editing a file means a new version.
-# rank-1: tuned on MIND-small holdout.
+# rank-1: tuned on MIND-small holdout. rank-2: rank-1 with the owner's k = 3 (the default).
 PINNED_SHA: dict[str, str] = {
     "rank-1": "cd25c71fe10fd0a0d1787dadbda417fb13b6b8c92c86e3dbbbfc7373294e6f23",
+    "rank-2": "3befa2936a3f1d5f205a4aee091a0159d173374b8863a0c750d992aab1427b51",
 }
+
+
+def test_rank_2_is_the_default_and_differs_from_rank_1_only_in_k() -> None:
+    one, two = load_config("rank-1"), load_config()
+    assert two.version == "rank-2"
+    assert model_version("v0.2.0", two) == "v0.2.0+rank-2"
+    assert (two.cold_start_k, two.cold_start_k_source) == (3.0, "judgment")
+    assert (one.cold_start_k, one.cold_start_k_source) == (0.0, "tuned")
+    same = {
+        k: v
+        for k, v in vars(one).items()
+        if k not in {"version", "cold_start_k", "cold_start_k_source"}
+    }
+    assert same == {k: v for k, v in vars(two).items() if k in same}
 
 
 def test_every_ranking_config_is_pinned_and_valid() -> None:
