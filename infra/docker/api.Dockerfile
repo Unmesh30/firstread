@@ -38,7 +38,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
 USER app
 EXPOSE 8000
 # Cloud Run injects $PORT; default 8000 locally.
-CMD ["sh", "-c", "exec uvicorn firstread_api.main:app --host 0.0.0.0 --port ${PORT} --proxy-headers --no-access-log"]
+# One worker per container: prometheus-client then needs no multiprocess mode, and
+# Cloud Run scales by instances. uvicorn trusts X-Forwarded-For only from
+# FORWARDED_ALLOW_IPS (default 127.0.0.1; the Cloud Run value is set in P5).
+CMD ["sh", "-c", "exec uvicorn firstread_api.main:app --host 0.0.0.0 --port ${PORT} --workers 1 --proxy-headers --no-access-log"]
 
 # ---- dev: editable install + hot reload (used by docker-compose) ----
 FROM builder AS dev

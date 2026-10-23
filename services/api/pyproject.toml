@@ -18,6 +18,9 @@ dependencies = [
   "prometheus-client>=0.26.0",
 ]
 
+[project.scripts]
+firstread-api = "firstread_api.cli:main"
+
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14"]
 build-backend = "uv_build"

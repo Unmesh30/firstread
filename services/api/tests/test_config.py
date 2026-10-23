@@ -59,3 +59,11 @@ def test_only_asymmetric_algorithms_are_allowed(algs: str) -> None:
 def test_jwks_ttl_is_capped_at_ten_minutes() -> None:
     with pytest.raises(ValidationError, match="TTL"):
         make(auth_jwks_ttl_s=601)
+
+
+def test_every_setting_is_documented_in_env_example() -> None:
+    example = (Path(__file__).resolve().parents[3] / ".env.example").read_text()
+    names = {line.split("=", 1)[0] for line in example.splitlines() if "=" in line
+             and not line.startswith("#")}  # fmt: skip
+    missing = sorted(f.upper() for f in Settings.model_fields if f.upper() not in names)
+    assert not missing, f"document these in .env.example: {missing}"
