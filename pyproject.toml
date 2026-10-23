@@ -63,6 +63,7 @@ files = [
   "services/api/src", "services/api/tests",
   "services/ingest/src", "services/ingest/tests",
   "ml/src", "ml/tests",
+  "services/api/scripts/persona_replay.py", "loadtest",
 ]
 strict = true
 warn_unreachable = true
