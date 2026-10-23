@@ -1,5 +1,6 @@
 """Supabase JWT verification (ADR 0015): every rejection path, JWKS caching rules."""
 
+import asyncio
 import base64
 import json
 import uuid
@@ -160,3 +161,21 @@ async def test_keys_with_disallowed_algorithms_are_dropped(signer: Signer) -> No
     hs = {"kty": "oct", "kid": signer.kid, "alg": "HS256", "k": "c2VjcmV0"}
     v, _ = http_verifier(Counting({"keys": [hs]}))
     assert (await rejected(v, signer.token(UID))).status == 401
+
+
+async def test_a_failed_fetch_backs_off_instead_of_queueing(signer: Signer) -> None:
+    t = Counting({"keys": [signer.jwk()]})
+    v, cache = http_verifier(t)
+    await v.verify(signer.token(UID))
+    cache.fetched_at -= 601  # cache expired
+    t.fail = True
+    assert (await rejected(v, signer.token(UID))).status == 503
+    assert t.calls == 2  # one failed fetch
+    results = await asyncio.gather(*(v.verify(signer.token(UID)) for _ in range(20)),
+                                   return_exceptions=True)  # fmt: skip
+    assert all(isinstance(r, ApiError) and r.status == 503 for r in results)
+    assert t.calls == 2  # no fetch during the backoff: 503 at once
+    cache.failed_at -= 11  # backoff over; JWKS reachable again
+    t.fail = False
+    assert (await v.verify(signer.token(UID))).user_id == UID
+    assert t.calls == 3

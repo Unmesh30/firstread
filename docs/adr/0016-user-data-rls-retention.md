@@ -65,6 +65,7 @@ Phase 3 stores readers' data for the first time: followed topics, clicks, hides,
   - A rebuild writes the rows from `user_history`, then a **marker** holding `profiles.hist_version`.
   - The list is trusted only if the entries after the last marker run exactly from marker + 1 to the current `hist_version` (or, once the marker is trimmed, form 60 consecutive versions ending there).
   - **A failed push, a lost key or a persona switch shows up as a gap,** and the next feed (P3d) rebuilds. A click that lands mid-rebuild only causes another rebuild.
+  - **The rebuild reads the rows and `hist_version` in one statement** (one snapshot; PR #19 review). Read separately, a click committing in between would get a marker claiming its version without its row and could vanish unnoticed. A test interleaves a click right after the read.
   - A missing hidden set (no sentinel) is rebuilt from hide events; hidden sources live in `profiles`. **Hides survive Redis loss and the TTL** (tested by flushing Redis).
 - **Redis failures after the Postgres commit are logged, not raised:** Postgres has the data, and the version check heals Redis.
 
