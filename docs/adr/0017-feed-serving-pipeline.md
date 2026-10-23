@@ -134,6 +134,7 @@ redis-py 8.1 defaults to a 5 s socket (and connect) timeout and up to 10 retries
 
 - Every degraded row of the stage table has a test (`services/api/tests/test_feed.py`). So do the E2E flow (anonymous reader → topics → feed → click → re-ranked page 2 → delete), cursor validation, no repeats over 5 pages, the 60 s page cache, every filter, the story cap within and across pages, and command counts. They run against CI's Postgres and Redis with the real encoder; the release files are cached in CI by the hash of `release.py`.
 - Tests can't fake `X-Request-ID` into `served_slates`: the id is always server-generated (ADR 0015).
+- **Cloud Run scaling (owner decision, 2026-10-24, after the P3e load test):** P5 starts at **max concurrency 10** per instance (not Cloud Run's default 80) and **max instances 3**, so the autoscaler adds an instance before requests queue into the 1 s deadline. P6 tunes both with k6 against Cloud Run.
 - **Local only so far:** Supabase Nano is shared CPU, so HNSW, exact and pooler latencies there may be 2–3× local. P5's smoke tests re-measure, and the rule can be re-run against the live database.
 - P6 compares batching on and off, and caching on and off, under k6. P3e reports the local p95 for the whole feed.
 
@@ -164,5 +165,5 @@ Postgres and Redis ran on the same Docker Desktop VM (Apple M4) without CPU limi
 
 - **SPEC §11's target (p95 ≤ 150 ms at 100 RPS on the local stack) is not met by one 1-vCPU container.** It holds about 70 RPS with a 44 ms p95; at 80 RPS it saturates.
 - Server time is the sum of the `Server-Timing` stages; client time is k6's request duration on the same Docker network.
-- **Overload collapses instead of slowing down:** past saturation, requests queue until the 1 s deadline and fail after spending CPU. Cloud Run's default concurrency of 80 per instance would let one instance accept such a queue. The P5/P6 lever is a lower concurrency (e.g. 40) so the autoscaler adds an instance (max 3) first, plus load shedding. P6 measures it.
+- **Overload collapses instead of slowing down:** past saturation, requests queue until the 1 s deadline and fail after spending CPU. Cloud Run's default concurrency of 80 per instance would let one instance accept such a queue, so P5 starts at concurrency 10 and P6 tunes it (Consequences).
 - **Other numbers:** image 503.5 MB; startup to `/readyz` 200 median 776 ms (5 runs); 144 MiB resident after the run; the in-container encoder unchanged (0.74 ms at batch 1, 22.3 ms at batch 32, one thread).

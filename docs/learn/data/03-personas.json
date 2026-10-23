@@ -6,164 +6,261 @@
   "steady_clock_times": 16,
   "steady_rule": "at least 24 h of replayed news before the clock time"
  },
- "ranking": "rank-2 (v0.2.0+rank-2); the w_fresh comparison raises w_fresh 0.05 -> 0.1",
+ "rankings": {
+  "rank-2": "w_fresh 0.05, w_trend 0.025 (cold segment 0.05 / 0.1)",
+  "rank-3": "the default: w_fresh 0.1, w_trend 0.05 (cold segment unchanged)"
+ },
  "personas": {
   "culture-food": {
-   "clock_times": 16,
-   "largest_group": 3,
-   "largest_group_mean": 2.69,
-   "groups_over_cap_mean": 2.31,
-   "cap_drops_page_1_mean": 0.06,
-   "cap_drops_slate_mean": 1.5,
-   "cap_drops_by_way": {
-    "cluster": 24
+   "rank-2": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3094,
+     "share_under_30min": 0.0656,
+     "median_age_h": 4.58
+    },
+    "largest_group": 3,
+    "largest_group_mean": 2.69,
+    "groups_over_cap_mean": 2.38,
+    "cap_drops_page_1_mean": 0.06,
+    "cap_drops_slate_mean": 1.06,
+    "cap_drops_by_way": {
+     "cluster": 17
+    },
+    "degraded_pages": 0
    },
-   "freshness": {
-    "items": 320,
-    "share_under_2h": 0.2969,
-    "share_under_30min": 0.0688,
-    "median_age_h": 5.21
-   },
-   "freshness_w_fresh_0.1": {
-    "items": 320,
-    "share_under_2h": 0.6906,
-    "share_under_30min": 0.1844,
-    "median_age_h": 1.08
-   },
-   "degraded_pages": 0
+   "rank-3": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.6687,
+     "share_under_30min": 0.15,
+     "median_age_h": 1.08
+    },
+    "largest_group": 3,
+    "largest_group_mean": 2.75,
+    "groups_over_cap_mean": 3.12,
+    "cap_drops_page_1_mean": 0.06,
+    "cap_drops_slate_mean": 0.88,
+    "cap_drops_by_way": {
+     "cluster": 14
+    },
+    "degraded_pages": 0
+   }
   },
   "markets-tech": {
-   "clock_times": 16,
-   "largest_group": 3,
-   "largest_group_mean": 2.56,
-   "groups_over_cap_mean": 0.81,
-   "cap_drops_page_1_mean": 0.12,
-   "cap_drops_slate_mean": 0.5,
-   "cap_drops_by_way": {
-    "cluster": 8
+   "rank-2": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3656,
+     "share_under_30min": 0.0656,
+     "median_age_h": 3.33
+    },
+    "largest_group": 3,
+    "largest_group_mean": 2.56,
+    "groups_over_cap_mean": 0.94,
+    "cap_drops_page_1_mean": 0.12,
+    "cap_drops_slate_mean": 0.5,
+    "cap_drops_by_way": {
+     "cluster": 8
+    },
+    "degraded_pages": 0
    },
-   "freshness": {
-    "items": 320,
-    "share_under_2h": 0.3688,
-    "share_under_30min": 0.0656,
-    "median_age_h": 3.21
-   },
-   "freshness_w_fresh_0.1": {
-    "items": 320,
-    "share_under_2h": 0.7031,
-    "share_under_30min": 0.1469,
-    "median_age_h": 1.08
-   },
-   "degraded_pages": 0
+   "rank-3": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.6438,
+     "share_under_30min": 0.125,
+     "median_age_h": 1.33
+    },
+    "largest_group": 3,
+    "largest_group_mean": 2.88,
+    "groups_over_cap_mean": 2.0,
+    "cap_drops_page_1_mean": 0.12,
+    "cap_drops_slate_mean": 1.12,
+    "cap_drops_by_way": {
+     "cluster": 18
+    },
+    "degraded_pages": 0
+   }
   },
   "sports-health": {
-   "clock_times": 16,
-   "largest_group": 3,
-   "largest_group_mean": 2.88,
-   "groups_over_cap_mean": 2.44,
-   "cap_drops_page_1_mean": 0.19,
-   "cap_drops_slate_mean": 1.25,
-   "cap_drops_by_way": {
-    "cluster": 20
+   "rank-2": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3156,
+     "share_under_30min": 0.0531,
+     "median_age_h": 5.08
+    },
+    "largest_group": 3,
+    "largest_group_mean": 2.88,
+    "groups_over_cap_mean": 2.44,
+    "cap_drops_page_1_mean": 0.19,
+    "cap_drops_slate_mean": 1.25,
+    "cap_drops_by_way": {
+     "cluster": 20
+    },
+    "degraded_pages": 0
    },
-   "freshness": {
-    "items": 320,
-    "share_under_2h": 0.3156,
-    "share_under_30min": 0.0469,
-    "median_age_h": 4.96
-   },
-   "freshness_w_fresh_0.1": {
-    "items": 320,
-    "share_under_2h": 0.7281,
-    "share_under_30min": 0.1875,
-    "median_age_h": 1.08
-   },
-   "degraded_pages": 0
+   "rank-3": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.6781,
+     "share_under_30min": 0.1594,
+     "median_age_h": 1.08
+    },
+    "largest_group": 3,
+    "largest_group_mean": 3.0,
+    "groups_over_cap_mean": 3.44,
+    "cap_drops_page_1_mean": 0.19,
+    "cap_drops_slate_mean": 1.5,
+    "cap_drops_by_way": {
+     "cluster": 24
+    },
+    "degraded_pages": 0
+   }
   },
   "us-news": {
-   "clock_times": 16,
-   "largest_group": 4,
-   "largest_group_mean": 3.06,
-   "groups_over_cap_mean": 4.06,
-   "cap_drops_page_1_mean": 0.19,
-   "cap_drops_slate_mean": 2.06,
-   "cap_drops_by_way": {
-    "cluster": 33
+   "rank-2": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3219,
+     "share_under_30min": 0.0906,
+     "median_age_h": 4.08
+    },
+    "largest_group": 4,
+    "largest_group_mean": 3.06,
+    "groups_over_cap_mean": 4.44,
+    "cap_drops_page_1_mean": 0.25,
+    "cap_drops_slate_mean": 2.31,
+    "cap_drops_by_way": {
+     "cluster": 37
+    },
+    "degraded_pages": 0
    },
-   "freshness": {
-    "items": 320,
-    "share_under_2h": 0.325,
-    "share_under_30min": 0.0844,
-    "median_age_h": 3.83
-   },
-   "freshness_w_fresh_0.1": {
-    "items": 320,
-    "share_under_2h": 0.7188,
-    "share_under_30min": 0.2062,
-    "median_age_h": 1.08
-   },
-   "degraded_pages": 0
+   "rank-3": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.625,
+     "share_under_30min": 0.1656,
+     "median_age_h": 1.33
+    },
+    "largest_group": 6,
+    "largest_group_mean": 3.31,
+    "groups_over_cap_mean": 4.19,
+    "cap_drops_page_1_mean": 0.25,
+    "cap_drops_slate_mean": 2.62,
+    "cap_drops_by_way": {
+     "cluster": 42
+    },
+    "degraded_pages": 0
+   }
   },
   "world-affairs": {
-   "clock_times": 16,
-   "largest_group": 4,
-   "largest_group_mean": 3.31,
-   "groups_over_cap_mean": 3.44,
-   "cap_drops_page_1_mean": 0.5,
-   "cap_drops_slate_mean": 1.06,
-   "cap_drops_by_way": {
-    "cluster": 17
+   "rank-2": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3406,
+     "share_under_30min": 0.0406,
+     "median_age_h": 3.71
+    },
+    "largest_group": 4,
+    "largest_group_mean": 3.31,
+    "groups_over_cap_mean": 3.56,
+    "cap_drops_page_1_mean": 0.5,
+    "cap_drops_slate_mean": 1.25,
+    "cap_drops_by_way": {
+     "cluster": 20
+    },
+    "degraded_pages": 0
    },
-   "freshness": {
-    "items": 320,
-    "share_under_2h": 0.3406,
-    "share_under_30min": 0.0437,
-    "median_age_h": 3.96
-   },
-   "freshness_w_fresh_0.1": {
-    "items": 320,
-    "share_under_2h": 0.7281,
-    "share_under_30min": 0.1781,
-    "median_age_h": 1.08
-   },
-   "degraded_pages": 0
+   "rank-3": {
+    "clock_times": 16,
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.6656,
+     "share_under_30min": 0.1375,
+     "median_age_h": 1.33
+    },
+    "largest_group": 4,
+    "largest_group_mean": 3.06,
+    "groups_over_cap_mean": 3.31,
+    "cap_drops_page_1_mean": 0.38,
+    "cap_drops_slate_mean": 1.69,
+    "cap_drops_by_way": {
+     "cluster": 27
+    },
+    "degraded_pages": 0
+   }
   }
  },
  "all_personas": {
-  "freshness": {
-   "items": 1600,
-   "share_under_2h": 0.3294,
-   "share_under_30min": 0.0619,
-   "median_age_h": 4.08
+  "rank-2": {
+   "freshness": {
+    "items": 1600,
+    "share_under_2h": 0.3306,
+    "share_under_30min": 0.0631,
+    "median_age_h": 4.08
+   },
+   "largest_group": 4,
+   "largest_group_mean": 2.9,
+   "groups_over_cap_mean": 2.75,
+   "cap_drops_page_1_mean": 0.23,
+   "cap_drops_slate_mean": 1.27,
+   "cap_drops_by_way": {
+    "cluster": 102
+   }
   },
-  "freshness_w_fresh_0.1": {
-   "items": 1600,
-   "share_under_2h": 0.7137,
-   "share_under_30min": 0.1806,
-   "median_age_h": 1.08
-  },
-  "cap_drops_page_1_mean": 0.21,
-  "largest_group": 4
+  "rank-3": {
+   "freshness": {
+    "items": 1600,
+    "share_under_2h": 0.6562,
+    "share_under_30min": 0.1475,
+    "median_age_h": 1.33
+   },
+   "largest_group": 6,
+   "largest_group_mean": 3.0,
+   "groups_over_cap_mean": 3.21,
+   "cap_drops_page_1_mean": 0.2,
+   "cap_drops_slate_mean": 1.56,
+   "cap_drops_by_way": {
+    "cluster": 125
+   }
+  }
  },
  "new_reader_check": {
   "rank-1": {
    "cold_start_k": 0.0,
    "readers": 48,
+   "page1_freshness_cold_segment": {
+    "items": 960,
+    "share_under_2h": 0.2917,
+    "share_under_30min": 0.026,
+    "median_age_h": 3.83
+   },
    "page2_items": 960,
-   "share_followed_topics": 0.1146,
-   "share_clicked_topic": 0.4729,
+   "share_followed_topics": 0.1052,
+   "share_clicked_topic": 0.4854,
    "by_topic_set": {
     "sports,health,entertainment": {
-     "share_followed_topics": 0.1094,
-     "share_clicked_topic": 0.4094
+     "share_followed_topics": 0.0844,
+     "share_clicked_topic": 0.3719
     },
     "business,tech_science,politics": {
-     "share_followed_topics": 0.0781,
-     "share_clicked_topic": 0.4875
+     "share_followed_topics": 0.075,
+     "share_clicked_topic": 0.55
     },
     "world,travel,food_drink": {
      "share_followed_topics": 0.1562,
-     "share_clicked_topic": 0.5219
+     "share_clicked_topic": 0.5344
     }
    },
    "skipped": 0,
@@ -172,21 +269,56 @@
   "rank-2": {
    "cold_start_k": 3.0,
    "readers": 48,
+   "page1_freshness_cold_segment": {
+    "items": 960,
+    "share_under_2h": 0.2917,
+    "share_under_30min": 0.026,
+    "median_age_h": 3.83
+   },
    "page2_items": 960,
-   "share_followed_topics": 0.5125,
-   "share_clicked_topic": 0.125,
+   "share_followed_topics": 0.5083,
+   "share_clicked_topic": 0.1344,
    "by_topic_set": {
     "sports,health,entertainment": {
-     "share_followed_topics": 0.5219,
-     "share_clicked_topic": 0.2188
+     "share_followed_topics": 0.5188,
+     "share_clicked_topic": 0.1844
     },
     "business,tech_science,politics": {
-     "share_followed_topics": 0.5687,
-     "share_clicked_topic": 0.05
+     "share_followed_topics": 0.575,
+     "share_clicked_topic": 0.0844
     },
     "world,travel,food_drink": {
-     "share_followed_topics": 0.4469,
-     "share_clicked_topic": 0.1062
+     "share_followed_topics": 0.4313,
+     "share_clicked_topic": 0.1344
+    }
+   },
+   "skipped": 0,
+   "degraded": 0
+  },
+  "rank-3": {
+   "cold_start_k": 3.0,
+   "readers": 48,
+   "page1_freshness_cold_segment": {
+    "items": 960,
+    "share_under_2h": 0.2917,
+    "share_under_30min": 0.026,
+    "median_age_h": 3.83
+   },
+   "page2_items": 960,
+   "share_followed_topics": 0.5083,
+   "share_clicked_topic": 0.1344,
+   "by_topic_set": {
+    "sports,health,entertainment": {
+     "share_followed_topics": 0.5188,
+     "share_clicked_topic": 0.1844
+    },
+    "business,tech_science,politics": {
+     "share_followed_topics": 0.575,
+     "share_clicked_topic": 0.0844
+    },
+    "world,travel,food_drink": {
+     "share_followed_topics": 0.4313,
+     "share_clicked_topic": 0.1344
     }
    },
    "skipped": 0,
@@ -194,6 +326,7 @@
   }
  },
  "sampled_cap_drops": {
+  "run": "rank-2, title-title tau_feed 0.925 (grouping doesn't depend on the weights)",
   "n": 40,
   "by_way": {
    "cluster": 40
@@ -208,7 +341,7 @@
   "note": "examples with headlines stay in data/persona-replay/ (gitignored) and the PR description"
  },
  "labelled_review_run": {
-  "why": "the sampled cap drops were labelled on this run, with title-title tau_feed 0.875; one sample (#41, three different AP digests) was two different stories, so ADR 0013's fallback raised title-title tau_feed to 0.925, and the numbers above are a re-run with that threshold",
+  "why": "the sampled cap drops were first labelled on this run, with title-title tau_feed 0.875; one sample (#41, three different AP digests) was two different stories, so ADR 0013's fallback raised title-title tau_feed to 0.925",
   "window": {
    "first": "2026-10-12T03:20:00+00:00",
    "last": "2026-10-15T00:20:00+00:00",

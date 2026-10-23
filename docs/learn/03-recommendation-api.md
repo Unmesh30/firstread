@@ -53,7 +53,7 @@ pgvector's **HNSW** index is a layered proximity graph: a search enters at the t
 
 ### 2.4 The blend
 
-`final = cos(u, a) + w_fresh · 2^(−age / 3 h) + w_trend · trend_percentile` with `w_fresh = 0.05`, `w_trend = 0.025` (0.1 for readers with ≤ 2 clicks). The trend term is a **percentile within the request**, so a MIND proxy (recent clicks) and the live signal (distinct outlets covering the story in 24 h, a 6 h half-life) mean the same thing: only their ranks matter. The weights were chosen on MIND-small's holdout by rules written before any result ([ADR 0014](../adr/0014-ranking-blend-mmr-cold-start.md)).
+`final = cos(u, a) + w_fresh · 2^(−age / 3 h) + w_trend · trend_percentile` with `w_fresh = 0.1`, `w_trend = 0.05` in the default `rank-3` (readers with ≤ 2 clicks keep the cold segment's 0.05 / 0.1). The trend term is a **percentile within the request**, so a MIND proxy (recent clicks) and the live signal (distinct outlets covering the story in 24 h, a 6 h half-life) mean the same thing: only their ranks matter. The weights were chosen on MIND-small's holdout by rules written before any result (`rank-1`, 0.05 / 0.025); `rank-3` is the owner's pick among configs that tie on the holdout objective, made after the persona replay showed `rank-1/2` pages too old ([ADR 0014](../adr/0014-ranking-blend-mmr-cold-start.md)).
 
 ### 2.5 MMR and the story cap
 
@@ -225,7 +225,7 @@ make session-cost LABEL=warm SESSIONS=20 SKIP=1
 
 ### 6.1 The persona replay (`docs/learn/data/03-personas.json`)
 
-`make persona-replay` replays 2026-10-12 02:30 → 10-15 02:15 (288 GKG runs, 14,400 articles, identical to P3a's replay) through the unchanged pipeline, which now refreshes the personas. At 24 clock times (every 3 h) the real app, its clock set to the replay time, serves each persona as a fresh activated reader, the same with `w_fresh` raised to the next grid value, and the new-reader check. Aggregates use the 16 "steady" clock times, those with at least 24 h of news behind them. No response was degraded.
+`make persona-replay` replays 2026-10-12 02:30 → 10-15 02:15 (288 GKG runs, 14,400 articles, identical to P3a's replay) through the unchanged pipeline, which now refreshes the personas. At 24 clock times (every 3 h) the real app, its clock set to the replay time, serves each persona as a fresh activated reader under rank-2 and under rank-3, and runs the new-reader check under rank-1, rank-2 and rank-3. Aggregates use the 16 "steady" clock times, those with at least 24 h of news behind them. No response was degraded.
 
 **Story grouping, and the fallback it triggered.** Sampled story-cap drops (with headlines; in `data/`, quoted in the PR) were LLM-labeled and spot-checked by a second, independent LLM session:
 
@@ -237,31 +237,40 @@ make session-cost LABEL=warm SESSIONS=20 SKIP=1
 - By ADR 0013's pre-registered rule, the one τ_feed mistake raised GDELT↔GDELT τ_feed to its τ_story (0.925).
 - The two remaining mistakes are ingestion's clusters (τ_story), which no pre-registered rule covers. A junk-title rule for digests and dated forecasts is proposed to the owner instead.
 
-Per persona after the fallback (16 clock times each):
+Per persona after the fallback (16 clock times each), under rank-2 → rank-3:
 
 | Persona | Largest story group | Cap drops on page 1 (mean) | Cap drops in the slate (mean) |
 |---|---:|---:|---:|
-| Markets & tech | 3 | 0.12 | 0.50 |
-| Sports & health | 3 | 0.19 | 1.25 |
-| World affairs | 4 | 0.50 | 1.06 |
-| Culture & food | 3 | 0.06 | 1.50 |
-| U.S. news | 4 | 0.19 | 2.06 |
+| Markets & tech | 3 → 3 | 0.12 → 0.12 | 0.50 → 1.12 |
+| Sports & health | 3 → 3 | 0.19 → 0.19 | 1.25 → 1.50 |
+| World affairs | 4 → 4 | 0.50 → 0.38 | 1.25 → 1.69 |
+| Culture & food | 3 → 3 | 0.06 → 0.06 | 1.06 → 0.88 |
+| U.S. news | 4 → 6 | 0.25 → 0.25 | 2.31 → 2.62 |
 
-How to read it: a "drop" is an item that would have been in the page (or slate) by MMR alone but was the third copy of a story. Fewer than one drop per page means the cap is a backstop; the story was already represented twice.
+How to read it: a "drop" is an item that would have been in the page (or slate) by MMR alone but was the third copy of a story. Fewer than one drop per page means the cap is a backstop; the story was already represented twice. The thresholds don't depend on the weights, but the candidates do: rank-3 brings more fresh copies of developing stories into the re-rank set, so slates drop a few more and U.S. news once grouped 6. The labelled samples are from the rank-2 run.
 
-**Freshness (a decision for the owner, not changed):**
+**Freshness: rank-2 vs rank-3 (owner decision, 2026-10-24).** Page 1, all personas, 1,600 items each:
 
-| Page 1, all personas (1,600 items) | rank-2 as shipped (`w_fresh` 0.05) | `w_fresh` 0.1 (next grid value) |
+| | rank-2 (`w_fresh` 0.05, `w_trend` 0.025) | **rank-3, the default** (0.1 / 0.05) |
 |---|---:|---:|
-| under 2 h old | 32.9% | 71.4% |
-| under 30 min old | 6.2% | 18.1% |
-| median age | 4.1 h | 1.1 h |
+| under 2 h old | 33.1% | **65.6%** |
+| under 30 min old | 6.3% | **14.8%** |
+| median age | 4.1 h | **1.3 h** |
 
-- Doubling `w_fresh` makes page 1 mostly last-two-hours news. The tuned value (from MIND, where "first seen" is a coarse proxy) leaves two thirds of page 1 older than 2 h.
-- The replay's youngest items are ~1 h old, because a GKG file's crawl times precede the run that processes it. That is why the 0.1 median sits at 1.08 h for every persona.
-- Whether to raise `w_fresh` (a `rank-3` with a new pinned config) is the owner's call. ADR 0014's MIND numbers can't settle it.
+- On ADR 0014's pre-registered holdout objective, rank-3's weights tie rank-2's (J 0.42307 vs 0.42309): rank-2 won only the "smallest weights" tie-break. The replay shows what that tie-break cost on live news, so the owner shipped rank-3. Dev was not re-run.
+- The replay's youngest items are ~1 h old, because a GKG file's crawl times precede the run that processes it; that is why several personas' rank-3 median is 1.08 h.
+- An earlier comparison raised only `w_fresh` (0.1 with `w_trend` 0.025): 71% under 2 h. It wasn't shipped because it isn't among the holdout's best configs (J < 0.4214).
 
-**New reader (ADR 0014 amendment):** after one off-topic click, page 2 is **51% followed topics / 13% the clicked topic under rank-2 (k = 3)** vs **11% / 47% under rank-1 (k = 0)** (48 readers each). One click no longer takes over a new reader's feed.
+**New reader (ADR 0014 amendments):** 48 readers per ranking, 960 page-2 items each.
+
+| | rank-1 (k = 0) | rank-2 (k = 3) | rank-3 (k = 3) |
+|---|---:|---:|---:|
+| page 2 from the followed topics | 10.5% | 50.8% | 50.8% |
+| page 2 from the clicked story's topic | 48.5% | 13.4% | 13.4% |
+| page 1 under 2 h old (median age) | 29.2% (3.8 h) | 29.2% (3.8 h) | 29.2% (3.8 h) |
+
+- k = 3 keeps a new reader's topics after one off-topic click; one click no longer takes over the feed.
+- rank-2 and rank-3 are identical for new readers **by construction**: with ≤ 2 clicks the cold segment's weights apply (0.05 / 0.1), and rank-3 kept them. So a brand-new reader's first page is still mostly older than 2 h (median 3.8 h). Changing that would mean changing the cold segment, which the owner kept.
 
 ### 6.2 Local p95 (`loadtest/results/03-local.json`)
 
@@ -300,12 +309,12 @@ Setup: the runtime image at Cloud Run's shape (`--cpus=1 --memory=512m`, one wor
 
 - **Runner-side window + one pool blob** instead of reading 14 MB a run and 30 Redis commands ([ADR 0012](../adr/0012-runner-window-and-pool-snapshot.md)).
 - **Trending v2:** complete-linkage merging, syndication networks counted once, quality-ordered representatives ([ADR 0013](../adr/0013-trending-v2.md)); title↔title τ_feed later fell back to 0.925 by its pre-registered rule (§8).
-- **Pre-registered tuning on MIND,** dev looked at once; rank-2 sets k = 3 as an owner decision, now supported by the new-reader check ([ADR 0014](../adr/0014-ranking-blend-mmr-cold-start.md)).
+- **Pre-registered tuning on MIND,** dev looked at once; rank-2 sets k = 3 and rank-3 w_fresh 0.1 / w_trend 0.05 as owner decisions, supported by the persona replay ([ADR 0014](../adr/0014-ranking-blend-mmr-cold-start.md)).
 - **JWKS verification, not `getUser` per request;** in-process rate limits, not Redis ([ADR 0015](../adr/0015-auth-supabase-jwt.md)).
 - **Append-only versioned Redis state with Postgres as truth;** retention and a size guard in ingestion ([ADR 0016](../adr/0016-user-data-rls-retention.md)).
 - **Seven stages with deadlines and degraded modes,** HNSW by a pre-registered benchmark, Postgres-before-Redis persistence ([ADR 0017](../adr/0017-feed-serving-pipeline.md)).
 - **Personas selected daily on the runner, public endpoints from the blob, `/why` recomputed for the caller** ([ADR 0018](../adr/0018-personas-why-stats.md)).
-- **Freshness weight:** kept at the tuned 0.05; the replay's numbers are the owner's call (§6.1).
+- **Freshness weight:** the owner shipped `rank-3` (w_fresh 0.1, w_trend 0.05), a tie on the holdout objective, after the replay (§6.1); dev not re-run.
 - **Budgets:** measured per session and per quota ([ADR 0011](../adr/0011-free-tier-budgets.md)).
 
 ---
@@ -324,7 +333,7 @@ Setup: the runtime image at Cloud Run's shape (`--cpus=1 --memory=512m`, one wor
 - **The pre-commit mypy hook checks untracked files,** so a half-written module blocks an unrelated commit; stash it first.
 - **Local numbers flatter the database:** Postgres and Redis share the laptop's CPU without limits, unlike Supabase Nano and Upstash. P5 and P6 re-measure.
 - **numpy's OpenBLAS starved the 1-vCPU container.** It starts a thread per *visible* host CPU (10 here), and they spin under a 1-CPU quota: the container was throttled in 88% of scheduler periods and used 74 ms of CPU per request against 29 ms of wall time. Every 30–80 ms stage deadline then fired, each fallback added work, and 79% of requests failed at 50 RPS. Loosening the deadlines didn't help. Setting `OPENBLAS_NUM_THREADS=1` did (0 errors, 21 ms p95 at 50 RPS), and CI now checks it. Lesson: pin every native thread pool (ONNX Runtime, BLAS, OpenMP) when the CPU quota is smaller than the CPUs the container can see.
-- **Overload collapses instead of degrading** past ~75 RPS per instance: queued requests run into the 1 s deadline after spending CPU. Cloud Run's concurrency setting is the lever (P5/P6).
+- **Overload collapses instead of degrading** past ~75 RPS per instance: queued requests run into the 1 s deadline after spending CPU. P5 starts Cloud Run at max concurrency 10 and 3 instances, so the autoscaler adds an instance first; P6 tunes both (ADR 0017).
 - **A shadowed variable in the k6 summarizer** (`name`, both the output file and the k6 metric) wrote every run to `iterations.json`; one pre-fix raw file was already deleted, so that run is recorded from its printed numbers.
 
 ---
@@ -350,10 +359,10 @@ Two event batches can overlap. Read-modify-write would lose one click. `RPUSH` i
 On MIND-small's holdout, with proxies (first-seen time for freshness, prior clicks for trending, ranked per request so only ranks matter), by rules written before seeing any result, then reported once on MIND-large dev. The proxies' limits are stated, and the live behaviour is checked separately by the persona replay.
 
 **7. What did the persona replay tell you about freshness?**
-That the tuned freshness weight under-delivers on the product promise. Only a third of page 1 was under 2 h old, with a median age of 4 h. The next grid value (0.1 instead of 0.05) makes it 71% and 1.1 h. MIND can't settle this (its "first seen" is a coarse proxy), so I reported it as a product decision instead of changing a tuned constant silently.
+That the tuned weights under-delivered on the product promise: only a third of page 1 was under 2 h old, with a median age of 4 h. I reported it instead of changing a tuned constant silently. The owner then picked rank-3 (w_fresh 0.1, w_trend 0.05), which ties the shipped config on the pre-registered holdout objective (J 0.42307 vs 0.42309; it lost only the "smallest weights" tie-break) and gives 66% under 2 h with a 1.3 h median. New readers are unchanged, because the cold segment kept its weights; that's the next lever.
 
 **8. Why k = 3 for the cold-start blend when the tuning chose 0?**
-The pre-registered rule optimised only readers with ≤ 2 clicks, where k barely matters, and chose 0. But with k = 0 one click replaces a new reader's chosen topics, because NRMS-lite's output is essentially that one article. The owner set k = 3 as a product decision (rank-2), and the replay's new-reader check backs it: after one off-topic click, page 2 is 51% followed topics under k = 3 vs 11% under k = 0. On MIND's holdout, k = 3 also helped readers with 3–10 clicks by 3–4%.
+The pre-registered rule optimised only readers with ≤ 2 clicks, where k barely matters, and chose 0. But with k = 0 one click replaces a new reader's chosen topics, because NRMS-lite's output is essentially that one article. The owner set k = 3 as a product decision (rank-2, kept in rank-3), and the replay's new-reader check backs it: after one off-topic click, page 2 is 51% followed topics under k = 3 vs 10.5% under k = 0. On MIND's holdout, k = 3 also helped readers with 3–10 clicks by 3–4%.
 
 **9. Did the API meet the 150 ms p95 at 100 RPS?**
 No, not on one 1-vCPU container: it holds about 70 RPS at a 44 ms p95 and saturates at 80. At 50 RPS the p95 is 21 ms. Getting there needed one fix: numpy's BLAS was spawning a thread per host CPU inside a 1-CPU quota, which failed 79% of requests at 50 RPS. 100 RPS needs two instances. The local stack also flatters the database (no CPU limit on Postgres), so P5 re-measures on Supabase and P6 does the full study.
