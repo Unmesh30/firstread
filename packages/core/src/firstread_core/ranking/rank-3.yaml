@@ -1,0 +1,23 @@
+# Ranking config (ADR 0014, amendment 2026-10-24). rank-2 with w_fresh 0.1 and
+# w_trend 0.05: an owner decision. On the pre-registered holdout objective it ties
+# rank-2 (J 0.42307 vs 0.42309; it lost only the "smallest weights" tie-break), and
+# the P3e persona replay showed page 1 too old under rank-2. The cold segment and
+# every other constant are unchanged. Dev is not re-run. rank-1 and rank-2 are kept
+# for the record; a new constant means a new version file (SHA pinned in tests).
+version: rank-3
+model_norm: raw
+w_fresh: 0.1
+w_trend: 0.05
+half_life_hours: 3.0
+mmr_lambda: 0.7
+cold_start_k: 3.0
+cold_start_k_source: judgment
+trend_half_life_hours: 6.0
+story_cap: 2
+rerank_size: 150
+slate_size: 100
+page_size: 20
+cold_segment:
+  max_history: 2
+  w_fresh: 0.05
+  w_trend: 0.1

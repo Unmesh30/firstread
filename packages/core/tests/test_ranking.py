@@ -172,16 +172,17 @@ def test_reasons_follow_the_largest_components() -> None:
 # ---- config ----
 
 # Each released ranking config's SHA-256 (ADR 0014): editing a file means a new version.
-# rank-1: tuned on MIND-small holdout. rank-2: rank-1 with the owner's k = 3 (the default).
+# rank-1: tuned on MIND-small holdout. rank-2: rank-1 with the owner's k = 3. rank-3 (the
+# default): rank-2 with the owner's w_fresh 0.1 / w_trend 0.05, a tie on the holdout J.
 PINNED_SHA: dict[str, str] = {
     "rank-1": "cd25c71fe10fd0a0d1787dadbda417fb13b6b8c92c86e3dbbbfc7373294e6f23",
     "rank-2": "3befa2936a3f1d5f205a4aee091a0159d173374b8863a0c750d992aab1427b51",
+    "rank-3": "eda190a272086927c56e6260cd93de21d5ad529161dee309b26d81f93b30d412",
 }
 
 
-def test_rank_2_is_the_default_and_differs_from_rank_1_only_in_k() -> None:
-    one, two = load_config("rank-1"), load_config()
-    assert two.version == "rank-2"
+def test_rank_2_differs_from_rank_1_only_in_k() -> None:
+    one, two = load_config("rank-1"), load_config("rank-2")
     assert model_version("v0.2.0", two) == "v0.2.0+rank-2"
     assert (two.cold_start_k, two.cold_start_k_source) == (3.0, "judgment")
     assert (one.cold_start_k, one.cold_start_k_source) == (0.0, "tuned")
@@ -191,6 +192,16 @@ def test_rank_2_is_the_default_and_differs_from_rank_1_only_in_k() -> None:
         if k not in {"version", "cold_start_k", "cold_start_k_source"}
     }
     assert same == {k: v for k, v in vars(two).items() if k in same}
+
+
+def test_rank_3_is_the_default_and_differs_from_rank_2_only_in_the_shared_weights() -> None:
+    two, three = load_config("rank-2"), load_config()
+    assert three.version == "rank-3"
+    assert model_version("v0.2.0", three) == "v0.2.0+rank-3"
+    assert (three.w_fresh, three.w_trend) == (0.1, 0.05)
+    assert three.cold_segment == two.cold_segment  # cold readers keep rank-2's weights
+    same = {k: v for k, v in vars(two).items() if k not in {"version", "w_fresh", "w_trend"}}
+    assert same == {k: v for k, v in vars(three).items() if k in same}
 
 
 def test_every_ranking_config_is_pinned_and_valid() -> None:

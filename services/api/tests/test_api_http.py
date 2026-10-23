@@ -14,7 +14,7 @@ def test_topics_are_public_and_carry_the_envelope(client: TestClient) -> None:
     body = client.get("/v1/topics").json()
     assert len(body["topics"]) == 13
     assert body["topics"][0] == {"id": "us", "name": "U.S."}
-    assert body["model_version"] == "v0.2.0+rank-2"
+    assert body["model_version"] == "v0.2.0+rank-3"
     assert body["request_id"]
 
 
