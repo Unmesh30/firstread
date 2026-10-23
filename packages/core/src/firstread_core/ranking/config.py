@@ -16,7 +16,7 @@ import yaml
 from firstread_core.ranking.features import NORMS, Norm
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_VERSION = "rank-1"
+DEFAULT_VERSION = "rank-2"  # rank-1 + owner-set k = 3 (ADR 0014 amendment)
 
 
 @dataclass(frozen=True)
