@@ -72,6 +72,7 @@ Phase 3 stores readers' data for the first time: followed topics, clicks, hides,
 ### Deleting a reader (`DELETE /v1/me`)
 
 - **Deleted now:** the reader's `served_slates`, `events`, `user_history` and `profiles` rows, plus their 5 Redis keys (one `DEL`, no SCAN). Returns 204.
+- **204 means every copy is gone.** If the Redis `DEL` fails after the Postgres rows are deleted, the call returns 503 `unavailable` with `Retry-After: 5`, and the client retries (both deletes are idempotent). Best effort would leave `u:{uid}:hist`, with vectors, for up to 7 days. The instance forgets the profile before the Redis step, so the next feed request recreates it (PR #20 review).
 - **Deleting the Supabase Auth user** needs the service key or the service role, so it waits for **P5**. After that, the cascade makes deletion complete even if the app rows were missed.
 
 ### Retention and the size guard (ingestion, every run; the API has no timers)
