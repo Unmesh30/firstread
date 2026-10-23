@@ -112,3 +112,36 @@ async def test_bad_or_mismatched_or_missing_blobs_keep_the_last_good_copy() -> N
     r.down = True
     clock.t += 61
     assert (await c.get()).version == "v1"  # type: ignore[union-attr]
+
+
+async def test_a_hanging_redis_times_out_keeps_the_copy_and_refreshes_later() -> None:
+    from firstread_api.metrics import POOLS_REFRESH
+
+    r, clock = FakeRedis(), Clock()
+    r.publish("v1")
+    c = PoolsCache(r, check_every_s=60, clock=clock, refresh_timeout_s=0.05)
+    await c.get()
+    before = POOLS_REFRESH.labels("timeout")._value.get()
+    r.publish("v2")
+    r.delay = 30  # every GET hangs
+    clock.t = 61
+    got = await asyncio.wait_for(c.get(), 1.0)  # bounded by the refresh deadline
+    assert got is not None
+    assert got.version == "v1"
+    assert c._refreshing is None
+    assert POOLS_REFRESH.labels("timeout")._value.get() == before + 1
+    clock.t = 90
+    await c.get()  # inside the 60 s interval: no new refresh
+    r.delay = 0
+    clock.t = 122
+    got = await c.get()
+    assert got is not None
+    assert got.version == "v2"
+
+
+async def test_a_cold_instance_with_a_hanging_redis_gets_none_quickly() -> None:
+    r, clock = FakeRedis(), Clock()
+    r.publish("v1")
+    r.delay = 30
+    c = PoolsCache(r, check_every_s=60, clock=clock, refresh_timeout_s=0.05)
+    assert await asyncio.wait_for(c.get(), 1.0) is None

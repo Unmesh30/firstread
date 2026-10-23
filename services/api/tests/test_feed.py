@@ -535,3 +535,101 @@ async def test_redis_commands_per_page(api: LiveApi) -> None:
     await page(api, uid, second["next_cursor"])  # re-rank: 2 + 3 reads, SET, HSET + EXPIRE
     c5 = redis_commands()
     assert (c1 - c0, c2 - c1, c3 - c2, c5 - c4) == (5, 3, 2, 8)
+
+
+# ---- PR #20 review: lost slate writes, hanging Redis ----
+
+
+class Flaky:
+    """Wraps the API's Redis: the first pipeline whose queued commands match ``when``
+    fails on execute; everything else goes through."""
+
+    def __init__(self, inner: CountingRedis, when: Any) -> None:
+        self.inner, self.when, self.fired = inner, when, False
+
+    def pipeline(self, transaction: bool = False) -> Any:
+        pipe = self.inner.pipeline(transaction)
+        run = pipe.execute
+
+        async def execute() -> list[Any]:
+            if not self.fired and self.when(list(pipe._names)):
+                self.fired = True
+                pipe._names = []
+                raise ConnectionError("flaky redis")
+            return await run()
+
+        pipe.execute = execute  # type: ignore[method-assign]
+        return pipe
+
+    def __getattr__(self, name: str) -> Any:
+        return getattr(self.inner, name)
+
+
+@pytest.mark.parametrize(
+    "when",
+    [
+        pytest.param(lambda names: names == ["get", "smembers"], id="light-read-fails"),
+        pytest.param(lambda names: "set" in names, id="slate-write-fails"),
+    ],
+)
+async def test_a_lost_slate_write_never_repeats_a_page(api: LiveApi, when: Any) -> None:
+    await seed(api)
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    first = await page(api, uid, limit=10)
+    live = svc(api).redis
+    flaky = Flaky(live, when)
+    svc(api).redis = flaky  # type: ignore[assignment]
+    try:
+        second = await page(api, uid, first["next_cursor"], limit=10)
+        assert flaky.fired
+        assert second["degraded"] == ["redis"]
+        third = await page(api, uid, second["next_cursor"], limit=10)
+        fourth = await page(api, uid, third["next_cursor"], limit=10)
+    finally:
+        svc(api).redis = live
+    shown = [*ids(first), *ids(second), *ids(third), *ids(fourth)]
+    assert len(shown) == len(set(shown)) == 40
+
+
+class HangingRedis:
+    async def get(self, key: str) -> Any:
+        await asyncio.sleep(30)
+
+
+async def test_a_hanging_redis_leaves_a_cold_instance_ann_only_inside_the_deadline(
+    api: LiveApi,
+) -> None:
+    import time
+
+    from firstread_api.pools_cache import PoolsCache
+
+    await seed(api)
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    svc(api).pools = PoolsCache(HangingRedis(), 60, refresh_timeout_s=0.3)  # cold
+    svc(api).settings.api_feed_timeout_s = 1.0
+    t0 = time.perf_counter()
+    body = await page(api, uid)
+    elapsed = time.perf_counter() - t0
+    assert body["degraded"] == ["pools"]
+    assert len(body["items"]) == 20
+    assert elapsed < 0.8
+    assert svc(api).pools._refreshing is None  # the in-flight refresh was cleared
+
+
+async def test_topics_save_with_redis_down(api: LiveApi) -> None:
+    from firstread_api.main import redis_client
+    from firstread_api.testing import make_settings
+
+    uid = uuid.uuid4()
+    live = svc(api).redis
+    dead = CountingRedis(redis_client(make_settings(redis_url="redis://127.0.0.1:1/0")))
+    svc(api).redis = dead
+    try:
+        await onboard(api, uid, ["sports", "health", "travel"])
+    finally:
+        svc(api).redis = live
+        await dead.aclose()
+    me = (await api.client.get("/v1/me", headers=api.auth(uid))).json()
+    assert me["topics"] == ["sports", "health", "travel"]

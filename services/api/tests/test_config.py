@@ -4,6 +4,7 @@ import pytest
 from pydantic import SecretStr, ValidationError
 
 from firstread_api.config import Settings
+from firstread_api.testing import make_settings
 
 PROD = {
     "app_env": "prod",
@@ -70,3 +71,22 @@ def test_every_setting_is_documented_in_env_example() -> None:
              and not line.startswith("#")}  # fmt: skip
     missing = sorted(f.upper() for f in Settings.model_fields if f.upper() not in names)
     assert not missing, f"document these in .env.example: {missing}"
+
+
+@pytest.mark.parametrize(
+    "override",
+    [{"redis_socket_timeout_s": 5}, {"redis_connect_timeout_s": 1}, {"redis_retries": 10}],
+)
+def test_the_redis_client_cannot_be_configured_to_hang(override: dict) -> None:  # type: ignore[type-arg]
+    with pytest.raises(ValueError, match="less than or equal"):
+        make_settings(**override)
+
+
+def test_the_redis_client_uses_the_fail_fast_settings() -> None:
+    from firstread_api.main import redis_client
+
+    client = redis_client(make_settings())
+    kw = client.connection_pool.connection_kwargs
+    assert kw["socket_timeout"] == 0.5
+    assert kw["socket_connect_timeout"] == 0.5
+    assert kw["retry"].get_retries() == 1
