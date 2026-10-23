@@ -38,3 +38,7 @@ node_modules/
 
 # Runner-side window snapshot (ingest; GitHub Actions cache)
 .window/
+
+# Load test: local keys and tokens, raw k6 samples (aggregates are committed)
+loadtest/.tokens/
+loadtest/results/raw*.csv

@@ -5,7 +5,7 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real rank-tune rank-report topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real rank-tune rank-report persona-replay persona-report loadtest-seed loadtest session-cost topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
@@ -58,6 +58,24 @@ ingest: ## One ingestion run against the local stack (DRY_RUN=1 writes nothing)
 DAYS ?= 3
 replay: ## Replay DAYS of GKG files into firstread_replay (FRESH=1 starts over, COMPARE=1 checks vs pre-P3 SQL)
 	uv run firstread-ingest replay --days $(DAYS) $(if $(FRESH),--fresh) $(if $(COMPARE),--compare)
+
+# ---- Recommendation API (Phase 3e): local only, never production ----
+persona-replay: ## Replay 3 days with the real feed at 8 clock times a day (~25 min; data/persona-replay/)
+	uv run python services/api/scripts/persona_replay.py run
+
+persona-report: ## Aggregates of the persona replay -> docs/learn/data/03-personas.json
+	uv run python services/api/scripts/persona_replay.py report
+
+loadtest-seed: ## Seed firstread_loadtest + Redis db 2 from the replay, 240 readers, local tokens
+	uv run python loadtest/seed_local.py
+
+loadtest: ## k6 at 50 then 100 RPS against a 1 vCPU / 512 MiB API container -> loadtest/results/
+	loadtest/run_local.sh
+	uv run python loadtest/analyze.py
+
+SESSIONS ?= 20
+session-cost: ## Redis commands, egress, bandwidth per feed session (LABEL=cold|warm, SKIP=n)
+	uv run python loadtest/session_cost.py --sessions $(SESSIONS) --label $(LABEL) --skip $(or $(SKIP),0)
 
 # ---- Offline ML (Phase 1) ----
 mind-download: ## Download + verify MIND (VARIANT=small|large, needs ACCEPT_LICENSE=1)
