@@ -11,7 +11,7 @@ dependencies = ["numpy>=2.5.4", "pyyaml>=6.0.3"]
 # fastembed can change vectors, which is train/serve skew.
 embed = ["fastembed==0.9.0"]
 # Postgres helpers (connect with the Supabase-pooler setting, migrations).
-db = ["asyncpg==0.32.0"]
+db = ["asyncpg==0.32.0", "pgvector==0.5.1"]
 
 [build-system]
 requires = ["uv_build>=0.13.0,<0.14"]
