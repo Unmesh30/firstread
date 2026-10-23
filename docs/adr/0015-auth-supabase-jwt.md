@@ -1,0 +1,76 @@
+# ADR 0015: API authentication with Supabase JWTs, and the API's HTTP standards
+
+- Status: Accepted
+- Date: 2026-10-23
+
+## Context
+
+Readers sign in anonymously on first launch (Supabase Auth), optionally linking Google later (SPEC §10). The API on Cloud Run must decide, per request, who the reader is, without calling Supabase per request and without trusting anything the token says about where its key lives.
+
+Facts checked on 2026-10-18:
+- Supabase publishes the project's signing keys at `https://<ref>.supabase.co/auth/v1/.well-known/jwks.json`. ES256 and RS256 are the asymmetric options, and HS256 is "not recommended for production" ([signing keys](https://supabase.com/docs/guides/auth/signing-keys)).
+- The JWKS endpoint is cached at Supabase's edge for 10 minutes.
+- Tokens carry `iss = https://<ref>.supabase.co/auth/v1`, `aud = authenticated`, `role = authenticated`, `sub` (a UUID) and `is_anonymous` ([JWT fields](https://supabase.com/docs/guides/auth/jwt-fields)).
+- PyJWT before 2.13.0 had CVE-2026-48522: `PyJWKClient` passed its URI straight to `urllib`, so `file://` and other schemes worked ([OSV](https://osv.dev/vulnerability/ROOT-APP-PYPI-CVE-2026-48522)). The latest release is 2.15.1.
+
+## Decision
+
+### Verification (`firstread_api/auth.py`)
+
+- **Keys:**
+  - Keys come only from the configured `AUTH_JWKS_URL` (or a local file, local/test only), fetched with `httpx.AsyncClient`, with redirects off.
+  - `jku`, `x5u` and `jwk` headers are ignored; a test signs with a different key under the same kid and a `jku` header, and is rejected.
+  - **PyJWT ≥ 2.15.1, without `PyJWKClient`.**
+- **Cache:**
+  - At most `AUTH_JWKS_TTL_S` (≤ 600 s, enforced by settings, matching Supabase's edge cache).
+  - Fetches are single-flight behind a lock and happen lazily inside requests (request-based billing gives no CPU outside them).
+  - An **unknown `kid`** refetches at most once per `AUTH_JWKS_MIN_REFRESH_S` (60 s), so a rotated key is picked up in seconds while a flood of random kids can't make us hammer Supabase. The first fetch doesn't count against that interval.
+  - **No stale-if-error:** past the TTL, an unreachable JWKS is a `503 auth_unavailable` with `Retry-After`, not an old key set used indefinitely.
+- **Algorithms:**
+  - An allowlist, `AUTH_ALGORITHMS = ES256`; RS256 only if added on purpose.
+  - Settings refuse HS256 and `none`, and keys in the JWKS with other algorithms are dropped.
+  - The key type must match the algorithm (EC for ES256).
+  - Tests cover HS256 signed with the public key (built by hand: PyJWT refuses to create one) and `alg: none`.
+- **Claims:**
+  - `exp` (30 s leeway), `iat`, `iss`, `aud` and `sub` are required;
+  - `role` must be `authenticated` (`anon` and `service_role` are refused);
+  - `sub` must be a UUID;
+  - `is_anonymous` is kept on the profile.
+- **Local and test only:**
+  - `AUTH_DEV_BYPASS` accepts `X-Dev-User: <uuid>` (Docker Compose sets it).
+  - `AUTH_LOCAL_JWKS_FILE` lets the load test sign its own tokens.
+- **Production refuses to start** with either set, without an https JWKS URL and an issuer, or without `METRICS_TOKEN` and `LOG_UID_SALT`.
+- **P5** switches the Supabase project to an ES256 signing key if it isn't one already.
+
+### HTTP standards
+
+- **One error shape** for every 4xx/5xx: `{"error": {"code", "message", "details?"}, "request_id"}`. It covers our errors, HTTP errors, validation (422 with field details) and unexpected exceptions (500, with only the exception type logged, never its text).
+- **Every JSON response** carries `request_id` and `model_version` (`v0.2.0+rank-2`).
+- **Inbound `X-Request-ID`** is kept only if it matches `[A-Za-z0-9._-]{8,64}`; otherwise it is replaced.
+- **operationIds are explicit** (`listTopics`, `getMe`, `setMyTopics`, `deleteMe`, `postEvents`, …). The spec is exported to `services/api/openapi.json` (`uv run firstread-api openapi`), and a contract test fails if it is stale. P4 generates its client from it.
+- **CORS** comes from `API_CORS_ORIGINS` (the GitHub Pages origin and the Expo dev servers). There are no credentials (bearer tokens, not cookies). `X-Request-ID`, `Server-Timing` and `Retry-After` are exposed.
+- **Rate limits are in-process token buckets:**
+  - per user: feed 60/min, events 120/min, writes 10/min; per IP: 300/min; health probes are exempt.
+  - 429 comes with `Retry-After`.
+  - A Redis-backed limiter would cost at least one Upstash command per request, the binding budget (ADR 0011). With at most 3 instances, a client can get up to 3× the limit, which is acceptable for abuse protection at demo scale.
+  - Client IPs come from `request.client.host`. uvicorn applies `X-Forwarded-For` only from `FORWARDED_ALLOW_IPS` (P5 sets Cloud Run's value).
+- **Logs** carry `uid_hash` = HMAC-SHA256(`LOG_UID_SALT`, uid)[:16], never the raw id.
+- **One uvicorn worker per container,** so prometheus-client needs no multiprocess mode; Cloud Run scales by instances.
+- **`/metrics`:**
+  - labels are route templates;
+  - it needs `Authorization: Bearer $METRICS_TOKEN` outside local, and is hidden from the spec;
+  - counters cover Redis commands by name (pipelined ones included) and estimated Postgres result bytes by query name.
+
+## Alternatives considered
+
+- **Calling Supabase's `getUser` per request.** A network round trip and an Auth request on every API call; local verification against the JWKS is what Supabase recommends for servers.
+- **The legacy shared JWT secret (HS256).** A leaked secret can mint tokens. Asymmetric keys mean the API holds nothing that can sign.
+- **`PyJWKClient`.** Synchronous urllib, any URI scheme before 2.13, and its own cache rules. Twenty lines of httpx give us the exact caching behaviour we want.
+- **Stale-if-error for the JWKS.** It keeps serving during a Supabase outage, but a revoked key could stay trusted for as long as the outage lasts. A short 503 is the safer failure.
+- **Redis rate limiting.** Exact across instances, but it costs commands (above).
+
+## Consequences
+
+- Auth adds no network call per request; the JWKS is fetched at most every 10 minutes per instance.
+- A Supabase Auth outage longer than the TTL makes authenticated endpoints 503. Public ones (`/v1/topics`, P3e's `/v1/stats` and personas list) keep working.
+- The token tests sign with a locally generated P-256 key (`firstread_api.testing.Signer`); the k6 run in P3e uses the same signer with `AUTH_LOCAL_JWKS_FILE`.
