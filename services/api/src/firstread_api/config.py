@@ -45,6 +45,8 @@ class Settings(BaseSettings):
     auth_jwks_min_refresh_s: int = 60  # at most one refetch per interval on an unknown kid
     auth_leeway_s: int = 30
     auth_http_timeout_s: float = 2.0
+    # After a failed JWKS fetch (cache expired), 503 immediately for this long.
+    auth_jwks_failure_backoff_s: float = 10.0
     # Local and test only: accept `X-Dev-User: <uuid>` without a token.
     auth_dev_bypass: bool = False
     # Local and test only: read the JWKS from a file (the load test signs its own tokens).

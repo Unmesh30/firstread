@@ -59,6 +59,7 @@ class JWKSCache:
         self.keys: dict[str, jwt.PyJWK] = {}
         self.fetched_at = -1e18
         self.last_unknown_kid_fetch = -1e18  # rate-limits refetches for unseen kids
+        self.failed_at = -1e18  # last failed fetch: 503 at once during the backoff
         self.lock = asyncio.Lock()
 
     def _fresh(self, now: float) -> bool:
@@ -82,13 +83,18 @@ class JWKSCache:
             if self.client is None:
                 await client.aclose()
 
+    def _backing_off(self, now: float) -> bool:
+        return now - self.failed_at < self.settings.auth_jwks_failure_backoff_s
+
     async def _refresh(self) -> None:
         try:
             data = await self._load()
         except AuthUnavailableError:
+            self.failed_at = time.monotonic()
             JWKS_REFRESH.labels("error").inc()
             raise
         except Exception as exc:
+            self.failed_at = time.monotonic()
             JWKS_REFRESH.labels("error").inc()
             log.warning("jwks_fetch_failed", error=type(exc).__name__)
             raise AuthUnavailableError(type(exc).__name__) from exc
@@ -111,9 +117,16 @@ class JWKSCache:
         now = time.monotonic()
         if self._fresh(now) and kid in self.keys:
             return self.keys[kid]
+        # After a failed fetch, answer 503 at once for a short backoff instead of every
+        # request queueing on the lock behind another timeout.
+        if not self._fresh(now) and self._backing_off(now):
+            JWKS_REFRESH.labels("backoff").inc()
+            raise AuthUnavailableError("backing off after a failed JWKS fetch")
         async with self.lock:
             now = time.monotonic()
             if not self._fresh(now):
+                if self._backing_off(now):  # another request failed while we waited
+                    raise AuthUnavailableError("backing off after a failed JWKS fetch")
                 await self._refresh()
             elif (
                 kid not in self.keys
