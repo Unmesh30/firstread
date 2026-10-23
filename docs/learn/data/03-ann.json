@@ -1,0 +1,36 @@
+{
+ "machine": "arm64 Darwin 25.3.0",
+ "postgres": "local Docker (pgvector/pgvector:0.8.7-pg17, Docker Desktop 4 GB)",
+ "rows": 72000,
+ "rows_in_72h_window": 14400,
+ "build_seconds": 55.4,
+ "queries": 200,
+ "runs_per_query": 3,
+ "limit": 200,
+ "results": {
+  "exact": {
+   "p50_ms": 4.9,
+   "p95_ms": 5.28,
+   "recall_at_200": 1.0,
+   "min_recall": 1.0,
+   "mean_results": 200.0
+  },
+  "hnsw_ef200": {
+   "p50_ms": 4.74,
+   "p95_ms": 5.57,
+   "recall_at_200": 0.9828,
+   "min_recall": 0.935,
+   "mean_results": 200.0
+  },
+  "hnsw_ef400": {
+   "p50_ms": 4.53,
+   "p95_ms": 5.29,
+   "recall_at_200": 0.9831,
+   "min_recall": 0.935,
+   "mean_results": 200.0
+  }
+ },
+ "rule": "HNSW if recall@200 >= 0.95 and p95 <= exact p95; otherwise exact",
+ "decision": "exact",
+ "hnsw_plan_uses_index": true
+}

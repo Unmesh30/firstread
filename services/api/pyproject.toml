@@ -16,6 +16,8 @@ dependencies = [
   "pyjwt[crypto]>=2.15.1",
   "httpx>=0.28.1",
   "prometheus-client>=0.26.0",
+  # The user encoder only: no torch, no scikit-learn, no fastembed (ADR 0005).
+  "onnxruntime>=1.31.0",
 ]
 
 [project.scripts]
