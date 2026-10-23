@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request, Response
 from firstread_api import redis_state, repo
 from firstread_api.auth import Principal
 from firstread_api.deps import Services, ensure_profile, forget_profile, limit_ip, services, user
-from firstread_api.errors import ERROR_RESPONSES, request_id_of
+from firstread_api.errors import ERROR_RESPONSES, ApiError, request_id_of
 from firstread_api.schemas import HistoryItem, MeResponse, TopicsUpdate
 
 log = structlog.get_logger("firstread_api.me")
@@ -71,9 +71,20 @@ async def delete_me(
 ) -> Response:
     """Delete this reader's profile, history, events, served slates and cached state.
 
+    204 only when every copy is gone; 503 with ``Retry-After`` if Redis couldn't be
+    cleared (the Postgres rows are already gone; retrying is safe).
+
     The Supabase Auth user itself is removed in P5 (that needs the service key)."""
     async with svc.pool.acquire() as conn:
         await repo.delete_user_data(repo.Q(conn), who.user_id)
-    await redis_state.delete_user(svc.redis, who.user_id)
+    # Before Redis: whatever happens next, this instance must recreate the profile.
     forget_profile(svc, who.user_id)
+    try:
+        await redis_state.delete_user(svc.redis, who.user_id)
+    except Exception as exc:
+        # A 204 must mean every copy is gone (u:{uid}:hist holds vectors for 7 days).
+        # Both deletes are idempotent, so the client simply retries.
+        log.warning("delete_me_redis_failed", error=type(exc).__name__)
+        raise ApiError(503, "could not delete cached data; retry", "unavailable",
+                       headers={"Retry-After": "5"}) from None  # fmt: skip
     return Response(status_code=204)

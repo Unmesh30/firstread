@@ -633,3 +633,45 @@ async def test_topics_save_with_redis_down(api: LiveApi) -> None:
         await dead.aclose()
     me = (await api.client.get("/v1/me", headers=api.auth(uid))).json()
     assert me["topics"] == ["sports", "health", "travel"]
+
+
+async def test_delete_me_with_redis_down_is_a_503_and_a_retry_finishes_it(api: LiveApi) -> None:
+    from firstread_api.main import redis_client
+    from firstread_api.testing import make_settings
+
+    await seed(api)
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    first = await page(api, uid)
+    await events(api, uid, ev("click", ids(first)[0]))
+    await page(api, uid, first["next_cursor"])  # slate, vector cache, history, hidden set
+    await api.redis.sadd(rs.seen_key(uid), ids(first)[1].encode())  # an impression
+    assert await api.redis.exists(*rs.all_keys(uid)) == 5
+
+    live = svc(api).redis
+    dead = CountingRedis(redis_client(make_settings(redis_url="redis://127.0.0.1:1/0")))
+    svc(api).redis = dead
+    try:
+        r = await api.client.delete("/v1/me", headers=api.auth(uid))
+        assert r.status_code == 503
+        assert r.headers["retry-after"] == "5"
+        assert r.json()["error"]["code"] == "unavailable"
+        assert r.json()["request_id"]
+    finally:
+        svc(api).redis = live
+        await dead.aclose()
+    conn = await api.db()
+    try:
+        for table in ("profiles", "user_history", "events", "served_slates"):
+            n = await conn.fetchval(
+                f"select count(*) from public.{table} where user_id = $1",  # noqa: S608
+                uid,
+            )
+            assert n == 0, table
+    finally:
+        await conn.close()
+    # The instance forgot the profile: the feed recreates it instead of 503ing.
+    assert (await page(api, uid))["items"]
+    r = await api.client.delete("/v1/me", headers=api.auth(uid))
+    assert r.status_code == 204
+    assert await api.redis.exists(*rs.all_keys(uid)) == 0
