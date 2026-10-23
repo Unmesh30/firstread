@@ -115,8 +115,10 @@ def trend_scores(
 
     ``Σ 2^(-(t - t_c) / half_life)`` over clicks with ``t - window < t_c < t``.
     """
-    arts = np.concatenate([p.cand[p.label == 1] for p in click_parts]).astype(np.int64)
-    times = np.concatenate([np.repeat(p.time, p.cand_len)[p.label == 1] for p in click_parts])
+    rows = [click_rows(p) for p in click_parts]
+    arts = np.concatenate([p.cand[pos] for p, (_, pos) in zip(click_parts, rows, strict=True)])
+    arts = arts.astype(np.int64)
+    times = np.concatenate([p.time[r] for p, (r, _) in zip(click_parts, rows, strict=True)])
     t0 = int(min(times.min(), test.time.min())) - int(window_h * HOUR) - 1
     rel = (times - t0).astype(np.int64)
     span = int(max(rel.max(), (test.time - t0).max())) + 1
@@ -126,7 +128,7 @@ def trend_scores(
     h = half_life_h * HOUR
     prefix = np.concatenate([[0.0], np.cumsum(np.power(2.0, rel / h))])
     cand = test.cand.astype(np.int64)
-    t = (np.repeat(test.time, test.cand_len) - t0).astype(np.int64)
+    t = (test.time[test.cand_imp] - t0).astype(np.int64)
     lo = np.searchsorted(key, cand * span + (t - int(window_h * HOUR)), side="right")
     hi = np.searchsorted(key, cand * span + t, side="left")  # strictly before t
     out: NDArray[np.float64] = (prefix[hi] - prefix[lo]) * np.power(2.0, -t / h)
@@ -142,8 +144,33 @@ def user_vectors(
     return l2_normalize(np.concatenate(parts))
 
 
-def cosines(imps: Impressions, users: NDArray[np.float32], emb: NDArray[np.float32]) -> Any:
-    return np.einsum("ij,ij->i", users[imps.cand_imp], emb[imps.cand]).astype(np.float64)
+def cosines(
+    imps: Impressions, users: NDArray[np.float32], emb: NDArray[np.float32]
+) -> NDArray[np.float64]:
+    """cos(user, candidate) per flat candidate, in chunks of impressions (MIND-large dev
+    has 14M candidates; gathering them all at once would need ~20 GB)."""
+    out = np.empty(len(imps.cand), np.float64)
+    for start in range(0, imps.n, SCORE_CHUNK):
+        stop = min(start + SCORE_CHUNK, imps.n)
+        lo, hi = imps.cand_offsets[start], imps.cand_offsets[stop]
+        local = np.repeat(np.arange(stop - start), imps.cand_len[start:stop])
+        out[lo:hi] = np.einsum("ij,ij->i", users[start:stop][local], emb[imps.cand[lo:hi]])
+    return out
+
+
+def click_rows(imps: Impressions) -> tuple[NDArray[np.int64], NDArray[np.int64]]:
+    """(impression row, flat candidate index) of every click, without per-candidate
+    temporaries (MIND-large train has 83M candidates)."""
+    pos = np.flatnonzero(imps.label == 1)
+    rows = np.searchsorted(imps.cand_offsets, pos, side="right") - 1
+    return rows.astype(np.int64), pos.astype(np.int64)
+
+
+def population_vector(fit: Impressions, emb: NDArray[np.float32]) -> NDArray[np.float32]:
+    """Normalized mean embedding of all fit clicks (the empty-history vector), as a
+    click-count-weighted sum instead of gathering every clicked row (~5 GB on large)."""
+    counts = np.bincount(fit.cand[fit.label == 1], minlength=len(emb)).astype(np.float64)
+    return l2_normalize((counts @ emb.astype(np.float64)) / counts.sum())
 
 
 def stated_topics(
@@ -158,8 +185,8 @@ def stated_topics(
     Revealed, not stated, interests (ADR 0014): an optimistic stand-in.
     """
     per_user: dict[int, Counter[str]] = {}
-    clicked = fit.label == 1
-    for u, a in zip(np.repeat(fit_users, fit.cand_len)[clicked], fit.cand[clicked], strict=True):
+    rows, pos = click_rows(fit)
+    for u, a in zip(fit_users[rows].tolist(), fit.cand[pos].tolist(), strict=True):
         t = str(article_topic[a])
         if t in TOPIC_IDS:
             per_user.setdefault(int(u), Counter())[t] += 1
@@ -209,6 +236,7 @@ def build_features(
         embedding_id=embedding_cache_key()[0][:16],
         model_dir=model_dir,
         tag=f"{variant}-{split}",
+        _population=population_vector(data.fit, emb),
     )
     encoder.fit(ctx)
     users = user_vectors(data.test, encoder.user_vectors)
