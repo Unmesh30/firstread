@@ -9,7 +9,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Literal
 
-from pydantic import SecretStr, field_validator, model_validator
+from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from firstread_core.ranking.config import DEFAULT_VERSION as RANKING_VERSION
@@ -31,6 +31,12 @@ class Settings(BaseSettings):
     redis_url: SecretStr = SecretStr("redis://localhost:6379/0")
     readyz_timeout_s: float = 2.0
     db_pool_max: int = 5
+    # The Redis client fails fast: redis-py's defaults (5 s socket timeout, several
+    # retries) can hold a call for about a minute when Redis hangs. Upper bounds are
+    # enforced so a typo can't bring that back.
+    redis_socket_timeout_s: float = Field(default=0.5, gt=0, le=0.5)
+    redis_connect_timeout_s: float = Field(default=0.5, gt=0, le=0.5)
+    redis_retries: int = Field(default=1, ge=0, le=1)
 
     # What every response's model_version names (ADR 0014): model release + ranking.
     api_model_tag: str = "v0.2.0"
@@ -49,6 +55,7 @@ class Settings(BaseSettings):
     api_ann_ef_search: int = 400  # the benchmark's winner (03-ann.json)
     api_vec_ttl_s: int = 600  # cached user vectors (SPEC: 10 min)
     api_pools_check_s: float = 60.0
+    api_pools_refresh_timeout_s: float = 0.3  # both GETs of a snapshot refresh
     api_article_cache: int = 20_000
     api_page_cache_s: float = 60.0
     # Stage deadlines (seconds); a stage past its deadline degrades or 503s (ADR 0017).
