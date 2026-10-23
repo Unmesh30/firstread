@@ -116,3 +116,57 @@ The rules say how each proxy is built and record the mismatches as limitations.
 - One file, `rank-1.yaml`, holds every ranking constant. The API, the offline replay and the persona report read it through the same functions.
 - The proxies' limitations go into learn chapter 03 next to the numbers.
 - A new ranking version means a new YAML file (pinned SHA), new reports, and a `model_version` bump in responses.
+
+## Results (added after the rules; the rules above are unchanged)
+
+### Holdout: MIND-small, 30,270 impressions, fit-days encoder
+
+Full table: `ml/reports/ranking-mind-small-holdout.md`.
+
+**Step 1, blend:** raw cosine + 0.05 · freshness (3 h half-life) + 0.025 · trend.
+
+| nDCG@10 | Model only | Chosen blend |
+|---|---:|---:|
+| overall | 0.3765 | 0.3843 (+2.1%) |
+| cold candidates | 0.4525 | 0.4619 (+2.1%) |
+| cold users | 0.3188 | 0.3318 (+4.1%) |
+
+- The best raw config by J (h = 6 h, 0.05 / 0.05, J 0.4241 vs 0.4231) is within the 0.001 tie band, so the rule took the lighter weights.
+- z-score and percentile normalization were worse at their best (J 0.4190 and 0.4189).
+
+**Step 2, MMR:** λ = 0.7.
+- nDCG@10 overall 0.3818, 99.3% of λ = 1's 0.3843; ILD@10 rises from 0.5502 to 0.5557.
+- MIND's impressions are already diverse, so MMR moves little offline. On live candidate pools with many copies of big stories it matters more (P3e reports it per persona).
+
+**Step 3, cold-start k:** k = 0, tuned. 737 cold (≤ 2 clicks) stated-topic impressions, over the 500 soundness threshold.
+- The k values are within noise on cold users: 0.3151 (k = 0) vs 0.3148 (k = 3).
+- **But the topic blend helps readers with 3–50 clicks:** k = 3 lifts nDCG@10 on the whole stated-topic population from 0.3787 to 0.3833 (+1.2%), with +0.016 at 6–10 clicks.
+- The pre-registered rule optimizes the ≤ 2-click bucket only, so it chose k = 0. The rule is not changed after the fact; a different k would need a new rule and `rank-2`. That is the owner's call (raised in the 3b PR).
+- With k = 0 the topic vector is used only at **zero** clicks (`cold_start_vector` returns the topic vector when n = 0, whatever k is). The first click replaces it.
+- The zero-click bucket is identical across k by construction. This study does not compare the topic vector with the population vector for brand-new readers.
+
+**Step 4, history-dependent weights:** adopted, marginally.
+- Cold users (≤ 2 clicks) get w_trend = 0.1 instead of 0.025.
+- Cold-user nDCG@10 0.3318 → 0.3353, +1.06% against the 1% threshold.
+
+**Config:** `packages/core/src/firstread_core/ranking/rank-1.yaml` (SHA pinned in `test_ranking.py`).
+
+### Dev: MIND-large, 376,471 impressions, shipped v0.2.0 encoder (reported once)
+
+Full table: `ml/reports/ranking-mind-large-dev.md`.
+
+**The single dev look.** The first attempt, on 2026-10-22, was killed for memory (exit 137, then a forced quit of the machine) **before it produced any dev metric**: its log holds only the command line and no report file was written. The report was then rewritten to stream 2,048 impressions at a time end to end, with a test that the result doesn't depend on the chunk size. It ran once, with a peak RSS of 4.13 GB, reached while deriving inputs from train. Nothing was tuned on these numbers.
+
+**Check:** model-only reproduces the model card's shipped seed-0 numbers exactly (0.4149 / 0.5515 / 0.3625).
+
+| nDCG@10 (full dev) | Model only | rank-1 blend |
+|---|---:|---:|
+| overall | 0.4149 | 0.4199 (+1.2%) |
+| cold candidates | 0.5515 | 0.5522 (+0.1%) |
+| cold users | 0.3625 | 0.3811 (+5.1%) |
+
+- The blend gains or holds on 13 of 14 categories (largest: travel +0.019, news +0.013, weather +0.014). Finance dips by 0.001.
+- **MMR,** on the fixed 50,000-impression sample: λ = 0.7 costs 0.9% nDCG@10 (0.4189 → 0.4151) for ILD@10 0.5502 → 0.5558. As on holdout, MIND's curated impressions leave MMR little to fix.
+- **Cold start,** on the 32,284 sampled impressions whose users have stated-topic proxies (blend + MMR): giving zero-click readers the topic vector instead of the population vector raises cold-user nDCG@10 from 0.3628 to 0.3700 (+2.0%), with overall 0.4099 → 0.4102. With k = 0 that is the only place topics act.
+
+**Against SPEC §11's quality target:** the shipped model already beats the best baseline (ADR 0003/model card), and the blend keeps it ahead overall and on cold candidates.
