@@ -136,3 +136,33 @@ redis-py 8.1 defaults to a 5 s socket (and connect) timeout and up to 10 retries
 - Tests can't fake `X-Request-ID` into `served_slates`: the id is always server-generated (ADR 0015).
 - **Local only so far:** Supabase Nano is shared CPU, so HNSW, exact and pooler latencies there may be 2–3× local. P5's smoke tests re-measure, and the rule can be re-run against the live database.
 - P6 compares batching on and off, and caching on and off, under k6. P3e reports the local p95 for the whole feed.
+
+## Amendment (2026-10-23, P3e): local p95 at Cloud Run's shape, and one BLAS thread
+
+**Setup** (`make loadtest-seed loadtest`):
+- the runtime image at `--cpus=1 --memory=512m`, one uvicorn worker, the shipped deadlines;
+- real ES256 tokens verified against `AUTH_LOCAL_JWKS_FILE`, rate limits raised;
+- the 3 replayed days of news shifted to "now" (14,400 articles), 200 readers (160 on personas, 40 cold);
+- k6 2.3.0 at a constant arrival rate, 60 s per rate, 60% first pages / 25% cursor pages / 15% event batches, on a fresh container.
+
+Postgres and Redis ran on the same Docker Desktop VM (Apple M4) without CPU limits, which is kinder than Supabase Nano and Upstash. Results: `loadtest/results/`.
+
+**Found: numpy's OpenBLAS starved the container.** On the first run 79% of requests failed at 50 RPS and 96% at 100 RPS. Even at 10 RPS 3% failed and many responses were degraded.
+- **Cause:** OpenBLAS sees the host's 10 CPUs and starts 10 threads for the small matrix products in story grouping and MMR. Under a 1-CPU quota those threads spin. The container was throttled in 88% of scheduler periods and used **74 ms of CPU per request against ~29 ms of wall time**.
+- Every stage deadline (30–80 ms) then fired, and each fallback added work. Loosening the stage deadlines alone did not help (20 RPS still failed 20%).
+- **Fix:** the image sets `OPENBLAS_NUM_THREADS=1` and `OMP_NUM_THREADS=1` (like the ONNX thread pin above), and the CI docker job asserts one OpenBLAS thread. CPU throttling fell to 2 of 3,013 periods.
+
+**Results with the fix** (`03-local.json`, `03-local-knee.json`):
+
+| Rate | Errors | Server p50 / p95 / p99 (ms) | Client p50 / p95 / p99 (ms) | Degraded |
+|---|---:|---|---|---:|
+| 50 RPS | 0% | 12.8 / **20.5** / 32.6 | 14.1 / 22.3 / 34.5 | 0 |
+| 60 RPS | 0% | 13.0 / 24.5 / 39.9 | 14.2 / 28.3 / 43.8 | 0 |
+| 70 RPS | 0% | 18.1 / **43.8** / 58.5 | 20.8 / 51.9 / 70.7 | 0 |
+| 80 RPS | 13% | 176 / 915 / 1003 | 158 / 1028 / 1078 | 26 |
+| **100 RPS** | **59%** | 795 / 1000 / 1019 | 1013 / 1051 / 1070 | 10 |
+
+- **SPEC §11's target (p95 ≤ 150 ms at 100 RPS on the local stack) is not met by one 1-vCPU container.** It holds about 70 RPS with a 44 ms p95; at 80 RPS it saturates.
+- Server time is the sum of the `Server-Timing` stages; client time is k6's request duration on the same Docker network.
+- **Overload collapses instead of slowing down:** past saturation, requests queue until the 1 s deadline and fail after spending CPU. Cloud Run's default concurrency of 80 per instance would let one instance accept such a queue. The P5/P6 lever is a lower concurrency (e.g. 40) so the autoscaler adds an instance (max 3) first, plus load shedding. P6 measures it.
+- **Other numbers:** image 503.5 MB; startup to `/readyz` 200 median 776 ms (5 runs); 144 MiB resident after the run; the in-container encoder unchanged (0.74 ms at batch 1, 22.3 ms at batch 32, one thread).

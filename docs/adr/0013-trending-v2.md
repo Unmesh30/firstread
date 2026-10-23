@@ -114,3 +114,20 @@ Phase 3's feed has the same problem as split stories: SPEC §7.8 allows at most 
 - **Re-run the network finder after sources change** (e.g. after P5's scheduled runs) and review the diff. A network that splits or grows only changes trending scores, never stored data.
 - **Costs** (included in the 84 KB-per-run egress, [ADR 0011](0011-free-tier-budgets.md)): two aggregates per run (≤ 400 and ≤ 200 rows). The representative and the merging use the runner-side window.
 - The P3d feed reuses `stories.group` for its 2-per-story cap and `stories.near_any` (τ_story) for already-read stories. P3e reports per-persona group sizes and cap drops, with examples, under the same fallback rule.
+
+## Amendment (2026-10-23, P3e): the τ_feed fallback fired for GDELT↔GDELT
+
+**What happened.** The P3e persona replay (`services/api/scripts/persona_replay.py`, `docs/learn/data/03-personas.json`) ranked each persona's page 1 with the real feed at 24 clock times over the three replayed days. It sampled the story-cap drops: up to 10 per persona, τ_feed merges first, 48 in all, with headlines.
+
+**Labels:** LLM-labeled, then spot-checked by a second, independent LLM session, which agreed on all 48. 47 were the same story. **One τ_feed merge (title↔title) was three different stories:** three AP news-digest pages from different times of the day (templated "summary at <time>" headlines with different content), at cos 0.89–0.92. Templated headlines again, as in 2b.
+
+**Decision, by the pre-registered rule:** GDELT↔GDELT τ_feed rises to its τ_story, **0.875 → 0.925** (`stories.FALLBACK_TO_TAU_STORY`). The computed values stay pinned to the rule in `COMPUTED_TAU_FEED`, and a test checks both. The other two pair types had no reviewed merges in the replay (it is GDELT-only), so they are unchanged.
+
+**Re-run with 0.925** (the numbers in `03-personas.json`; the labelled run's aggregates are kept under `labelled_review_run`):
+- every sampled cap drop now comes from ingestion's own `story_cluster_id`;
+- the largest story group on a persona's ranking is 3–4 (it was 4–6);
+- 40 drops were sampled, labelled and spot-checked the same way: 38 same story, **2 different, both inside one ingestion cluster** (τ_story, not τ_feed). One was again AP digest pages from different times of day; the other was generic dated weather forecasts from different outlets, probably for different places.
+
+**Not changed here:** ingestion's τ_story for title↔title (0.925, ADR 0009) has no pre-registered fallback, and these are digest or listing pages rather than articles. The cleaner fix is a junk-title rule for AP digests and dated generic forecasts (`config/junk_titles.yaml`). That is left to the owner (raised in the P3e PR).
+
+**Effect on trending:** merging representatives now needs cos ≥ 0.925 for GDELT pairs, so fewer split stories merge. The materiality and network decisions above are unaffected (they compare outlets, not titles).

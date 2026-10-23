@@ -1,6 +1,6 @@
 # FirstRead — Product & Technical Spec (v1)
 
-Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-23 (ADRs 0011–0016: budgets, runner window and pool snapshot, trending v2, ranking, auth, user data)
+Owner: Unmesh Achar (GitHub: Unmesh30) · Status: v1 draft · Last updated: 2026-10-23 (ADRs 0011–0018: budgets, runner window and pool snapshot, trending v2, ranking, auth, user data, feed serving, personas/why/stats)
 
 > This document is the single source of truth for what we are building. It is read before every phase. Change it deliberately (and record the reason in an ADR) rather than drifting away from it in code.
 
@@ -143,39 +143,43 @@ flowchart LR
 
 ## 8. Serving design (API)
 
-### Endpoints (v1)
+### Endpoints (v1, as built in P3; ADRs 0015–0018)
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
 | GET | `/healthz` | none | Liveness |
-| GET | `/readyz` | none | DB + Redis reachable, model loaded |
-| GET | `/v1/feed?limit=20&cursor=` | user | Ranked feed page |
-| POST | `/v1/events` | user | Batch of `impression`/`click`/`like`/`hide`/`dwell` events; idempotent by client `event_id` |
+| GET | `/readyz` | none | DB + Redis reachable, model loaded (with its tag) |
+| GET | `/v1/feed?limit=20&cursor=` | user | Ranked feed page; `next_cursor` is opaque; pages never repeat; a click or hide re-ranks the rest |
+| POST | `/v1/events` | user | Batch (≤ 100) of `impression`/`click`/`like`/`hide`/`dwell` events; idempotent by client `event_id` |
 | GET | `/v1/topics` | none | Topic list |
-| PUT | `/v1/me/topics` | user | Set followed topics (onboarding) |
+| PUT | `/v1/me/topics` | user | Set followed topics (onboarding; 3–13) |
 | GET | `/v1/me` | user | Profile summary |
-| DELETE | `/v1/me` | user | Delete my data |
-| GET | `/v1/demo/personas` | none | Demo readers |
-| POST | `/v1/demo/personas/{id}/activate` | user | Load a persona's history into this session |
-| GET | `/v1/articles/{id}/why` | user | Explanation for a recommendation |
-| GET | `/v1/stats` | none | Public stats for the System page |
-| GET | `/metrics` | internal | Prometheus metrics |
+| DELETE | `/v1/me` | user | Delete my data (204 only when every copy is gone) |
+| GET | `/v1/demo/personas` | none | Demo readers, from the pool snapshot (no database read) |
+| POST | `/v1/demo/personas/{id}/activate?replace=false` | user | Load a persona's history and topics; 409 `history_exists` for a reader with their own history or topics unless `replace=true` |
+| GET | `/v1/articles/{id}/why` | user | The blend's components and reasons for this article, recomputed for the caller |
+| GET | `/v1/stats` | none | Public stats for the System page, from the pool snapshot (with the GDELT credit) |
+| GET | `/metrics` | internal | Prometheus metrics (bearer token outside local) |
 
-Feed item: `id, title, source_name, source_domain, url, image_url?, category, published_at?, first_seen_at, score, reasons[]`. Every response carries `request_id` and `model_version`.
+Feed item: `id, title, source_name, source_domain, url, image_url?, category, published_at?, first_seen_at, score, reasons[]`. A feed page also carries `next_cursor` and `degraded` (the parts that failed and were worked around). Every response carries `request_id` (always server-generated) and `model_version` (`<model tag>+<ranking version>`, e.g. `v0.2.0+rank-2`). Errors share one schema. Rate limits are in-process token buckets (ADR 0015).
 
-**Demo personas** are synthetic readers built from **live** articles in chosen topics (for example "Markets & tech", "Sports & health"), not from MIND rows.
+**Demo personas** are synthetic readers built from **live** articles, not from MIND rows: five personas ("Markets & tech", "Sports & health", "World affairs", "Culture & food", "U.S. news"), 20 articles each, selected once a day by ingestion from the last 48 h (ADR 0018).
 
-### Feed pipeline and latency budget
+### Feed pipeline and latency budget (ADR 0017)
 
-1. Auth + load user state from Redis (≤5 ms).
-2. **Candidate generation in parallel** (`asyncio.gather`, per-source deadlines, graceful degradation): ANN top-200 by user vector over the last 72 h (pgvector HNSW) · fresh pool · trending pool · followed-topic pools → union, filter seen/hidden (≤60 ms).
-3. **Scoring** with ONNX Runtime in a thread pool, with **micro-batching across concurrent requests** (collect up to ~5 ms or 32 requests, one ONNX call) (≤20 ms).
-4. Blend + MMR diversity + reasons (≤10 ms).
-5. Cache the page in Redis (60 s), respond, log impressions asynchronously.
+Seven stages, each with a deadline and a tested way to fail; the whole request has 1 s.
 
-If a candidate source times out, continue with the others. If ANN fails, fall back to fresh + trending.
+1. **auth:** the JWT against the cached JWKS.
+2. **state** (30 ms): Redis reads ∥ the profile row; history version check and rebuilds. Redis down → history and hides from Postgres.
+3. **encode** (30 ms): the cached user vector, or the **micro-batched** ONNX encoder (up to 5 ms or 32 requests per call), then the cold-start topic blend. Encoder failure → mean of history.
+4. **candidates** (80 ms each, in parallel): ANN top-200 by user vector over the last 72 h (pgvector HNSW) ∥ cosines for the fresh, trending and followed-topic pool members; seen, read and hidden items excluded in SQL. ANN fails → pools only; no snapshot → ANN only.
+5. **hydrate** (60 ms): the top 150 from an in-process article cache.
+6. **rank:** blend, story groups, MMR with ≤ 2 per story across pages, reasons.
+7. **persist** (50 ms): the `served_slates` row, then the Redis slate, **before** responding (no work after a response on Cloud Run).
 
-**Real-time personalization:** a click event pushes the article onto the user's Redis history and invalidates the cached user vector; the next feed request recomputes it.
+Impressions are logged by the client through `/v1/events`.
+
+**Real-time personalization:** a click event appends the article to the user's Redis history with a new history version; the next feed page sees the version move, recomputes the user vector and re-ranks the rest of the slate.
 
 **Concurrency settings:** asyncpg pool sizes, ONNX intra-op threads and uvicorn workers are configurable. Cloud Run: concurrency 80, min instances 0, max instances 3, request-based billing, startup CPU boost.
 
@@ -193,7 +197,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - **`ingestion_runs`**: `id`, `started_at`, `finished_at`, `source`, `window_start`, `window_end`, `fetched`, `inserted`, `duplicates`, `near_duplicates`, `clustered`, `errors`, `gdelt_calls`, `redis_commands`, `status ('running'|'ok'|'partial'|'failed')`, `details jsonb`.
 - **`story_coverage`**: `(story_cluster_id, source_domain)` pk, `first_seen_at`: every outlet that carried a story, including dropped duplicates (trending, ADR 0010).
 - **`feed_state`**: RSS conditional-GET state (`etag`, `last_modified`, failures). **`source_cursor`**: the GKG catch-up cursor, and the published/pending pool snapshot versions (ADR 0012).
-- **`demo_personas`**, **`persona_articles`**: persona definitions built from live articles.
+- **`demo_personas`**, **`persona_articles`**: five persona definitions and a copy of each one's 20 live articles (vector included, so they outlive article retention); service-only, no grants (ADR 0018).
 - **RLS on every table** (ADR 0008/0016): articles are public-read; user tables are owner-only (`select` only; on Supabase `anon` gets nothing); all service tables have no policy. Services use a dedicated DB role (P5). Locally a shim provides `auth.users`/`auth.uid()` only where no `auth` schema exists (never on Supabase).
 - **Retention** (run by ingestion): articles 14 days, `story_coverage` 48 h, `ingestion_runs` 30 days, impressions 7 days, other events and served slates 30 days, inactive anonymous readers' app rows after 30 days. A **size guard** shortens these above 350/375/400 MB and vacuums after big deletes (Supabase Free is read-only above 500 MB; ADR 0016). Target DB size < 400 MB; measured article steady state ≈ 227 MB (3-day replay, ADR 0008).
 
@@ -203,7 +207,7 @@ If a candidate source times out, continue with the others. If ANN fails, fall ba
 - `u:{uid}:hidden` (set, 7 d, with a sentinel) and `u:{uid}:seen` (set of viewed ids, 3 d)
 - `u:{uid}` (hash, 7 d): cached user vector, stale after 10 min or when the history version moves
 - `u:{uid}:slate` (30 min): the ranked slate, served ids and a 60 s page cache (P3d)
-- `pools:ver` (current snapshot version) and `pools:blob:{ver}` (one compressed snapshot: fresh, trending, 13 topic pools, centroids, stats; no TTL, the previous one expires 120 s after the switch). Replaces the `pool:*` sorted sets (ADR 0012).
+- `pools:ver` (current snapshot version) and `pools:blob:{ver}` (one compressed snapshot: fresh, trending, 13 topic pools, centroids, stats, persona summaries; no TTL, the previous one expires 120 s after the switch). Replaces the `pool:*` sorted sets (ADR 0012).
 
 **Command budget:** ≤300K/month. Ingestion publishes in 3 commands a run; pipeline reads; count commands in metrics (ADR 0011).
 

@@ -1,0 +1,430 @@
+{
+ "window": {
+  "first": "2026-10-12T03:20:00+00:00",
+  "last": "2026-10-15T00:20:00+00:00",
+  "clock_times": 24,
+  "steady_clock_times": 16,
+  "steady_rule": "at least 24 h of replayed news before the clock time"
+ },
+ "ranking": "rank-2 (v0.2.0+rank-2); the w_fresh comparison raises w_fresh 0.05 -> 0.1",
+ "personas": {
+  "culture-food": {
+   "clock_times": 16,
+   "largest_group": 3,
+   "largest_group_mean": 2.69,
+   "groups_over_cap_mean": 2.31,
+   "cap_drops_page_1_mean": 0.06,
+   "cap_drops_slate_mean": 1.5,
+   "cap_drops_by_way": {
+    "cluster": 24
+   },
+   "freshness": {
+    "items": 320,
+    "share_under_2h": 0.2969,
+    "share_under_30min": 0.0688,
+    "median_age_h": 5.21
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 320,
+    "share_under_2h": 0.6906,
+    "share_under_30min": 0.1844,
+    "median_age_h": 1.08
+   },
+   "degraded_pages": 0
+  },
+  "markets-tech": {
+   "clock_times": 16,
+   "largest_group": 3,
+   "largest_group_mean": 2.56,
+   "groups_over_cap_mean": 0.81,
+   "cap_drops_page_1_mean": 0.12,
+   "cap_drops_slate_mean": 0.5,
+   "cap_drops_by_way": {
+    "cluster": 8
+   },
+   "freshness": {
+    "items": 320,
+    "share_under_2h": 0.3688,
+    "share_under_30min": 0.0656,
+    "median_age_h": 3.21
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 320,
+    "share_under_2h": 0.7031,
+    "share_under_30min": 0.1469,
+    "median_age_h": 1.08
+   },
+   "degraded_pages": 0
+  },
+  "sports-health": {
+   "clock_times": 16,
+   "largest_group": 3,
+   "largest_group_mean": 2.88,
+   "groups_over_cap_mean": 2.44,
+   "cap_drops_page_1_mean": 0.19,
+   "cap_drops_slate_mean": 1.25,
+   "cap_drops_by_way": {
+    "cluster": 20
+   },
+   "freshness": {
+    "items": 320,
+    "share_under_2h": 0.3156,
+    "share_under_30min": 0.0469,
+    "median_age_h": 4.96
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 320,
+    "share_under_2h": 0.7281,
+    "share_under_30min": 0.1875,
+    "median_age_h": 1.08
+   },
+   "degraded_pages": 0
+  },
+  "us-news": {
+   "clock_times": 16,
+   "largest_group": 4,
+   "largest_group_mean": 3.06,
+   "groups_over_cap_mean": 4.06,
+   "cap_drops_page_1_mean": 0.19,
+   "cap_drops_slate_mean": 2.06,
+   "cap_drops_by_way": {
+    "cluster": 33
+   },
+   "freshness": {
+    "items": 320,
+    "share_under_2h": 0.325,
+    "share_under_30min": 0.0844,
+    "median_age_h": 3.83
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 320,
+    "share_under_2h": 0.7188,
+    "share_under_30min": 0.2062,
+    "median_age_h": 1.08
+   },
+   "degraded_pages": 0
+  },
+  "world-affairs": {
+   "clock_times": 16,
+   "largest_group": 4,
+   "largest_group_mean": 3.31,
+   "groups_over_cap_mean": 3.44,
+   "cap_drops_page_1_mean": 0.5,
+   "cap_drops_slate_mean": 1.06,
+   "cap_drops_by_way": {
+    "cluster": 17
+   },
+   "freshness": {
+    "items": 320,
+    "share_under_2h": 0.3406,
+    "share_under_30min": 0.0437,
+    "median_age_h": 3.96
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 320,
+    "share_under_2h": 0.7281,
+    "share_under_30min": 0.1781,
+    "median_age_h": 1.08
+   },
+   "degraded_pages": 0
+  }
+ },
+ "all_personas": {
+  "freshness": {
+   "items": 1600,
+   "share_under_2h": 0.3294,
+   "share_under_30min": 0.0619,
+   "median_age_h": 4.08
+  },
+  "freshness_w_fresh_0.1": {
+   "items": 1600,
+   "share_under_2h": 0.7137,
+   "share_under_30min": 0.1806,
+   "median_age_h": 1.08
+  },
+  "cap_drops_page_1_mean": 0.21,
+  "largest_group": 4
+ },
+ "new_reader_check": {
+  "rank-1": {
+   "cold_start_k": 0.0,
+   "readers": 48,
+   "page2_items": 960,
+   "share_followed_topics": 0.1146,
+   "share_clicked_topic": 0.4729,
+   "by_topic_set": {
+    "sports,health,entertainment": {
+     "share_followed_topics": 0.1094,
+     "share_clicked_topic": 0.4094
+    },
+    "business,tech_science,politics": {
+     "share_followed_topics": 0.0781,
+     "share_clicked_topic": 0.4875
+    },
+    "world,travel,food_drink": {
+     "share_followed_topics": 0.1562,
+     "share_clicked_topic": 0.5219
+    }
+   },
+   "skipped": 0,
+   "degraded": 0
+  },
+  "rank-2": {
+   "cold_start_k": 3.0,
+   "readers": 48,
+   "page2_items": 960,
+   "share_followed_topics": 0.5125,
+   "share_clicked_topic": 0.125,
+   "by_topic_set": {
+    "sports,health,entertainment": {
+     "share_followed_topics": 0.5219,
+     "share_clicked_topic": 0.2188
+    },
+    "business,tech_science,politics": {
+     "share_followed_topics": 0.5687,
+     "share_clicked_topic": 0.05
+    },
+    "world,travel,food_drink": {
+     "share_followed_topics": 0.4469,
+     "share_clicked_topic": 0.1062
+    }
+   },
+   "skipped": 0,
+   "degraded": 0
+  }
+ },
+ "sampled_cap_drops": {
+  "n": 40,
+  "by_way": {
+   "cluster": 40
+  },
+  "labels": {
+   "cluster:title-title": {
+    "same_story": 38,
+    "different": 2
+   }
+  },
+  "labelled_by": "LLM-labeled; spot-checked by a second, independent LLM session (all 40 labels held; #23 and #34 footnoted as the weakest same_story)",
+  "note": "examples with headlines stay in data/persona-replay/ (gitignored) and the PR description"
+ },
+ "labelled_review_run": {
+  "why": "the sampled cap drops were labelled on this run, with title-title tau_feed 0.875; one sample (#41, three different AP digests) was two different stories, so ADR 0013's fallback raised title-title tau_feed to 0.925, and the numbers above are a re-run with that threshold",
+  "window": {
+   "first": "2026-10-12T03:20:00+00:00",
+   "last": "2026-10-15T00:20:00+00:00",
+   "clock_times": 24,
+   "steady_clock_times": 16,
+   "steady_rule": "at least 24 h of replayed news before the clock time"
+  },
+  "ranking": "rank-2 (v0.2.0+rank-2); the w_fresh comparison raises w_fresh 0.05 -> 0.1",
+  "personas": {
+   "culture-food": {
+    "clock_times": 16,
+    "largest_group": 6,
+    "largest_group_mean": 4.88,
+    "groups_over_cap_mean": 4.5,
+    "cap_drops_page_1_mean": 0.12,
+    "cap_drops_slate_mean": 2.75,
+    "cap_drops_by_way": {
+     "cluster": 35,
+     "tau_feed": 9
+    },
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3219,
+     "share_under_30min": 0.0813,
+     "median_age_h": 4.08
+    },
+    "freshness_w_fresh_0.1": {
+     "items": 320,
+     "share_under_2h": 0.7219,
+     "share_under_30min": 0.1875,
+     "median_age_h": 1.08
+    },
+    "degraded_pages": 0
+   },
+   "markets-tech": {
+    "clock_times": 16,
+    "largest_group": 4,
+    "largest_group_mean": 3.31,
+    "groups_over_cap_mean": 1.94,
+    "cap_drops_page_1_mean": 0.88,
+    "cap_drops_slate_mean": 1.06,
+    "cap_drops_by_way": {
+     "cluster": 11,
+     "tau_feed": 6
+    },
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3719,
+     "share_under_30min": 0.0625,
+     "median_age_h": 3.33
+    },
+    "freshness_w_fresh_0.1": {
+     "items": 320,
+     "share_under_2h": 0.7031,
+     "share_under_30min": 0.1469,
+     "median_age_h": 1.08
+    },
+    "degraded_pages": 0
+   },
+   "sports-health": {
+    "clock_times": 16,
+    "largest_group": 5,
+    "largest_group_mean": 3.75,
+    "groups_over_cap_mean": 3.56,
+    "cap_drops_page_1_mean": 0.25,
+    "cap_drops_slate_mean": 2.06,
+    "cap_drops_by_way": {
+     "cluster": 27,
+     "tau_feed": 6
+    },
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3469,
+     "share_under_30min": 0.0563,
+     "median_age_h": 4.46
+    },
+    "freshness_w_fresh_0.1": {
+     "items": 320,
+     "share_under_2h": 0.7281,
+     "share_under_30min": 0.1844,
+     "median_age_h": 1.08
+    },
+    "degraded_pages": 0
+   },
+   "us-news": {
+    "clock_times": 16,
+    "largest_group": 6,
+    "largest_group_mean": 4.88,
+    "groups_over_cap_mean": 6.44,
+    "cap_drops_page_1_mean": 0.69,
+    "cap_drops_slate_mean": 5,
+    "cap_drops_by_way": {
+     "cluster": 56,
+     "tau_feed": 24
+    },
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.2687,
+     "share_under_30min": 0.0719,
+     "median_age_h": 4.96
+    },
+    "freshness_w_fresh_0.1": {
+     "items": 320,
+     "share_under_2h": 0.6813,
+     "share_under_30min": 0.1969,
+     "median_age_h": 1.08
+    },
+    "degraded_pages": 0
+   },
+   "world-affairs": {
+    "clock_times": 16,
+    "largest_group": 6,
+    "largest_group_mean": 4.56,
+    "groups_over_cap_mean": 5.81,
+    "cap_drops_page_1_mean": 0.69,
+    "cap_drops_slate_mean": 2.62,
+    "cap_drops_by_way": {
+     "cluster": 37,
+     "tau_feed": 5
+    },
+    "freshness": {
+     "items": 320,
+     "share_under_2h": 0.3594,
+     "share_under_30min": 0.0437,
+     "median_age_h": 3.83
+    },
+    "freshness_w_fresh_0.1": {
+     "items": 320,
+     "share_under_2h": 0.7125,
+     "share_under_30min": 0.1625,
+     "median_age_h": 1.08
+    },
+    "degraded_pages": 0
+   }
+  },
+  "all_personas": {
+   "freshness": {
+    "items": 1600,
+    "share_under_2h": 0.3337,
+    "share_under_30min": 0.0631,
+    "median_age_h": 4.08
+   },
+   "freshness_w_fresh_0.1": {
+    "items": 1600,
+    "share_under_2h": 0.7094,
+    "share_under_30min": 0.1756,
+    "median_age_h": 1.08
+   },
+   "cap_drops_page_1_mean": 0.53,
+   "largest_group": 6
+  },
+  "new_reader_check": {
+   "rank-1": {
+    "cold_start_k": 0.0,
+    "readers": 48,
+    "page2_items": 960,
+    "share_followed_topics": 0.1083,
+    "share_clicked_topic": 0.5062,
+    "by_topic_set": {
+     "sports,health,entertainment": {
+      "share_followed_topics": 0.1156,
+      "share_clicked_topic": 0.4094
+     },
+     "business,tech_science,politics": {
+      "share_followed_topics": 0.05,
+      "share_clicked_topic": 0.5906
+     },
+     "world,travel,food_drink": {
+      "share_followed_topics": 0.1594,
+      "share_clicked_topic": 0.5188
+     }
+    },
+    "skipped": 0,
+    "degraded": 0
+   },
+   "rank-2": {
+    "cold_start_k": 3.0,
+    "readers": 48,
+    "page2_items": 960,
+    "share_followed_topics": 0.526,
+    "share_clicked_topic": 0.1292,
+    "by_topic_set": {
+     "sports,health,entertainment": {
+      "share_followed_topics": 0.5594,
+      "share_clicked_topic": 0.1344
+     },
+     "business,tech_science,politics": {
+      "share_followed_topics": 0.5719,
+      "share_clicked_topic": 0.1156
+     },
+     "world,travel,food_drink": {
+      "share_followed_topics": 0.4469,
+      "share_clicked_topic": 0.1375
+     }
+    },
+    "skipped": 0,
+    "degraded": 0
+   }
+  },
+  "sampled_cap_drops": {
+   "n": 48,
+   "by_way": {
+    "tau_feed": 27,
+    "cluster": 21
+   },
+   "labels": {
+    "tau_feed:title-title": {
+     "same_story": 26,
+     "different": 1
+    },
+    "cluster:title-title": {
+     "same_story": 21
+    }
+   },
+   "labelled_by": "LLM-labeled; spot-checked by a second, independent LLM session (all 48 labels held; #29/#30/#36/#37 flagged as the weakest same_story group)",
+   "note": "examples with headlines stay in data/persona-replay/ (gitignored) and the PR description"
+  }
+ }
+}
