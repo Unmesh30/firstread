@@ -63,7 +63,7 @@ The rules say how each proxy is built and record the mismatches as limitations.
   1. Drop configs whose cold-user nDCG@10 is more than 1% (relative) below model-only (raw normalization, w_fresh = w_trend = 0).
   2. Among the rest, take the best J.
   3. Among configs within 0.001 of that J, take the smallest w_fresh + w_trend.
-  4. Then prefer raw < zscore < percentile, then the shorter half-life.
+  4. Then prefer raw < zscore < percentile, then the shorter half-life, then the higher J, then the smaller w_trend. The last two were added before any result, when a unit test showed the first three could leave a tie.
 - **If w_fresh = 0 wins, it ships.** The 72 h candidate window still bounds staleness, and P3e reports the share of page-1 items under 2 h old per persona as a separate product check.
 
 ### Step 2: MMR with the story cap
