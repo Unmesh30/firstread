@@ -1,8 +1,9 @@
 """Structured JSON logging with a per-request ``request_id`` and a hashed user id.
 
-* An inbound ``X-Request-ID`` is kept only if it looks like an id
-  (``[A-Za-z0-9._-]{8,64}``); anything else is replaced, so clients can't inject
-  log content or oversized headers.
+* ``request_id`` is always generated here. It becomes the ``served_slates`` key and
+  the id events join on (P3d), so a client must not be able to choose it: a retry
+  with the same header would collide. A valid inbound ``X-Request-ID``
+  (``[A-Za-z0-9._-]{8,64}``) is only logged as ``client_request_id``, for tracing.
 * User ids are logged as ``uid_hash`` = HMAC-SHA256(LOG_UID_SALT, uid)[:16]
   (SPEC section 12), never raw.
 * Request metrics use the matched route's *template* as the label.
@@ -44,10 +45,9 @@ def configure_logging(level: str) -> None:
     )
 
 
-def valid_request_id(value: str | None) -> str:
-    if value and _VALID_REQUEST_ID.match(value):
-        return value
-    return uuid.uuid4().hex
+def client_request_id(value: str | None) -> str | None:
+    """The client's id if it looks like one, else None (never trusted as ours)."""
+    return value if value and _VALID_REQUEST_ID.match(value) else None
 
 
 def uid_hash(uid: uuid.UUID, salt: str) -> str:
@@ -64,10 +64,13 @@ async def request_context_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     """Attach a request_id to every log line and response, log latency, count requests."""
-    request_id = valid_request_id(request.headers.get(REQUEST_ID_HEADER))
+    request_id = uuid.uuid4().hex
     request.state.request_id = request_id
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(request_id=request_id)
+    client_id = client_request_id(request.headers.get(REQUEST_ID_HEADER))
+    if client_id:
+        structlog.contextvars.bind_contextvars(client_request_id=client_id)
     start = time.perf_counter()
     response = await call_next(request)
     elapsed = time.perf_counter() - start

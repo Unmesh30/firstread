@@ -47,13 +47,27 @@ def test_validation_errors_use_the_error_shape(client: TestClient, signer: Signe
         assert r.status_code == 422, topics
 
 
-def test_inbound_request_ids_are_validated(client: TestClient) -> None:
-    ok = "req-12345678"
-    assert client.get("/healthz", headers={"X-Request-ID": ok}).headers["X-Request-ID"] == ok
-    for bad in ("short", "x" * 65, "has spaces in it", "<script>alert(1)</script>"):
-        echoed = client.get("/healthz", headers={"X-Request-ID": bad}).headers["X-Request-ID"]
-        assert echoed != bad
-        assert len(echoed) == 32
+def test_request_id_is_always_generated_by_the_server(client: TestClient) -> None:
+    """A client can't choose request_id (it keys served slates in P3d): even a valid
+    inbound X-Request-ID is only logged as client_request_id."""
+    for inbound in ("req-12345678", "short", "<script>alert(1)</script>", None):
+        headers = {"X-Request-ID": inbound} if inbound else {}
+        r = client.get("/v1/topics", headers=headers)
+        rid = r.headers["X-Request-ID"]
+        assert rid != inbound
+        assert len(rid) == 32
+        assert r.json()["request_id"] == rid
+    first = client.get("/v1/topics", headers={"X-Request-ID": "retry-12345678"}).json()
+    second = client.get("/v1/topics", headers={"X-Request-ID": "retry-12345678"}).json()
+    assert first["request_id"] != second["request_id"]  # a retry gets a new id
+
+
+def test_only_a_valid_client_id_is_kept_for_tracing() -> None:
+    from firstread_api.logging import client_request_id
+
+    assert client_request_id("trace-abc-123") == "trace-abc-123"
+    for bad in (None, "short", "x" * 65, "bad id", "<script>"):
+        assert client_request_id(bad) is None
 
 
 def test_cors_allows_only_configured_origins(client: TestClient) -> None:

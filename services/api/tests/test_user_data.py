@@ -220,3 +220,48 @@ async def test_last_seen_is_touched_at_most_once_a_day(api: LiveApi) -> None:
         await conn.close()
     assert touched >= first
     assert again == touched
+
+
+async def test_a_click_between_the_rebuild_read_and_write_is_never_lost(
+    api: LiveApi, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The race from the PR #19 review: a click commits (and reaches Redis) after the
+    rebuild read its snapshot but before the rebuild's DEL. With rows and version read
+    in one statement, the marker carries the old version, so the click shows up as a
+    gap and the next check rebuilds again, instead of vanishing."""
+    uid = uuid.uuid4()
+    h = api.auth(uid)
+    a, b = await articles(api, 2)
+    await api.client.post("/v1/events", json={"events": [ev("click", a)]}, headers=h)
+    original = repo.Q.fetch
+    fired = False
+
+    async def fetch_then_click(self: repo.Q, name: str, sql: str, *args: Any) -> list[Any]:
+        nonlocal fired
+        rows = await original(self, name, sql, *args)
+        if name == "history_rebuild" and not fired:
+            fired = True  # interleave: a full click (commit + RPUSH) right after the read
+            r = await api.client.post("/v1/events", json={"events": [ev("click", b)]}, headers=h)
+            assert r.status_code == 200
+        return rows
+
+    monkeypatch.setattr(repo.Q, "fetch", fetch_then_click)
+    svc = api.app.state.services
+    conn = await api.db()
+    try:
+        rows, version = await repo.history_for_rebuild(repo.Q(conn), uid)
+        assert fired
+        assert version == max(e.version for e in rows)  # never a version without its row
+        await rs.rebuild_history(svc.redis, uid, rows, version)  # DEL wipes b's RPUSH
+        now = await hist_version(api, uid)
+        assert now == version + 1
+        after = await redis_history(api, uid)
+        assert not rs.is_consistent(after, now)  # the lost click is visible as a gap
+        monkeypatch.undo()
+        rows2, v2 = await repo.history_for_rebuild(repo.Q(conn), uid)
+    finally:
+        await conn.close()
+    await rs.rebuild_history(svc.redis, uid, rows2, v2)
+    healed = await redis_history(api, uid)
+    assert rs.is_consistent(healed, now)
+    assert [e.article_id for e in rs.latest(healed)] == [a, b]

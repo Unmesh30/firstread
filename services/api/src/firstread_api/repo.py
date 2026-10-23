@@ -278,17 +278,26 @@ async def process_events(
 # ---- rebuild sources (when the Redis copy is missing or has a gap) ----
 
 
+_HISTORY_SNAPSHOT = """
+select p.hist_version, h.article_id, h.version, h.story_cluster_id, h.category,
+       h.text_source, h.embedding
+from public.profiles p
+left join public.user_history h on h.user_id = p.user_id
+where p.user_id = $1
+order by h.version
+"""
+
+
 async def history_for_rebuild(q: Q, uid: uuid.UUID) -> tuple[list[HistoryEntry], int]:
-    rows = await q.fetch(
-        "history_rebuild",
-        "select article_id, version, story_cluster_id, category, text_source, embedding "
-        "from public.user_history where user_id = $1 order by version",
-        uid,
-    )
-    version = await q.fetchval(
-        "profile_version_read", "select hist_version from public.profiles where user_id = $1", uid
-    )
-    return [entry_from_row(r) for r in rows], int(version or 0)
+    """The reader's history rows and ``hist_version`` from **one statement**, so both
+    come from the same snapshot. Read separately, a click committing in between would
+    get a marker claiming its version without its row; if that click's ``RPUSH`` had
+    landed before the rebuild's ``DEL``, it would vanish from Redis unnoticed."""
+    rows = await q.fetch("history_rebuild", _HISTORY_SNAPSHOT, uid)
+    if not rows:
+        return [], 0
+    version = int(rows[0]["hist_version"])
+    return [entry_from_row(r) for r in rows if r["article_id"] is not None], version
 
 
 async def hidden_for_rebuild(q: Q, uid: uuid.UUID) -> list[uuid.UUID]:
