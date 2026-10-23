@@ -1,7 +1,8 @@
 # Syndication networks for trending breadth (ADR 0013).
 # Found by scripts/outlet_networks.py on the 3-day replay's last 48 h of story_coverage
 # (56030 rows, 9224 stories): domains with >= 10 stories whose story
-# sets have Jaccard >= 0.5, as connected components of >= 3 domains. PENDING OWNER REVIEW.
+# sets have Jaccard >= 0.5, as connected components of >= 3 domains. Reviewed by the owner on
+# 2026-10-22: all 47 kept; netscape.com removed from network-29 (an AP-wire portal, now blocked).
 # `apply` is set by the pre-registered materiality rule in ADR 0013, not by hand.
 version: 1
 apply: true  # material on the 3-day replay (ADR 0013): 6, 4, 9 of the top 10 changed; networks 70-91% of the score
@@ -828,11 +829,10 @@ networks:
     - abc7chicago.com
     - abc7news.com
     - abc7ny.com
-  network-29:  # 6 domains, 166 stories
+  network-29:  # 5 domains (netscape.com removed), 166 stories
     - clickondetroit.com
     - clickorlando.com
     - ksat.com
-    - netscape.com
     - news4jax.com
     - wsls.com
   network-30:  # 6 domains, 75 stories

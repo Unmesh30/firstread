@@ -57,6 +57,7 @@ blocklist:
   - ghanamma.com        # rewrites of other outlets' football and celebrity stories (1,239)
   - aol.com             # syndicated copies of other outlets, e.g. Motley Fool (2,061)
   - aol.co.uk           # syndicated copies of other outlets, e.g. PA (1,900)
+  - netscape.com        # portal republishing AP wire copy (87 coverage rows in 48 h), 2026-10-22
   # Big News Network: one publisher, 100 domains. Every record has the URL shape
   # /news/<9-digit id>/<slug>, and the same id appears on many domains (one story,
   # many copies). All 100 domains in the replay share ids with the six named in PR #12
