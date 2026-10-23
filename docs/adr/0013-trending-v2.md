@@ -65,6 +65,10 @@ Phase 3's feed has the same problem as split stories: SPEC §7.8 allows at most 
   - connected components of ≥ 3 domains.
 - **Result: 47 networks, 869 domains.** The largest are 142 UK local titles, 106 US public-radio stations, 68 Australian regional papers, 64 and 41 US radio station groups, and 58 US local TV stations.
 - **Components can chain,** so the list is a draft for the owner's review, not applied blindly.
+- **Owner review, 2026-10-22:** the 38 sampled merges were approved (all the same story) and the 47 networks were approved, with one change:
+  - `netscape.com` was removed from network-29 and added to the aggregator blocklist (`gdelt_domains.yaml`, the same rule as `aol.com`, ADR 0007);
+  - why: five of its stored URLs (`isp.netscape.com/.../story/0001/<date>/<hash>`) were all word-for-word AP wire copy, three of them the same stories the Graham Media stations' AP pages carried;
+  - `screencrush.com` stays in network-27 (Townsquare Media, like the rest of that network).
 - **Materiality rule (pre-registered):** apply networks if counting each as one outlet changes ≥ 3 of the daily top 10 on ≥ 2 of 3 replay days, **or** networks supply > 30% of the summed top-10 score.
 
 ## Evidence (3-day replay, 2026-10-12 02:30 → 10-15 02:15; aggregates in `docs/learn/data/03-replay.json`)
