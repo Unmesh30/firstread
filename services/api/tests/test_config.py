@@ -1,16 +1,61 @@
+from pathlib import Path
+
 import pytest
+from pydantic import SecretStr, ValidationError
 
 from firstread_api.config import Settings
 
+PROD = {
+    "app_env": "prod",
+    "auth_jwks_url": "https://ref.supabase.co/auth/v1/.well-known/jwks.json",
+    "auth_issuer": "https://ref.supabase.co/auth/v1",
+    "metrics_token": SecretStr("m"),
+    "log_uid_salt": SecretStr("s"),
+}
+
+
+def make(**kw: object) -> Settings:
+    return Settings(_env_file=None, **kw)  # type: ignore[call-arg, arg-type]
+
 
 def test_settings_read_from_env(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("APP_ENV", "prod")
     monkeypatch.setenv("REDIS_URL", "redis://example:6379/1")
-    s = Settings(_env_file=None)  # type: ignore[call-arg]
-    assert s.app_env == "prod"
+    s = make()
     assert s.redis_url.get_secret_value() == "redis://example:6379/1"
+    assert s.model_version == "v0.2.0+rank-2"
 
 
 def test_secrets_are_masked_in_repr() -> None:
-    s = Settings(_env_file=None, database_url="postgresql://u:hunter2@h/db")  # type: ignore[call-arg, arg-type]
+    s = make(database_url="postgresql://u:hunter2@h/db")
     assert "hunter2" not in repr(s)
+
+
+def test_a_complete_prod_config_starts() -> None:
+    assert make(**PROD).app_env == "prod"
+
+
+@pytest.mark.parametrize(
+    ("override", "message"),
+    [
+        ({"auth_dev_bypass": True}, "AUTH_DEV_BYPASS"),
+        ({"auth_local_jwks_file": Path("jwks.json")}, "AUTH_LOCAL_JWKS_FILE"),
+        ({"auth_jwks_url": "http://ref.supabase.co/jwks"}, "https"),
+        ({"auth_issuer": ""}, "AUTH_ISSUER"),
+        ({"metrics_token": None}, "METRICS_TOKEN"),
+        ({"log_uid_salt": SecretStr("local-dev-salt-not-secret")}, "LOG_UID_SALT"),
+    ],
+)
+def test_prod_refuses_local_only_or_missing_settings(override: dict, message: str) -> None:  # type: ignore[type-arg]
+    with pytest.raises(ValidationError, match=message):
+        make(**(PROD | override))
+
+
+@pytest.mark.parametrize("algs", ["HS256", "none", "ES256,HS256", ""])
+def test_only_asymmetric_algorithms_are_allowed(algs: str) -> None:
+    with pytest.raises(ValidationError, match="AUTH_ALGORITHMS"):
+        make(auth_algorithms=algs)
+
+
+def test_jwks_ttl_is_capped_at_ten_minutes() -> None:
+    with pytest.raises(ValidationError, match="TTL"):
+        make(auth_jwks_ttl_s=601)

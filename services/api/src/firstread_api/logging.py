@@ -1,6 +1,17 @@
-"""Structured JSON logging with a per-request `request_id`."""
+"""Structured JSON logging with a per-request ``request_id`` and a hashed user id.
 
+* An inbound ``X-Request-ID`` is kept only if it looks like an id
+  (``[A-Za-z0-9._-]{8,64}``); anything else is replaced, so clients can't inject
+  log content or oversized headers.
+* User ids are logged as ``uid_hash`` = HMAC-SHA256(LOG_UID_SALT, uid)[:16]
+  (SPEC section 12), never raw.
+* Request metrics use the matched route's *template* as the label.
+"""
+
+import hashlib
+import hmac
 import logging
+import re
 import time
 import uuid
 from collections.abc import Awaitable, Callable
@@ -8,7 +19,10 @@ from collections.abc import Awaitable, Callable
 import structlog
 from fastapi import Request, Response
 
+from firstread_api.metrics import HTTP_LATENCY, HTTP_REQUESTS
+
 REQUEST_ID_HEADER = "X-Request-ID"
+_VALID_REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{8,64}$")
 
 log = structlog.get_logger("firstread_api")
 
@@ -30,21 +44,42 @@ def configure_logging(level: str) -> None:
     )
 
 
+def valid_request_id(value: str | None) -> str:
+    if value and _VALID_REQUEST_ID.match(value):
+        return value
+    return uuid.uuid4().hex
+
+
+def uid_hash(uid: uuid.UUID, salt: str) -> str:
+    return hmac.new(salt.encode(), uid.bytes, hashlib.sha256).hexdigest()[:16]
+
+
+def route_template(request: Request) -> str:
+    route = request.scope.get("route")
+    path = getattr(route, "path", None)
+    return str(path) if path else "unmatched"
+
+
 async def request_context_middleware(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """Attach a request_id to every log line and response, and log request latency."""
-    request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex
+    """Attach a request_id to every log line and response, log latency, count requests."""
+    request_id = valid_request_id(request.headers.get(REQUEST_ID_HEADER))
+    request.state.request_id = request_id
     structlog.contextvars.clear_contextvars()
     structlog.contextvars.bind_contextvars(request_id=request_id)
     start = time.perf_counter()
     response = await call_next(request)
+    elapsed = time.perf_counter() - start
     response.headers[REQUEST_ID_HEADER] = request_id
+    route = route_template(request)
+    HTTP_REQUESTS.labels(route, request.method, str(response.status_code)).inc()
+    HTTP_LATENCY.labels(route).observe(elapsed)
     log.info(
         "request",
         method=request.method,
-        path=request.url.path,
+        route=route,
         status=response.status_code,
-        latency_ms=round((time.perf_counter() - start) * 1000, 2),
+        latency_ms=round(elapsed * 1000, 2),
     )
     return response
