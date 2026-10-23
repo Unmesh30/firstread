@@ -144,7 +144,7 @@ async def main() -> None:
                 print(name, results[name], flush=True)
             plan_text = await conn.fetch(
                 "explain " + ANN_HNSW.replace("$1::extensions.halfvec(384)", "$1"),
-                HalfVector(queries[0]), since, [], [], LIMIT,
+                HalfVector(queries[0]), since, [], [], LIMIT, [], [],
             )  # fmt: skip
         finally:
             await conn.close()
