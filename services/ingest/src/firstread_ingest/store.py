@@ -18,6 +18,10 @@ from typing import Any
 
 import numpy as np
 
+# Egress accounting lives in core (the API meters its queries the same way).
+from firstread_core.db import Metered as Metered
+from firstread_core.db import rows_bytes as rows_bytes
+from firstread_core.db import value_bytes as value_bytes
 from firstread_core.embedding import EMBED_DIM
 from firstread_ingest.dedupe import Recent
 from firstread_ingest.sources.rss import FeedState
@@ -27,85 +31,6 @@ async def register_codecs(conn: Any) -> None:
     from pgvector.asyncpg import register_vector
 
     await register_vector(conn, schema="extensions")
-
-
-# ---- egress accounting (Supabase Free: 5 GB/month, pooler egress included; ADR 0011) ----
-
-_ROW_OVERHEAD = 11  # DataRow message: type byte, length, field count
-_FIELD_OVERHEAD = 4  # per-field length prefix
-
-
-def value_bytes(v: Any) -> int:
-    """Approximate wire size of one result value (binary protocol)."""
-    if v is None:
-        return 0
-    if isinstance(v, bytes | bytearray | memoryview):
-        return len(v)
-    if isinstance(v, str):
-        return len(v.encode())
-    if isinstance(v, bool):
-        return 1
-    if isinstance(v, int | float | datetime):
-        return 8
-    if isinstance(v, uuid.UUID):
-        return 16
-    if isinstance(v, list | tuple):
-        return 20 + sum(value_bytes(x) + _FIELD_OVERHEAD for x in v)
-    dim = getattr(v, "dimensions", None)  # pgvector HalfVector / Vector
-    if callable(dim):
-        return 4 + 2 * int(dim())
-    return 8
-
-
-def rows_bytes(rows: Any) -> int:
-    if rows is None:
-        return 0
-    if not isinstance(rows, list):
-        rows = [rows]
-    total = 0
-    for r in rows:
-        values = r.values() if hasattr(r, "values") else [r]
-        total += _ROW_OVERHEAD + sum(value_bytes(v) + _FIELD_OVERHEAD for v in values)
-    return total
-
-
-class Metered:
-    """A connection wrapper that estimates result bytes (Supabase bills egress).
-
-    Everything else passes straight through to the asyncpg connection.
-    """
-
-    def __init__(self, conn: Any) -> None:
-        self._conn = conn
-        self.bytes = 0
-        self.queries = 0
-
-    def __getattr__(self, name: str) -> Any:
-        return getattr(self._conn, name)
-
-    async def fetch(self, *args: Any, **kwargs: Any) -> Any:
-        rows = await self._conn.fetch(*args, **kwargs)
-        self.queries += 1
-        self.bytes += rows_bytes(rows)
-        return rows
-
-    async def fetchrow(self, *args: Any, **kwargs: Any) -> Any:
-        row = await self._conn.fetchrow(*args, **kwargs)
-        self.queries += 1
-        self.bytes += rows_bytes(row)
-        return row
-
-    async def fetchval(self, *args: Any, **kwargs: Any) -> Any:
-        v = await self._conn.fetchval(*args, **kwargs)
-        self.queries += 1
-        self.bytes += _ROW_OVERHEAD + value_bytes(v) + _FIELD_OVERHEAD
-        return v
-
-    async def execute(self, *args: Any, **kwargs: Any) -> Any:
-        status = await self._conn.execute(*args, **kwargs)
-        self.queries += 1
-        self.bytes += len(str(status)) + 8  # CommandComplete
-        return status
 
 
 @dataclass(frozen=True)
