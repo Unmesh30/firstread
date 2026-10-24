@@ -3,6 +3,8 @@
 import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
+import { useHydrated } from '@/hooks/useHydrated';
+
 import { Button } from './Button';
 import { modalLabel } from './Sheet';
 import { Text } from './Text';
@@ -33,6 +35,9 @@ export function Dialog({
   onCancel,
 }: DialogProps) {
   const { colors } = useTheme();
+  // Not in the static HTML (a portal), so not in the hydration render either.
+  const hydrated = useHydrated();
+  if (!hydrated) return null;
   return (
     <Modal
       visible={visible}

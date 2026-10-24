@@ -12,6 +12,7 @@ import { useEventQueue } from '@/events/EventsProvider';
 import type { EventQueue } from '@/events/queue';
 import { viewabilityConfig, ViewabilityTracker } from '@/events/viewability';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useHydrated } from '@/hooks/useHydrated';
 import { useForeground } from '@/lib/lifecycle';
 import { useOnline } from '@/providers/AppProviders';
 import { useSession } from '@/providers/session';
@@ -78,6 +79,9 @@ export function FeedScreen() {
   const session = useSession();
   const online = useOnline();
   const wide = useBreakpoint().breakpoint === 'expanded';
+  // In the static HTML at every width; CSS hides it below `expanded` (ui/responsive).
+  const hydrated = useHydrated();
+  const panel = wide || !hydrated;
   const feed = useFeed();
   const { query, rows } = feed;
   const actions = useArticleActions();
@@ -213,7 +217,7 @@ export function FeedScreen() {
             testID="feed-list"
           />
         </View>
-        {wide ? <SidePanel /> : null}
+        {panel ? <SidePanel /> : null}
       </View>
       <Sheet
         visible={menuFor != null}

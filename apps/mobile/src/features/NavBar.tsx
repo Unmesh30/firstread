@@ -6,6 +6,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { Icon, Text, useTheme, type IconName } from '@/ui';
+import { shownAt } from '@/ui/responsive';
 import { HIT, layout, space } from '@/ui/tokens';
 
 export const SECTIONS: { href: Href; path: string; label: string; icon: IconName }[] = [
@@ -23,6 +24,7 @@ export function NavBar({ position }: { position: 'top' | 'bottom' }) {
     <View
       role="navigation"
       aria-label="Sections"
+      {...shownAt(top ? 'nav-top' : 'nav-bottom')}
       style={[
         styles.bar,
         { backgroundColor: colors.surface, borderColor: colors.border },
