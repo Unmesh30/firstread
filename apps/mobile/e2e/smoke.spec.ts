@@ -33,7 +33,6 @@ test('the reader id survives a reload', async ({ page }) => {
 });
 
 for (const [path, heading] of [
-  ['/feed', 'For You'],
   ['/system', 'System'],
   ['/account', 'Account'],
   ['/personas', 'Demo readers'],
@@ -47,6 +46,15 @@ for (const [path, heading] of [
     await expect(page.getByRole('heading', { name: heading, level: 1 })).toBeVisible();
   });
 }
+
+test('a deep link to /feed sends a new reader to onboarding, also on reload', async ({ page }) => {
+  // An onboarded reader's /feed deep link and reload are covered in feed.spec.ts.
+  const r = await page.goto(`${BASE}/feed`);
+  expect(r?.status()).toBe(200);
+  await expect(page).toHaveURL(`${BASE}/onboarding`);
+  await page.goto(`${BASE}/feed`);
+  await expect(page.getByRole('heading', { name: 'Pick at least 3 topics' })).toBeVisible();
+});
 
 test('an unknown path is a real 404 with a way back', async ({ page }) => {
   const r = await page.goto(`${BASE}/no-such-page`);
