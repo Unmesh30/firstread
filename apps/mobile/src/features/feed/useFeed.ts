@@ -3,7 +3,9 @@
 // Never refetched on its own (mount, focus, reconnect): every refetch would be a new
 // first page, 7 Redis commands (ADR 0011). Refreshing resets the query to one new first
 // page. An expired or unreadable cursor starts the feed over, with a toast. The query
-// waits for /v1/me to show an onboarded reader.
+// waits for /v1/me to show an onboarded reader, and for the feed to be on screen: a
+// deep link to /about or /personas mounts the feed under it (the root anchor), and
+// that copy mustn't spend a first page the reader may never look at.
 import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useMemo } from 'react';
 
@@ -51,7 +53,8 @@ export function isCursorError(e: unknown): boolean {
   return isApiError(e, 'cursor_expired') || isApiError(e, 'invalid_cursor');
 }
 
-export function useFeed() {
+/** `active`: the feed is on screen (focused, or visible behind the Why sheet). */
+export function useFeed({ active }: { active: boolean }) {
   const api = useApi();
   const qc = useQueryClient();
   // Only for an onboarded reader: a feed fetched before the topics are saved would be
@@ -70,7 +73,7 @@ export function useFeed() {
       ),
     initialPageParam: null as string | null,
     getNextPageParam: (last) => last.next_cursor,
-    enabled: api != null && onboarded,
+    enabled: api != null && onboarded && active,
     staleTime: Infinity,
     gcTime: FEED_GC_MS,
     refetchOnMount: false,

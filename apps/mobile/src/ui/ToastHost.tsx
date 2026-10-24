@@ -1,7 +1,9 @@
 // Renders the current toast at the bottom of the screen in a polite live region. The
-// action button is a normal control: reachable with Tab, never focused automatically.
+// action button is a normal control, reachable with Tab. It takes focus only when asked
+// (focusAction): a keyboard reader who hid a story from the menu, whose focus would
+// otherwise fall to the top of the page, far from Undo.
 import { useEffect } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { subscribeLifecycle } from '@/lib/lifecycle';
@@ -11,6 +13,8 @@ import { Text } from './Text';
 import { useTheme } from './theme';
 import { useToasts } from './toast';
 import { layout, radius, space } from './tokens';
+
+const ACTION_ID = 'toast-action';
 
 export function ToastHost() {
   const { colors } = useTheme();
@@ -25,6 +29,11 @@ export function ToastHost() {
       ),
     [],
   );
+
+  const focusAction = toast?.focusAction === true;
+  useEffect(() => {
+    if (focusAction && Platform.OS === 'web') document.getElementById(ACTION_ID)?.focus();
+  }, [focusAction]);
 
   return (
     <View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + space.lg }]}>
@@ -49,6 +58,7 @@ export function ToastHost() {
                 onFocus={() => pause(toast.id, 'focus')}
                 onBlur={() => resume(toast.id, 'focus')}
                 testID="toast-action"
+                nativeID={ACTION_ID}
               />
             ) : (
               <Button variant="ghost" label="Dismiss" onPress={() => dismiss(toast.id)} />

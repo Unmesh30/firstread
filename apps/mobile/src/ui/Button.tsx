@@ -20,6 +20,8 @@ export interface ButtonProps {
   testID?: string;
   onFocus?: () => void;
   onBlur?: () => void;
+  /** The element's id on web (to move focus to it). */
+  nativeID?: string;
 }
 
 function palette(c: Colors, v: ButtonVariant) {
@@ -47,6 +49,7 @@ export function Button({
   testID,
   onFocus,
   onBlur,
+  nativeID,
 }: ButtonProps) {
   const { colors } = useTheme();
   const p = palette(colors, variant);
@@ -62,6 +65,7 @@ export function Button({
       onFocus={onFocus}
       onBlur={onBlur}
       testID={testID}
+      nativeID={nativeID}
       style={({ pressed, hovered }) => [
         styles.base,
         { backgroundColor: p.bg, borderColor: p.border },

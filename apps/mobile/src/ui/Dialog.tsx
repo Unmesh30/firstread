@@ -1,15 +1,18 @@
 // A modal confirmation (never window.confirm: browser dialogs block the page). On web
-// react-native-web's Modal traps focus and restores it on close; Esc closes it.
+// react-native-web's Modal traps focus and restores it on close; Esc closes it (also
+// during the fade-in). No fade when the reader asked for reduced motion.
 import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
 import { useHydrated } from '@/hooks/useHydrated';
+import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { Button } from './Button';
 import { modalLabel } from './Sheet';
 import { Text } from './Text';
 import { useTheme } from './theme';
 import { radius, space } from './tokens';
+import { useEscapeWhileOpening } from './useEscapeWhileOpening';
 
 export interface DialogProps {
   visible: boolean;
@@ -35,6 +38,8 @@ export function Dialog({
   onCancel,
 }: DialogProps) {
   const { colors } = useTheme();
+  const reduced = useReducedMotion();
+  const onShow = useEscapeWhileOpening(visible, onCancel);
   // Not in the static HTML (a portal), so not in the hydration render either.
   const hydrated = useHydrated();
   if (!hydrated) return null;
@@ -42,8 +47,9 @@ export function Dialog({
     <Modal
       visible={visible}
       transparent
-      animationType="fade"
+      animationType={reduced ? 'none' : 'fade'}
       onRequestClose={onCancel}
+      onShow={onShow}
       {...modalLabel(title)}
     >
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
