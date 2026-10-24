@@ -469,9 +469,10 @@ async def main(
     compare: bool = False,
     after_run: AfterRun | None = None,
     write_reports: bool = True,
-) -> None:
+) -> Replay:
     """Replay ``days`` of GKG files. ``write_reports=False`` (the persona replay) skips
-    the final state, the live RSS estimate and every report file."""
+    the final state, the live RSS estimate and every report file; the caller keeps
+    the returned per-run summaries instead."""
     from redis.asyncio import Redis
 
     from firstread_core.dbtest import with_database
@@ -521,7 +522,7 @@ async def main(
             after_run=after_run,
         )
         if not write_reports:
-            return
+            return result
         state = await final_state(conn, redis)
         rss = await rss_estimate(settings, classifier, embedder.embed)
     finally:
@@ -584,3 +585,4 @@ async def main(
         }
         EQUIVALENCE.write_text(json.dumps(evidence, indent=1, default=str) + "\n")
     print(f"wrote {REPORT} and {AGGREGATES}")
+    return result
