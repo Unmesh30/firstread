@@ -1,10 +1,9 @@
-// PR 4c: demo readers, Account (un-hide, delete my data), accessibility of the new
-// screens, and the GDELT credit wherever GDELT headlines appear.
-import AxeBuilder from '@axe-core/playwright';
+// PR 4c: demo readers, Account (un-hide, delete my data) and the GDELT credit wherever
+// GDELT headlines appear. Their accessibility scans are in polish.spec.ts (all screens).
 import { expect, test, type Page } from '@playwright/test';
 
 import { API_URL, BASE } from './env';
-import { cards, devUser, onboard, stubPublishers, waitForEvents, eventsOf } from './helpers';
+import { cards, devUser, eventsOf, onboard, stubPublishers, waitForEvents } from './helpers';
 
 test.beforeEach(async ({ context }) => stubPublishers(context));
 
@@ -20,15 +19,6 @@ async function meOf(page: Page, id?: string) {
     active_persona: string | null;
     history_count: number;
   };
-}
-
-async function seriousViolations(page: Page): Promise<string[]> {
-  const results = await new AxeBuilder({ page })
-    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
-    .analyze();
-  return results.violations
-    .filter((v) => v.impact === 'serious' || v.impact === 'critical')
-    .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
 
 test('a reader with topics is asked before a persona replaces them (409), then replaced', async ({
@@ -147,37 +137,6 @@ test('delete my data retries a 503, then starts over as a new reader', async ({ 
   // The old reader is gone: asking as them finds a brand-new, empty profile.
   const gone = await meOf(page, old);
   expect(gone).toMatchObject({ topics: [], history_count: 0, hidden_sources: [] });
-});
-
-test('the 4c screens have no serious accessibility violations (light and dark)', async ({
-  page,
-}) => {
-  test.setTimeout(90_000);
-  await onboard(page);
-  const screens: [string, () => Promise<void>][] = [
-    ['/personas', () => expect(page.getByTestId('persona-markets-tech')).toBeVisible()],
-    ['/account', () => expect(page.getByTestId('followed-topics')).toBeVisible()],
-    ['/system', () => expect(page.getByTestId('stat-last-run')).toBeVisible()],
-    ['/privacy', () => expect(page.getByTestId('retention')).toBeVisible()],
-    ['/about', () => expect(page.getByTestId('font-credit')).toBeVisible()],
-  ];
-  const found: Record<string, string[]> = {};
-  for (const colorScheme of ['light', 'dark'] as const) {
-    await page.emulateMedia({ colorScheme });
-    for (const [path, ready] of screens) {
-      await page.goto(`${BASE}${path}`);
-      await ready();
-      const v = await seriousViolations(page);
-      if (v.length) found[`${colorScheme} ${path}`] = v;
-    }
-    // The persona question, open.
-    await page.goto(`${BASE}/personas`);
-    await page.getByTestId('activate-markets-tech').click();
-    await expect(page.getByRole('dialog', { name: 'Replace your reading history?' })).toBeVisible();
-    const v = await seriousViolations(page);
-    if (v.length) found[`${colorScheme} persona dialog`] = v;
-  }
-  expect(found).toEqual({});
 });
 
 test('the GDELT credit links to gdeltproject.org wherever GDELT headlines appear', async ({

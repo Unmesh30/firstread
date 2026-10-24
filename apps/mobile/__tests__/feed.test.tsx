@@ -1,6 +1,6 @@
 import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, screen, waitFor, within } from '@testing-library/react-native';
-import { Slot } from 'expo-router';
+import { router, Slot, Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 import type { PropsWithChildren } from 'react';
 import { Text } from 'react-native';
@@ -163,6 +163,40 @@ describe('the feed', () => {
     await open();
     await screen.findByText('onboarding screen');
     expect(requests.some((r) => r.includes('/v1/feed'))).toBe(false);
+  });
+
+  it('under another screen (a deep link with the feed anchored below) it loads nothing', async () => {
+    await renderRouter(
+      {
+        _layout: {
+          default: () => (
+            <Providers>
+              <Stack screenOptions={{ headerShown: false }} />
+            </Providers>
+          ),
+          unstable_settings: { anchor: 'feed' },
+        },
+        feed: Feed,
+        about: () => <Text>about screen</Text>,
+      },
+      { initialUrl: '/about' },
+    );
+    expect(await screen.findByText('about screen')).toBeTruthy();
+    // The feed is mounted below (its heading is in the tree) and the reader is onboarded…
+    expect(screen.queryAllByText('For You', { includeHiddenElements: true })).toHaveLength(1);
+    await waitFor(() => expect(requests).toContain('GET /v1/me'));
+    for (let i = 0; i < 5; i++) {
+      await act(async () => {
+        jest.advanceTimersByTime(100); // renderRouter runs on fake timers
+        await Promise.resolve();
+      });
+    }
+    // …yet no first page is spent on it.
+    expect(requests.filter((r) => r.startsWith('GET /v1/feed'))).toEqual([]);
+    // Back to the feed: now it's on screen, and its first page loads.
+    await act(() => router.back());
+    expect(await screen.findByRole('link', { name: /^Headline 1, / })).toBeTruthy();
+    expect(requests.filter((r) => r.startsWith('GET /v1/feed'))).toEqual(['GET /v1/feed?limit=20']);
   });
 
   it('loads the next page at the end, then shows "all caught up"', async () => {

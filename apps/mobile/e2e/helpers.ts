@@ -1,5 +1,6 @@
 // Shared steps for the feed E2E: onboarding, reading the API's /metrics, the events a
 // page posts, and scrolling the feed's list.
+import AxeBuilder from '@axe-core/playwright';
 import { expect, type BrowserContext, type Page, type Request } from '@playwright/test';
 
 import { API_URL, BASE } from './env';
@@ -121,4 +122,14 @@ export async function visibleCardIds(page: Page): Promise<string[]> {
       })
       .map((el) => el.getAttribute('data-testid')!.slice('card-'.length));
   });
+}
+
+/** axe's serious and critical WCAG 2.2 A/AA violations on the page as it is now. */
+export async function seriousViolations(page: Page): Promise<string[]> {
+  const results = await new AxeBuilder({ page })
+    .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
+    .analyze();
+  return results.violations
+    .filter((v) => v.impact === 'serious' || v.impact === 'critical')
+    .map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`);
 }
