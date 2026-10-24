@@ -2,6 +2,7 @@ import { onlineManager, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect, useState, useSyncExternalStore, type PropsWithChildren } from 'react';
 
 import { createQueryClient } from '@/api/queries';
+import { EventsProvider } from '@/events/EventsProvider';
 import { ThemeProvider } from '@/ui/theme';
 
 import { wireOnlineManager } from './online';
@@ -13,7 +14,9 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <ThemeProvider>
       <QueryClientProvider client={client}>
-        <SessionProvider>{children}</SessionProvider>
+        <SessionProvider>
+          <EventsProvider>{children}</EventsProvider>
+        </SessionProvider>
       </QueryClientProvider>
     </ThemeProvider>
   );

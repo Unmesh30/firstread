@@ -33,12 +33,18 @@ export function shouldRetry(failureCount: number, error: unknown): boolean {
 }
 
 /** Retry-After when the server sent one (capped), else exponential backoff with jitter. */
-export function retryDelay(attempt: number, error: unknown, random: () => number = Math.random) {
-  if (error instanceof ApiError && error.retryAfterS != null) {
-    return Math.min(error.retryAfterS, MAX_RETRY_AFTER_S) * 1000;
-  }
+export function backoffMs(
+  attempt: number,
+  retryAfterS: number | null,
+  random: () => number = Math.random,
+): number {
+  if (retryAfterS != null) return Math.min(retryAfterS, MAX_RETRY_AFTER_S) * 1000;
   const base = Math.min(1000 * 2 ** attempt, MAX_RETRY_AFTER_S * 1000);
   return base / 2 + random() * (base / 2);
+}
+
+export function retryDelay(attempt: number, error: unknown, random: () => number = Math.random) {
+  return backoffMs(attempt, error instanceof ApiError ? error.retryAfterS : null, random);
 }
 
 export function createQueryClient(): QueryClient {

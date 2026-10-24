@@ -19,7 +19,7 @@ import { configErrors, env } from '@/lib/env';
 export type SessionState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
-  | { status: 'ready'; session: AuthSession; auth: AuthProvider; api: Api };
+  | { status: 'ready'; session: AuthSession; auth: AuthProvider; api: Api; apiUrl: string };
 
 const SessionContext = createContext<SessionState>({ status: 'loading' });
 
@@ -36,11 +36,11 @@ export function SessionProvider({
     const auth = factory();
     const api = createApi(apiUrl, auth);
     const unsubscribe = auth.subscribe((session) => {
-      if (alive && session) setState({ status: 'ready', session, auth, api });
+      if (alive && session) setState({ status: 'ready', session, auth, api, apiUrl });
     });
     auth
       .init()
-      .then((session) => alive && setState({ status: 'ready', session, auth, api }))
+      .then((session) => alive && setState({ status: 'ready', session, auth, api, apiUrl }))
       .catch(
         (e: unknown) =>
           alive &&
