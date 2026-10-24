@@ -108,3 +108,24 @@ test('the static HTML shows one nav bar per width, before any JavaScript', async
     await context.close();
   }
 });
+
+test('"For You" stays on one line in the top bar (768–1023 px)', async ({ browser }) => {
+  for (const width of [768, 900, 1023, 1280]) {
+    const context = await browser.newContext({ viewport: { width, height: 800 } });
+    const page = await context.newPage();
+    await page.goto(`${BASE}/system`);
+    const link = page.getByRole('navigation', { name: 'Sections' }).getByRole('link', {
+      name: 'For You',
+    });
+    await expect(link).toBeVisible();
+    // The label's own box: one line of the small type (20 px line height), not two.
+    const height = await link.evaluate((el) => {
+      const label = [...el.querySelectorAll('*')].find(
+        (n) => n.children.length === 0 && n.textContent === 'For You',
+      )!;
+      return label.getBoundingClientRect().height;
+    });
+    expect(height).toBeLessThan(30);
+    await context.close();
+  }
+});
