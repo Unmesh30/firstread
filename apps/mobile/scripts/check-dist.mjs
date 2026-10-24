@@ -2,7 +2,9 @@
 //   1. No secrets in the bundle: only EXPO_PUBLIC_* values belong there.
 //   2. The size budget: the gzip size of what the first page loads (its scripts and the
 //      preloaded font) and of lazy chunks may grow at most `maxGrowth` over the
-//      baseline in bundle-budget.json. Prints a table either way.
+//      baseline in bundle-budget.json. Prints a table either way. 4d set the baseline
+//      to 469.8 KB (from 501.2 KB) and the growth to 5%, so the limit (~493 KB) stays
+//      below the old size: raising it is a reviewed change to bundle-budget.json.
 // Usage: node scripts/check-dist.mjs [dist] [--update-baseline]
 import { readdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
@@ -68,7 +70,9 @@ console.log(
 if (fonts.length !== 1) failures.push(`expected exactly one preloaded font, found ${fonts.length}`);
 
 if (update) {
-  writeFileSync(BUDGET, JSON.stringify({ ...totals, maxGrowth: 0.25 }, null, 2) + '\n');
+  // The allowed growth is a deliberate choice: kept from the file (see apps/mobile/README.md).
+  const { maxGrowth } = JSON.parse(readFileSync(BUDGET, 'utf8'));
+  writeFileSync(BUDGET, JSON.stringify({ ...totals, maxGrowth }, null, 2) + '\n');
   console.log(`wrote ${BUDGET}`);
 } else {
   const budget = JSON.parse(readFileSync(BUDGET, 'utf8'));

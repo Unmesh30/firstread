@@ -1,10 +1,10 @@
-import { SourceSerif4_600SemiBold } from '@expo-google-fonts/source-serif-4/600SemiBold';
 import { FontDisplay, useFonts } from 'expo-font';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 
 import { AppProviders } from '@/providers/AppProviders';
 import { SkipLink, ToastHost, useTheme } from '@/ui';
+import { headlineFontSource } from '@/ui/headlineFont';
 import { HEADLINE_FONT } from '@/ui/tokens';
 
 export const unstable_settings = {
@@ -38,8 +38,9 @@ function Navigator() {
 
 export default function RootLayout() {
   // One headline weight, never awaited: text renders in the fallback serif until it loads
-  // (font-display: swap on web), so the font can't block the first render.
-  useFonts({ [HEADLINE_FONT]: { uri: SourceSerif4_600SemiBold, display: FontDisplay.SWAP } });
+  // (font-display: swap on web), so the font can't block the first render. WOFF2 on the
+  // web, the TTF on native (ui/headlineFont).
+  useFonts({ [HEADLINE_FONT]: { uri: headlineFontSource, display: FontDisplay.SWAP } });
   return (
     <AppProviders>
       <Navigator />
