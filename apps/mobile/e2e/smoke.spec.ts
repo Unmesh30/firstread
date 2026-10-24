@@ -1,9 +1,9 @@
 // The 4a smoke test: the static build under /firstread, the gate, the dev sign-in
 // through CORS, deep links, the 404 page, the font rules and a first accessibility scan.
-import AxeBuilder from '@axe-core/playwright';
 import { expect, test } from '@playwright/test';
 
 import { API_URL, BASE } from './env';
+import { seriousViolations } from './helpers';
 
 test('a new reader lands on onboarding, signed in with the dev header', async ({ page }) => {
   const me = page.waitForResponse(
@@ -78,14 +78,6 @@ test('onboarding has no serious accessibility violations (light and dark)', asyn
     await page.emulateMedia({ colorScheme });
     await page.goto(`${BASE}/onboarding`);
     await expect(page.getByRole('checkbox')).toHaveCount(13);
-    const results = await new AxeBuilder({ page })
-      .withTags(['wcag2a', 'wcag2aa', 'wcag21aa', 'wcag22aa'])
-      .analyze();
-    const serious = results.violations.filter(
-      (v) => v.impact === 'serious' || v.impact === 'critical',
-    );
-    expect(
-      serious.map((v) => `${v.id}: ${v.nodes.map((n) => n.target.join(' ')).join(', ')}`),
-    ).toEqual([]);
+    expect(await seriousViolations(page)).toEqual([]);
   }
 });
