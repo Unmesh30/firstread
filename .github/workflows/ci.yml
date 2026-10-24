@@ -138,10 +138,83 @@ jobs:
           fi
       - run: npm run lint
       - run: npm run format:check
+      # The client's types come from the committed OpenAPI spec (services/api/openapi.json).
+      - name: Generated API types are fresh
+        run: npm run gen:api:check
       - run: npm run typecheck
       - run: npm test
+      # Static rendering runs every route in Node: a route touching window or storage at
+      # import time fails here.
       - name: Web export (GitHub Pages build)
-        run: npx expo export -p web
+        run: npm run export:web
+      - name: Bundle budget and no secrets in dist
+        run: npm run check:dist
+
+  e2e-web:
+    name: e2e-web
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_USER: firstread
+          POSTGRES_PASSWORD: firstread
+          POSTGRES_DB: firstread
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U firstread -d firstread"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+      redis:
+        image: redis:7.4.11-alpine
+        ports: ["6379:6379"]
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s --health-timeout 3s --health-retries 20
+    env:
+      DATABASE_URL: postgresql://firstread:firstread@localhost:5432/firstread
+      REDIS_URL: redis://localhost:6379/0
+    defaults:
+      run:
+        working-directory: apps/mobile
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          version: "0.13.0"
+          enable-cache: true
+      - name: Install Python dependencies
+        run: uv sync --all-packages --frozen
+      # The API under test runs the real pinned encoder, as in the python job.
+      - name: Cache model release
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/firstread/models/firstread-models
+          key: model-release-${{ hashFiles('packages/core/src/firstread_core/release.py') }}
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .node-version
+          cache: npm
+          cache-dependency-path: apps/mobile/package-lock.json
+      - run: npm ci
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ hashFiles('apps/mobile/package-lock.json') }}
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+      # Seeds firstread_e2e + Redis db 3, exports the app against the E2E API, then
+      # Playwright starts the API (dev bypass) and the Pages-like static server.
+      - name: Web E2E against the local stack
+        run: npm run e2e
+      - name: Playwright report
+        if: failure()
+        uses: actions/upload-artifact@v7
+        with:
+          name: playwright-report
+          path: apps/mobile/playwright-report
+          retention-days: 7
 
   docker:
     name: docker
