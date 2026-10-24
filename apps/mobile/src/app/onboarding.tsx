@@ -22,7 +22,9 @@ export default function Onboarding() {
     mutationFn: (ids: string[]) => call(api!.PUT('/v1/me/topics', { body: { topics: ids } })),
     onSuccess: (me) => {
       qc.setQueryData(keys.me, me);
-      router.replace('/feed');
+      qc.removeQueries({ queryKey: keys.feed }); // any earlier feed was for other topics
+      // Back to the feed under this screen (the root anchor), not a second copy of it.
+      router.dismissTo('/feed');
     },
   });
   const toggle = (id: string) =>
