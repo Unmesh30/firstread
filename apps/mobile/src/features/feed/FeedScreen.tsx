@@ -3,8 +3,8 @@
 // Impressions: FlatList reports rows ≥ 50% on screen, the ViewabilityTracker counts one
 // after a continuous second in the foreground, once per (request, article), and the
 // event queue sends them with the next click or within a minute.
-import { Redirect, router, useIsFocused } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { Redirect, router, useIsFocused, usePathname } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
 import { FlatList, Platform, RefreshControl, StyleSheet, View, type ViewToken } from 'react-native';
 
 import { ApiError } from '@/api/errors';
@@ -13,6 +13,7 @@ import type { EventQueue } from '@/events/queue';
 import { viewabilityConfig, ViewabilityTracker } from '@/events/viewability';
 import { useBreakpoint } from '@/hooks/useBreakpoint';
 import { useHydrated } from '@/hooks/useHydrated';
+import { isKeyboardModality } from '@/lib/inputModality';
 import { useForeground } from '@/lib/lifecycle';
 import { useOnline } from '@/providers/AppProviders';
 import { useSession } from '@/providers/session';
@@ -29,6 +30,7 @@ import {
   Text,
   useTheme,
 } from '@/ui';
+import { useToasts } from '@/ui/toast';
 import { layout, space } from '@/ui/tokens';
 
 import { GdeltCredit } from '../credits';
@@ -83,15 +85,20 @@ export function FeedScreen() {
   // In the static HTML at every width; CSS hides it below `expanded` (ui/responsive).
   const hydrated = useHydrated();
   const panel = wide || !hydrated;
-  const feed = useFeed();
+  // Under another screen (Why, or a copy left in the stack) it counts and loads nothing;
+  // the first page loads once the feed is on screen, also behind a Why sheet.
+  const focused = useIsFocused();
+  const pathname = usePathname();
+  const feed = useFeed({ active: focused || pathname === '/why' });
   const { query, rows } = feed;
   const actions = useArticleActions();
   const queue = useEventQueue();
-  // Under another screen (Why, or a copy left in the stack) it counts and loads nothing.
-  const focused = useIsFocused();
   const onViewableItemsChanged = useImpressions(queue, focused);
   const liked = useFeedLocal((s) => s.liked);
   const [menuFor, setMenuFor] = useState<FeedRow | null>(null);
+  // A keyboard hide: the hidden card took the focus target with it, so once the menu
+  // has closed, focus goes to the toast's Undo (which pauses its timer).
+  const undoFocus = useRef<number | null>(null);
   const countdown = useRetryCountdown(
     query.isFetching ? query.failureReason : null,
     query.failureCount,
@@ -99,7 +106,10 @@ export function FeedScreen() {
   const refreshing = query.isFetching && !query.isFetchingNextPage && query.data != null;
 
   const hide = (scope: HideScope) => {
-    if (menuFor) actions.hide(menuFor, scope);
+    if (menuFor) {
+      const toast = actions.hide(menuFor, scope);
+      undoFocus.current = isKeyboardModality() ? toast : null;
+    }
     setMenuFor(null);
   };
 
@@ -225,6 +235,10 @@ export function FeedScreen() {
         visible={menuFor != null}
         title="Hide"
         onClose={() => setMenuFor(null)}
+        onClosed={() => {
+          if (undoFocus.current != null) useToasts.getState().focusAction(undoFocus.current);
+          undoFocus.current = null;
+        }}
         testID="hide-menu"
       >
         <Text tone="muted">You can undo this for a few seconds.</Text>

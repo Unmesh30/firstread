@@ -1,7 +1,8 @@
 // A sheet over the current screen: from the bottom on narrow screens, centered on wide
 // ones. React Native's Modal (react-native-web on web) is the dialog: it moves focus to
-// the first focusable control (Close), traps it and gives it back on close; Esc and the
-// backdrop close it. No slide when the reader asked for reduced motion.
+// the first focusable control (Close), traps it and gives it back on close; Esc (also
+// during the open animation) and the backdrop close it. No slide or fade when the reader
+// asked for reduced motion.
 import type { ReactNode } from 'react';
 import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -14,22 +15,34 @@ import { IconButton } from './IconButton';
 import { Text } from './Text';
 import { useTheme } from './theme';
 import { layout, radius, space } from './tokens';
+import { useEscapeWhileOpening } from './useEscapeWhileOpening';
 
 export interface SheetProps {
   visible: boolean;
   title: string;
   onClose: () => void;
+  /** After it has finished closing (its animation done). */
+  onClosed?: () => void;
   children: ReactNode;
   /** Heading level of the title: 1 when the sheet is the page (a deep link). */
   level?: 1 | 2;
   testID?: string;
 }
 
-export function Sheet({ visible, title, onClose, children, level = 2, testID }: SheetProps) {
+export function Sheet({
+  visible,
+  title,
+  onClose,
+  onClosed,
+  children,
+  level = 2,
+  testID,
+}: SheetProps) {
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const wide = useBreakpoint().breakpoint !== 'compact';
+  const onShow = useEscapeWhileOpening(visible, onClose);
   // react-native-web's Modal portals into document.body, which the static HTML lacks.
   const hydrated = useHydrated();
   if (!hydrated) return null;
@@ -39,6 +52,8 @@ export function Sheet({ visible, title, onClose, children, level = 2, testID }: 
       transparent
       animationType={reduced ? 'none' : wide ? 'fade' : 'slide'}
       onRequestClose={onClose}
+      onShow={onShow}
+      onDismiss={onClosed}
       {...modalLabel(title)}
     >
       <View style={[styles.backdrop, wide ? styles.center : styles.bottom]}>

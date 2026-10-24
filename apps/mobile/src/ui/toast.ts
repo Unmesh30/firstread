@@ -22,6 +22,8 @@ export interface ToastSpec {
 export interface ToastItem extends ToastSpec {
   id: number;
   timer: PausableTimer;
+  /** Move keyboard focus to the action (ToastHost does it; focus also pauses the timer). */
+  focusAction?: boolean;
 }
 
 interface ToastState {
@@ -35,6 +37,8 @@ interface ToastState {
   hidden(): void;
   visible(): void;
   commitPending(): void;
+  /** Focus this toast's action, if it's still showing (a keyboard reader's Undo). */
+  focusAction(id: number): void;
   /** Close every toast without its onExpire (Delete my data: nothing may be committed). */
   discardAll(): void;
 }
@@ -71,6 +75,11 @@ export const useToasts = create<ToastState>((set, get) => {
     },
     resume(id, reason) {
       find(id)?.timer.resume(reason);
+    },
+    focusAction(id) {
+      set((s) => ({
+        toasts: s.toasts.map((t) => (t.id === id ? { ...t, focusAction: true } : t)),
+      }));
     },
     commitPending() {
       for (const t of get().toasts) if (t.commitOnHide) t.timer.finish();

@@ -1,6 +1,7 @@
 // One story in the feed. The headline block is a real link to the publisher (a new tab
 // on web), labelled "headline, source, 12 minutes ago". Like, hide and why are separate
 // buttons beside it (a link can't contain buttons), each named with the headline.
+// A middle-click opens the tab without a press, so it's recorded as a click too.
 import { Image } from 'expo-image';
 import { useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
@@ -62,13 +63,19 @@ export function Thumbnail({ uri, label, id }: { uri: string | null; label: strin
   );
 }
 
+/** The story link on web: a real new-tab link; a middle-click (button 1) is a click too. */
+export function webLinkProps(url: string, onOpen: () => void) {
+  return {
+    href: url,
+    hrefAttrs: { target: '_blank', rel: 'noopener noreferrer' },
+    onAuxClick: (e: { button: number }) => (e.button === 1 ? onOpen() : undefined),
+  };
+}
+
 export function ArticleCard(p: ArticleCardProps) {
   const { colors } = useTheme();
   const ago = timeAgo(p.at, p.now);
-  const link = Platform.select({
-    web: { href: p.url, hrefAttrs: { target: '_blank', rel: 'noopener noreferrer' } },
-    default: {},
-  }) as object;
+  const link = Platform.OS === 'web' ? webLinkProps(p.url, p.onOpen) : {};
   return (
     <View testID={`card-${p.id}`} style={[styles.card, { borderBottomColor: colors.border }]}>
       <Pressable

@@ -20,6 +20,12 @@ function install() {
   window.addEventListener('pointerdown', set(false), true);
 }
 
+/** The last input was a key press (read once, e.g. when deciding where focus goes). */
+export function isKeyboardModality(): boolean {
+  install();
+  return keyboard;
+}
+
 export function useKeyboardModality(): boolean {
   return useSyncExternalStore(
     (l) => {

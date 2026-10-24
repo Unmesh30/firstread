@@ -1,7 +1,11 @@
-// Pressable with the app's focus ring (keyboard focus only) and hover state.
+// Pressable with the app's focus ring (keyboard focus only) and hover state. On web,
+// Space also presses checkboxes, radios and switches: react-native-web maps Space to a
+// press only for buttons, but Space is the key that toggles these controls.
 import { useState, type ReactNode } from 'react';
 import {
+  Platform,
   Pressable as RNPressable,
+  type GestureResponderEvent,
   type PressableProps,
   type StyleProp,
   type ViewStyle,
@@ -22,6 +26,20 @@ export interface AppPressableProps extends Omit<PressableProps, 'style' | 'child
   children?: ReactNode | ((s: InteractionState) => ReactNode);
 }
 
+const TOGGLE_ROLES = new Set(['checkbox', 'radio', 'switch']);
+
+interface KeyEvent {
+  key: string;
+  repeat?: boolean;
+  preventDefault(): void;
+}
+
+export function pressOnSpace(e: KeyEvent, p: Pick<PressableProps, 'onPress' | 'disabled'>) {
+  if (e.key !== ' ') return;
+  e.preventDefault(); // not a page scroll
+  if (!e.repeat && !p.disabled) p.onPress?.(e as unknown as GestureResponderEvent);
+}
+
 export function Pressable({
   style,
   children,
@@ -35,9 +53,12 @@ export function Pressable({
   const keyboard = useKeyboardModality();
   const [focused, setFocused] = useState(false);
   const [hovered, setHovered] = useState(false);
+  const spaceToggles =
+    Platform.OS === 'web' && typeof rest.role === 'string' && TOGGLE_ROLES.has(rest.role);
   return (
     <RNPressable
       {...rest}
+      {...(spaceToggles ? { onKeyDown: (e: KeyEvent) => pressOnSpace(e, rest) } : null)}
       onFocus={(e) => {
         setFocused(true);
         onFocus?.(e);

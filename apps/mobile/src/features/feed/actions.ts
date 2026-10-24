@@ -1,11 +1,11 @@
 // What a reader can do with a story: open it, like it, hide it (or its source), and
 // each becomes an event in the queue.
 import { useQueryClient } from '@tanstack/react-query';
-import * as WebBrowser from 'expo-web-browser';
 import { Platform } from 'react-native';
 
 import { keys } from '@/api/queries';
 import { useEventQueue } from '@/events/EventsProvider';
+import { openUrl } from '@/lib/platformKit';
 import { useToasts } from '@/ui/toast';
 
 import { useFeedLocal } from './store';
@@ -39,7 +39,7 @@ export function useArticleActions() {
       if (now - (lastOpen.get(row.item.id) ?? 0) < OPEN_DEBOUNCE_MS) return;
       lastOpen.set(row.item.id, now);
       queue?.enqueue({ type: 'click', ...base(row) });
-      if (Platform.OS !== 'web') void WebBrowser.openBrowserAsync(row.item.url);
+      if (Platform.OS !== 'web') openUrl(row.item.url);
     },
 
     /** There is no unlike in v1: a second press only explains that. */
@@ -56,12 +56,12 @@ export function useArticleActions() {
      * Hidden from view now; the hide event is queued only when the undo toast closes
      * (or at once if the page goes to the background meanwhile).
      */
-    hide(row: FeedRow, scope: HideScope) {
+    hide(row: FeedRow, scope: HideScope): number {
       const key = scope === 'article' ? row.item.id : row.item.source_domain;
       // One undo at a time: a newer hide commits the one before it.
       useToasts.getState().commitPending();
       local().hide(scope, key);
-      useToasts.getState().show({
+      return useToasts.getState().show({
         message: hideMessage(row, scope),
         actionLabel: 'Undo',
         commitOnHide: true,
