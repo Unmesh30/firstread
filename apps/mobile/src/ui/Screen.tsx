@@ -1,5 +1,6 @@
 // A page: the theme background, a centered content column (≤ 720 px) with 16 px
-// gutters, and the skip link's target (`main`).
+// gutters, and the skip link's target (`main`). `scroll={false}` with `column={false}`
+// leaves layout to the children (the feed's own full-width list).
 import Head from 'expo-router/head';
 import type { PropsWithChildren } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
@@ -16,14 +17,17 @@ export function pageTitle(title?: string): string {
 export function Screen({
   children,
   scroll = true,
+  column: useColumn = true,
   title,
   testID,
-}: PropsWithChildren<{ scroll?: boolean; title?: string; testID?: string }>) {
+}: PropsWithChildren<{ scroll?: boolean; column?: boolean; title?: string; testID?: string }>) {
   const { colors } = useTheme();
-  const column = (
+  const column = useColumn ? (
     <View nativeID="main" role="main" style={styles.column}>
       {children}
     </View>
+  ) : (
+    children
   );
   return (
     <SafeAreaView

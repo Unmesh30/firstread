@@ -15,3 +15,6 @@ export { useToasts } from './toast';
 export { TopicChip } from './TopicChip';
 export { ErrorState, describeError } from './ErrorState';
 export { SkipLink } from './SkipLink';
+export { ArticleCard, Thumbnail } from './ArticleCard';
+export { ComponentBar } from './ComponentBar';
+export { Sheet } from './Sheet';
