@@ -86,7 +86,8 @@ const styles = StyleSheet.create({
   items: { flexDirection: 'row' },
   itemsBottom: { justifyContent: 'space-around' },
   item: { minHeight: HIT + 8, justifyContent: 'center', flex: 1 },
-  itemTop: { flex: 0, paddingHorizontal: space.md },
+  // Content-sized and never shrunk: `flex: 0` is a 0% basis on web, which wrapped "For You".
+  itemTop: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: space.md },
   itemInner: { alignItems: 'center', gap: 2, paddingVertical: space.xs },
   itemInnerTop: { flexDirection: 'row', gap: space.sm },
 });
