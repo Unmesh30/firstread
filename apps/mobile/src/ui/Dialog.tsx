@@ -4,6 +4,7 @@ import type { ReactNode } from 'react';
 import { Modal, StyleSheet, View } from 'react-native';
 
 import { Button } from './Button';
+import { modalLabel } from './Sheet';
 import { Text } from './Text';
 import { useTheme } from './theme';
 import { radius, space } from './tokens';
@@ -33,14 +34,15 @@ export function Dialog({
 }: DialogProps) {
   const { colors } = useTheme();
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={onCancel}>
+    <Modal
+      visible={visible}
+      transparent
+      animationType="fade"
+      onRequestClose={onCancel}
+      {...modalLabel(title)}
+    >
       <View style={[styles.backdrop, { backgroundColor: colors.overlay }]}>
-        <View
-          role="dialog"
-          aria-modal
-          aria-label={title}
-          style={[styles.card, { backgroundColor: colors.surface }]}
-        >
+        <View style={[styles.card, { backgroundColor: colors.surface }]}>
           <Text variant="title" serif role="heading" aria-level={2}>
             {title}
           </Text>

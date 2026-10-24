@@ -76,6 +76,13 @@ export const contrastPairs: { fg: keyof Colors; bg: keyof Colors; min: 4.5 | 3 }
   { fg: 'borderStrong', bg: 'surface', min: 3 },
   { fg: 'focus', bg: 'background', min: 3 },
   { fg: 'focus', bg: 'surface', min: 3 },
+  // Why's component bar and legend swatches (graphics, ≥ 3:1).
+  { fg: 'accent', bg: 'surfaceAlt', min: 3 },
+  { fg: 'info', bg: 'surface', min: 3 },
+  { fg: 'info', bg: 'surfaceAlt', min: 3 },
+  { fg: 'success', bg: 'surfaceAlt', min: 3 },
+  // Feed notes and the source-initial tile.
+  { fg: 'info', bg: 'background', min: 4.5 },
 ];
 
 /** 4-point spacing scale. */
