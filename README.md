@@ -13,7 +13,7 @@ Most recommenders learn from clicks, so a brand-new article is invisible until p
 
 | Area | Tech |
 |---|---|
-| App | Expo (React Native + TypeScript, Expo Router), web on GitHub Pages |
+| App | Expo (React Native + TypeScript, Expo Router) with static rendering, web on GitHub Pages; TanStack Query, zustand; impressions by the MRC 50%/1 s rule, idempotent batched events sent with keepalive ([ADR 0019](docs/adr/0019-app-architecture.md), [ADR 0020](docs/adr/0020-impressions-and-event-delivery.md)) |
 | API | Python 3.12, FastAPI, asyncpg, redis-py, ONNX Runtime, on Google Cloud Run; a seven-stage feed with per-stage deadlines and tested degraded modes, the user encoder micro-batched across requests, HNSW candidates ([ADR 0017](docs/adr/0017-feed-serving-pipeline.md)); demo personas from live news, "Why this?" and public stats ([ADR 0018](docs/adr/0018-personas-why-stats.md)) |
 | Ingestion | GDELT GKG files + RSS feeds with explicit publisher permission, every 15 min on GitHub Actions; the 72 h dedupe window stays on the runner (~84 KB of database egress a run) and pools are published as one versioned Redis snapshot ([ADR 0012](docs/adr/0012-runner-window-and-pool-snapshot.md)) |
 | ML | PyTorch (NRMS-lite user encoder), `bge-small-en-v1.5` embeddings, trained/evaluated on MIND |
@@ -33,7 +33,14 @@ make up           # Postgres+pgvector, Redis, API (hot reload) on http://localho
 curl localhost:8000/healthz
 curl localhost:8000/readyz
 make lint typecheck test
-cd apps/mobile && npx expo start   # app (press w for web)
+cd apps/mobile && npx expo start   # app (press w for web), against the local API
+```
+
+**The app** (local, dev sign-in): onboarding or a demo reader, the "For You" feed that re-ranks after each click, like, hide with Undo, "Why am I seeing this?", Account, System, Privacy and About. It's accessible (axe-clean in light and dark, keyboard-only, 320 px and 200% zoom, reduced motion) and its first load is 470 KB gzip with a CI budget. A reading session costs ~33 Redis commands ([learn chapter 04](docs/learn/04-app.md)).
+
+```bash
+make web          # static export served like GitHub Pages: http://localhost:19006/firstread/
+make e2e          # Playwright: 49 end-to-end tests on a seeded database (needs db + redis)
 ```
 
 Try the feed locally (the dev stack accepts `X-Dev-User` instead of a token):
