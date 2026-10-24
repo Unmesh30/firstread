@@ -235,7 +235,7 @@ make session-cost LABEL=warm SESSIONS=20 SKIP=1
 | Re-run after the fallback | **0.925** | 40 (all via ingestion's cluster) | 38 | 2, inside one ingestion cluster each: AP digests again, and dated generic weather forecasts |
 
 - By ADR 0013's pre-registered rule, the one τ_feed mistake raised GDELT↔GDELT τ_feed to its τ_story (0.925).
-- The two remaining mistakes are ingestion's clusters (τ_story), which no pre-registered rule covers. A junk-title rule for digests and dated forecasts is proposed to the owner instead.
+- The two remaining mistakes are ingestion's clusters (τ_story), which no pre-registered rule covers. A junk-title rule for digests and dated forecasts was proposed to the owner instead, and added after P3 (ADR 0007's 2026-10-23 amendment): with it, 40 newly sampled cap drops were all the same story.
 
 Per persona after the fallback (16 clock times each), under rank-2 → rank-3:
 
