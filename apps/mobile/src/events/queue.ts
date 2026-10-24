@@ -141,6 +141,16 @@ export class EventQueue {
     if (this.events.some((e) => !this.inFlight.has(e.event_id))) this.armImpressionTimer();
   }
 
+  /** Forget every pending event (Delete my data: nothing left to re-create the data). */
+  clear(): void {
+    this.events = [];
+    this.clearImpressionTimer();
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = null;
+    this.attempt = 0;
+    this.persist();
+  }
+
   /** (Re)start after stop(): the provider's effect can run twice. */
   start(): void {
     this.stopped = false;
