@@ -31,6 +31,7 @@ import {
 } from '@/ui';
 import { layout, space } from '@/ui/tokens';
 
+import { GdeltCredit } from '../credits';
 import { SessionProblem } from '../SessionProblem';
 import { useArticleActions, type HideScope } from './actions';
 import { BusyBanner, DegradedNote, OfflineBanner, useRetryCountdown } from './notices';
@@ -120,6 +121,7 @@ export function FeedScreen() {
           />
         ) : null}
       </View>
+      <GdeltCredit prefix="Live headlines:" />
       {session.status === 'error' ? <Banner tone="danger" message={session.message} /> : null}
       {!online ? <OfflineBanner /> : null}
       {countdown != null ? <BusyBanner seconds={countdown} /> : null}
