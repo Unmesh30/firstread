@@ -2,10 +2,10 @@
 // lifecycle and the network: hidden → commit pending hides, one keepalive batch;
 // back online → flush.
 import { onlineManager } from '@tanstack/react-query';
-import * as Crypto from 'expo-crypto';
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
 
 import { subscribeLifecycle } from '@/lib/lifecycle';
+import { randomUUID } from '@/lib/platformKit';
 import { useSession } from '@/providers/session';
 import { kv, type KV } from '@/storage/kv';
 import { useToasts } from '@/ui/toast';
@@ -33,7 +33,7 @@ export function EventsProvider({
             transport: transport ?? httpTransport(apiUrl, auth),
             store,
             storageKey: `events:${userId}`,
-            newId: () => Crypto.randomUUID(),
+            newId: randomUUID,
             isOnline: () => onlineManager.isOnline(),
           })
         : null,

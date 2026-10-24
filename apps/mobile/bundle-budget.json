@@ -1,5 +1,5 @@
 {
-  "initialGzipBytes": 467074,
-  "lazyGzipBytes": 67096,
-  "maxGrowth": 0.25
+  "initialGzipBytes": 481054,
+  "lazyGzipBytes": 67106,
+  "maxGrowth": 0.05
 }
