@@ -6,9 +6,9 @@ repos:
     hooks:
       # Generated matplotlib SVGs carry trailing spaces in path data.
       - id: trailing-whitespace
-        exclude: ^ml/reports/figures/.*\.svg$
+        exclude: ^(ml/reports/figures/.*\.svg|apps/mobile/public/fonts/.*\.txt)$
       - id: end-of-file-fixer
-        exclude: ^ml/reports/figures/.*\.svg$
+        exclude: ^(ml/reports/figures/.*\.svg|apps/mobile/public/fonts/.*\.txt)$
       - id: check-yaml
       - id: check-toml
       - id: check-json
