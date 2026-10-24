@@ -11,6 +11,7 @@ import respx
 from firstread_core import pools as core_pools
 from firstread_core.db import apply_migrations, connect
 from firstread_core.dbtest import MIGRATIONS, skip_or_fail_if_unreachable_async, temp_database
+from firstread_ingest import dedupe, pipeline
 from firstread_ingest.config import Feed, Settings, load_personas
 from firstread_ingest.models import TopicClassifier
 from firstread_ingest.pipeline import EmbedFn, run
@@ -226,3 +227,79 @@ async def test_gdelt_cap_keeps_the_run_within_budget(
                     dry_run=True, now=GKG_SLOT + timedelta(minutes=20))  # fmt: skip
     assert out.inserted == 3
     assert out.gdelt["capped"] == {"run_cap": 5}
+
+
+JUNK = (
+    "AP News Summary at 2:50 p.m. EDT",
+    "AP News Summary at 9:30 p.m. EDT",
+    "AP News in Brief at 9:04 p.m. EDT",
+    "Weather forecast for October 14th",
+    "Weather Forecast for Tuesday, October 13, 2026",
+)
+JUNK_FEED = Feed(
+    id="digests", url="https://digests.example.com/feed.xml", source_name="Digests",
+    domain="digests.example.com", region="US", geo="us", topic_hint="weather",
+    terms="website_with_attribution",
+)  # fmt: skip
+
+
+def mock_junk_feed(router: respx.MockRouter) -> None:
+    items = "".join(
+        f"<item><title>{t}</title><link>https://digests.example.com/{i}</link>"
+        f"<pubDate>Wed, 14 Oct 2026 20:0{i}:00 GMT</pubDate></item>"
+        for i, t in enumerate(JUNK)
+    )
+    xml = f'<?xml version="1.0"?><rss version="2.0"><channel>{items}</channel></rss>'
+    router.get(JUNK_FEED.url).mock(return_value=httpx.Response(200, content=xml.encode()))
+
+
+@pytest.mark.integration
+async def test_templated_non_articles_never_reach_dedupe_personas_or_pools(
+    no_network: respx.MockRouter,
+    classifier: TopicClassifier,
+    fake_embed: EmbedFn,
+    redis_test: Any,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    await skip_or_fail_if_unreachable_async()
+    mock_feeds(no_network)
+    mock_junk_feed(no_network)
+    seen_by_dedupe: list[str] = []
+    real_decide = dedupe.decide
+
+    def spy(items: Any, *args: Any, **kw: Any) -> Any:
+        seen_by_dedupe.extend(i.url_canonical for i in items)
+        return real_decide(items, *args, **kw)
+
+    monkeypatch.setattr(pipeline, "decide", spy)
+    async with temp_database() as dsn:
+        conn = await connect(dsn)
+        try:
+            await apply_migrations(conn, MIGRATIONS)
+            s = await run(settings(), classifier, embed=fake_embed, feeds=[*FEEDS, JUNK_FEED],
+                          sources=RSS, conn=conn, redis=redis_test, now=NOW)  # fmt: skip
+            assert s.dropped["junk_title:ap_digest"] == 3
+            assert s.dropped["junk_title:dated_weather_forecast"] == 2
+            assert s.inserted > 0  # the other feeds' items still go through
+            assert seen_by_dedupe
+            assert not [u for u in seen_by_dedupe if "digests.example.com" in u]
+            stored = await conn.fetchval(
+                "select count(*) from public.articles where source_domain = 'digests.example.com'"
+            )
+            covered = await conn.fetchval(
+                "select count(*) from public.story_coverage "
+                "where source_domain = 'digests.example.com'"
+            )
+            in_personas = await conn.fetchval(
+                "select count(*) from public.persona_articles where title = any($1::text[])",
+                list(JUNK),
+            )
+            assert (stored, covered, in_personas) == (0, 0, 0)
+            ver = (await redis_test.get(core_pools.VER_KEY)).decode()
+            blob = core_pools.decode(await redis_test.get(core_pools.blob_key(ver)), ver)
+            ids = {str(i) for i in blob.articles}
+            stored_ids = {str(r["id"]) for r in await conn.fetch("select id from public.articles")}
+            assert ids
+            assert ids <= stored_ids  # every pool member is a stored article
+        finally:
+            await conn.close()

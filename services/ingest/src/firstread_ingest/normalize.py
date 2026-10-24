@@ -1,7 +1,8 @@
 """RawItem -> Candidate: clean, filter and prepare the embedding text.
 
 Every drop has a reason, counted in the run summary: ``no_url``, ``non_english``,
-``short_title``, ``junk_title``, ``section_page``, ``press_release:<pattern>``, ``stale``.
+``short_title``, ``junk_title``, ``junk_title:<pattern>``, ``section_page``,
+``press_release:<pattern>``, ``stale``.
 """
 
 from __future__ import annotations
@@ -90,6 +91,15 @@ def is_junk(title: str, junk: JunkTitles) -> bool:
     return folded.startswith(junk.media_prefixes)
 
 
+def junk_pattern(title: str, junk: JunkTitles) -> str | None:
+    """The name of the first templated non-article pattern ("AP News Summary at 2:50
+    p.m. EDT") the title matches, if any."""
+    for name, pattern in junk.patterns:
+        if pattern.search(title):
+            return name
+    return None
+
+
 def normalize(
     item: RawItem,
     now: datetime,
@@ -115,6 +125,8 @@ def normalize(
         return "short_title"
     if is_junk(title, junk):
         return "junk_title"
+    if (name := junk_pattern(title, junk)) is not None:
+        return f"junk_title:{name}"
     if (rule := announcement(title)) is not None:
         return f"press_release:{rule}"
     published = item.published_at

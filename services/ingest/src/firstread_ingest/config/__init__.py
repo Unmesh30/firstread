@@ -111,6 +111,8 @@ class JunkTitles(BaseModel):
     media_prefixes: tuple[str, ...]
     sections: frozenset[str] = frozenset()
     outlet_words: frozenset[str] = frozenset()
+    # (name, compiled regex) for templated non-articles, in file order.
+    patterns: tuple[tuple[str, re.Pattern[str]], ...] = ()
 
 
 def _yaml(path: Path) -> dict[str, Any]:
@@ -147,6 +149,10 @@ def load_junk_titles(path: Path = CONFIG_DIR / "junk_titles.yaml") -> JunkTitles
         media_prefixes=tuple(p.casefold() for p in data["media_prefixes"]),
         sections=frozenset(data.get("sections") or []),
         outlet_words=frozenset(data.get("outlet_words") or []),
+        patterns=tuple(
+            (name, re.compile(pattern, re.IGNORECASE))
+            for name, pattern in (data.get("patterns") or {}).items()
+        ),
     )
 
 
