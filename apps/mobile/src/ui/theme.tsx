@@ -1,5 +1,7 @@
 // Light/dark theme: the system setting unless the reader picks one in Account. The
 // preference is loaded in an effect (never at import time) and stored on this device.
+// While a static page hydrates (web), colors are CSS variables that +html.tsx resolves
+// for the system scheme or the stored choice, so the first paint is already right.
 import { createContext, useContext, useEffect, useMemo, type PropsWithChildren } from 'react';
 import { Platform } from 'react-native';
 import { create } from 'zustand';
@@ -7,10 +9,11 @@ import { create } from 'zustand';
 import { useHydrated, useSystemScheme } from '@/hooks/useHydrated';
 import { kv } from '@/storage/kv';
 
-import { colors, type Colors, type ThemeName } from './tokens';
+import { colors, colorVars, type Colors, type ThemeName } from './tokens';
 
 export type ThemePreference = 'system' | ThemeName;
-const KEY = 'theme';
+/** kv key: "fr:theme" in localStorage, read by +html.tsx's pre-paint script. */
+export const THEME_KEY = 'theme';
 
 interface PrefsState {
   theme: ThemePreference;
@@ -21,7 +24,7 @@ export const usePrefs = create<PrefsState>((set) => ({
   theme: 'system',
   setTheme: (theme) => {
     set({ theme });
-    void kv.set(KEY, theme);
+    void kv.set(THEME_KEY, theme);
   },
 }));
 
@@ -38,24 +41,24 @@ export function resolveTheme(pref: ThemePreference, system: string | null | unde
 }
 
 export function ThemeProvider({ children }: PropsWithChildren) {
-  // Light while hydrating (as the static HTML was rendered), then the system's.
+  // The static HTML's scheme while hydrating (null: the CSS decides), then the system's.
   const system = useSystemScheme();
   const hydrated = useHydrated();
   const pref = usePrefs((s) => s.theme);
   useEffect(() => {
-    void kv.get(KEY).then((v) => {
+    void kv.get(THEME_KEY).then((v) => {
       if (v === 'light' || v === 'dark' || v === 'system') usePrefs.setState({ theme: v });
     });
   }, []);
   const name = resolveTheme(pref, system);
+  const vars = Platform.OS === 'web' && !hydrated;
   useEffect(() => {
-    // Until hydrated, +html.tsx's media query already paints the system theme.
     if (Platform.OS !== 'web' || !hydrated) return;
-    // +html.tsx paints the system theme before JS loads; follow the reader's choice after.
-    document.documentElement.style.colorScheme = name;
-    document.body.style.backgroundColor = colors[name].background;
+    // The variables and html/body now follow the resolved theme (the reader's choice
+    // included), not just the media query.
+    document.documentElement.setAttribute('data-theme', name);
   }, [name, hydrated]);
-  const value = useMemo(() => ({ name, colors: colors[name] }), [name]);
+  const value = useMemo(() => ({ name, colors: vars ? colorVars : colors[name] }), [name, vars]);
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
 }
 
