@@ -5,12 +5,12 @@ SHELL := /bin/bash
 COMPOSE := docker compose -f infra/docker/docker-compose.yml --env-file .env
 MOBILE  := apps/mobile
 
-.PHONY: help setup fmt lint typecheck test up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real rank-tune rank-report persona-replay persona-report loadtest-seed loadtest session-cost topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
+.PHONY: help setup fmt lint typecheck test e2e web up down logs db-migrate ingest replay mind-download eda eval eval-gate eval-gate-real rank-tune rank-report persona-replay persona-report loadtest-seed loadtest session-cost topics skew reproduce mlflow-ui release-build release-upload release-verify release-verify-tag
 
 VARIANT ?= small
 
 help: ## Show this help
-	@grep -E '^[a-zA-Z_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
+	@grep -E '^[a-zA-Z0-9_-]+:.*## ' $(MAKEFILE_LIST) | awk 'BEGIN {FS = ":.*## "}; {printf "  \033[36m%-10s\033[0m %s\n", $$1, $$2}'
 
 setup: ## Install Python + JS deps, git hooks, and create .env
 	uv sync --all-packages
@@ -36,6 +36,12 @@ typecheck: ## Type-check Python (mypy) and the app (tsc)
 test: ## Run Python (pytest) and app (jest) tests
 	uv run pytest
 	cd $(MOBILE) && npm test
+
+e2e: ## Web E2E (Playwright): seeds firstread_e2e + Redis db 3, exports the app, runs the suite (needs db + redis)
+	cd $(MOBILE) && npm run -s e2e
+
+web: ## Export the web app and serve it like GitHub Pages at http://localhost:19006/firstread/
+	cd $(MOBILE) && npm run -s export:web && npm run -s serve:web
 
 up: ## Start the local stack (Postgres+pgvector, Redis, API with hot reload)
 	@test -f .env || cp .env.example .env
