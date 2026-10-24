@@ -12,7 +12,7 @@ FirstRead recommends news **before anyone has clicked it**. For that, every new 
 Every 15 minutes the ingestion job:
 
 1. **Fetches** headlines from two sources: GDELT's 15-minute GKG files (worldwide, ~1,200 English articles per file) and 8 publisher RSS feeds whose terms explicitly allow showing headlines on a website.
-2. **Cleans and filters:** canonical URLs, English only, junk and too-short titles, stale items, spam outlets, press releases.
+2. **Cleans and filters:** canonical URLs, English only, junk, templated (AP digests, date-only forecasts) and too-short titles, stale items, spam outlets, press releases.
 3. **Removes copies:** the same URL, the same headline on many sites, and near-identical rewrites.
 4. **Embeds** what's new with the shared `packages/core` embedder (the same one used to train the model).
 5. **Labels a topic** (one of 13) with the v0.2.0 ONNX classifier, plus two small rules.
@@ -163,7 +163,7 @@ Two operating modes:
 | `sources/gkg.py` | GKG files: slots, cursor, pending/missing, `lastupdate.txt`, parsing, placement |
 | `sources/gdelt_domains.py` | The pinned domain lookup, overrides, blocklist, press wires |
 | `sources/rss.py` | Feeds: conditional GET, per-host serial, thumbnails, the run clock |
-| `normalize.py` | Every drop has a reason: `no_url`, `non_english`, `short_title`, `junk_title`, `section_page`, `press_release:<rule>`, `stale` |
+| `normalize.py` | Every drop has a reason: `no_url`, `non_english`, `short_title`, `junk_title`, `junk_title:<pattern>`, `section_page`, `press_release:<rule>`, `stale` |
 | `dedupe.py` | Exact, near-duplicate and story decisions; `VALIDATED_BY_PAIR` thresholds |
 | `select.py` | The per-run GDELT selection (breadth, caps, topic floor) |
 | `models.py` | Downloads v0.2.0 at a pinned Hub commit and checks the manifest SHA and its blocks against `packages/core` |
@@ -180,7 +180,7 @@ Two operating modes:
 | `feeds.yaml` | 53 feeds with terms verdicts (8 enabled) |
 | `gdelt_domains.yaml` | Overrides, blocklist, press wires |
 | `announcement_titles.yaml` | PR-shaped title patterns |
-| `junk_titles.yaml` | Junk and short-title rules |
+| `junk_titles.yaml` | Junk and short-title rules, section pages, and `patterns` for templated non-articles (AP digests, date-only weather forecasts) |
 
 **Scripts:** `probe_gdelt.py`, `probe_gkg.py`, `record_fixtures.py`, `sample_pairs.py`, `score_pairs.py`, `topic_audit.py`. Manual only, never in CI.
 
@@ -315,6 +315,7 @@ GDELT↔GDELT τ_story rose because templated headlines sit at 0.85–0.92 witho
 - **Templated headlines** fooled a 0.875 story threshold; found only with a per-story-capped sample.
 - **A permitted feed can still be unreachable from CI:** Yale Climate Connections answers HTTP 403 to GitHub-hosted runners (it works from a home IP). A feed that fails every run makes every run `partial` and hides real problems, so it's disabled; weather stays covered by the GDELT topic floor.
 - **Section pages stored as articles** ("Health - Carroll Broadcasting Inc."), found during the 2b spot-check, are now dropped as `section_page`.
+- **Templated non-articles** (found by the P3e persona replay, after Phase 2): AP rolling digests ("AP News Summary at 2:50 p.m. EDT") and date-only weather forecasts ("Weather forecast for October 14th") change content under near-identical titles, so ingestion clustered different pages as one story. They're dropped before dedupe as `junk_title:ap_digest` and `junk_title:dated_weather_forecast` (106 distinct records in the 3-day replay; ADR 0007's 2026-10-23 amendment, `docs/learn/data/03-junk-titles.json`).
 - **Known limitations:** corporate-milestone press releases ("QuickMD Surpasses 2 Million Patient Visits") pass the filter, and local-TV suffixes ("– NBC4 Washington") aren't stripped, so syndicated copies cluster as the same story instead of dropping as duplicates. The per-story cap limits the impact (ADR 0007).
 - **Tighter story thresholds fragment big evolving stories** (the Pope's surgery appeared as three trending entries on 10-13). P3's 2-per-story feed rule and MMR must treat near-identical stories as one.
 - **Breadth favours UK local-news networks:** one PA wire story on dozens of UK local sites counts as dozens of outlets. An ownership-group weight is a P3/P6 candidate.

@@ -1,0 +1,114 @@
+{
+ "rule": {
+  "config": "services/ingest/src/firstread_ingest/config/junk_titles.yaml (patterns)",
+  "patterns": [
+   "ap_digest",
+   "dated_weather_forecast"
+  ],
+  "drop_reason": "junk_title:<pattern>, before dedupe"
+ },
+ "replay": {
+  "window": {
+   "first": "20261012023000",
+   "last": "20261015021500",
+   "slots": 288
+  },
+  "gdelt_records": 344711,
+  "dropped_by_pattern": {
+   "ap_digest": 110,
+   "dated_weather_forecast": 13
+  },
+  "dropped_junk_title_total": 123,
+  "share_of_gdelt_records": 0.000357,
+  "totals_with_rule": {
+   "inserted": 14400,
+   "duplicates": 67527,
+   "near_duplicates": 3900,
+   "clustered": 1210,
+   "errors": 0
+  },
+  "totals_before (03-replay.json)": {
+   "inserted": 14400,
+   "duplicates": 67690,
+   "near_duplicates": 3922,
+   "clustered": 1216,
+   "errors": 0,
+   "redis_commands": 863
+  },
+  "statuses": {
+   "ok": 288
+  },
+  "counting": "dropped_by_pattern sums the run summaries, which count a GKG file each time it is read: at the window's start the 7 earlier slots (not cached) stay pending for 2 h, so the first 6 files are re-read up to 7 times (as in 03-replay.json). distinct_records counts each file once.",
+  "distinct_records_by_pattern": {
+   "ap_digest": 93,
+   "dated_weather_forecast": 13
+  },
+  "scan_distinct_titles_dropped": 63
+ },
+ "sampled_drops": {
+  "n": 30,
+  "labels": {
+   "junk_title:ap_digest": {
+    "in_family": 17
+   },
+   "junk_title:dated_weather_forecast": {
+    "in_family": 13
+   }
+  }
+ },
+ "sampled_near_misses": {
+  "n": 30,
+  "labels": {
+   "ap_digest": {
+    "templated_out_of_scope": 15
+   },
+   "dated_weather_forecast": {
+    "article": 12,
+    "templated_out_of_scope": 3
+   }
+  }
+ },
+ "persona_replay": {
+  "ranking": "rank-3",
+  "steady_clock_times": 16,
+  "pages": 80,
+  "cap_drops_slate": 122,
+  "cap_drops_slate_mean": 1.52,
+  "cap_drops_by_way": {
+   "cluster": 122
+  },
+  "cap_drops_slate_mean_before (03-personas.json)": 1.56,
+  "cap_drops_by_way_before (03-personas.json)": {
+   "cluster": 125
+  },
+  "junk_titles_in_cap_drops": 0,
+  "sampled_cap_drops": {
+   "n": 40,
+   "by_way": {
+    "cluster": 40
+   },
+   "labels": {
+    "cluster:title-title": {
+     "same_story": 40
+    }
+   }
+  }
+ },
+ "labelled_by": "LLM-labeled",
+ "spot_check": {
+  "by": "a second, independent LLM session, labelling blind (titles and label definitions only)",
+  "drops": {
+   "n": 30,
+   "agreed": 30
+  },
+  "near_misses": {
+   "n": 30,
+   "agreed": 30
+  },
+  "cap_drops": {
+   "n": 40,
+   "agreed": 40
+  }
+ },
+ "note": "headlines stay in data/junk-titles/ (gitignored) and the PR description"
+}
