@@ -20,7 +20,15 @@ function Navigator() {
       <Stack
         screenOptions={{ headerShown: false, contentStyle: { backgroundColor: colors.background } }}
       >
-        <Stack.Screen name="why" options={{ presentation: 'modal' }} />
+        {/* The route draws its own sheet and backdrop over the feed. */}
+        <Stack.Screen
+          name="why"
+          options={{
+            presentation: 'transparentModal',
+            animation: 'none',
+            contentStyle: { backgroundColor: 'transparent' },
+          }}
+        />
       </Stack>
       <ToastHost />
       <StatusBar style={name === 'dark' ? 'light' : 'dark'} />
