@@ -83,6 +83,10 @@ export const contrastPairs: { fg: keyof Colors; bg: keyof Colors; min: 4.5 | 3 }
   { fg: 'success', bg: 'surfaceAlt', min: 3 },
   // Feed notes and the source-initial tile.
   { fg: 'info', bg: 'background', min: 4.5 },
+  // Errors inside dialogs; the diagram's highlighted boxes; topic tags on cards.
+  { fg: 'danger', bg: 'surface', min: 4.5 },
+  { fg: 'textMuted', bg: 'accentSoft', min: 4.5 },
+  { fg: 'accent', bg: 'accentSoft', min: 3 },
 ];
 
 /** 4-point spacing scale. */

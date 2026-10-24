@@ -18,3 +18,6 @@ export { SkipLink } from './SkipLink';
 export { ArticleCard, Thumbnail } from './ArticleCard';
 export { ComponentBar } from './ComponentBar';
 export { Sheet } from './Sheet';
+export { ChoiceGroup } from './ChoiceGroup';
+export { ExternalLink, NEW_TAB } from './ExternalLink';
+export { StatTile } from './StatTile';

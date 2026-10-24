@@ -35,6 +35,8 @@ interface ToastState {
   hidden(): void;
   visible(): void;
   commitPending(): void;
+  /** Close every toast without its onExpire (Delete my data: nothing may be committed). */
+  discardAll(): void;
 }
 
 let nextId = 1;
@@ -72,6 +74,10 @@ export const useToasts = create<ToastState>((set, get) => {
     },
     commitPending() {
       for (const t of get().toasts) if (t.commitOnHide) t.timer.finish();
+    },
+    discardAll() {
+      for (const t of get().toasts) t.timer.cancel();
+      set({ toasts: [] });
     },
     hidden() {
       get().commitPending();
