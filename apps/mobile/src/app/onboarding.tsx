@@ -6,7 +6,8 @@ import { StyleSheet, View } from 'react-native';
 
 import { call } from '@/api/client';
 import { keys } from '@/api/queries';
-import { useTopics } from '@/features/me';
+import { FooterLinks } from '@/features/FooterLinks';
+import { useMe, useTopics } from '@/features/me';
 import { useApi } from '@/providers/session';
 import { Banner, Button, ErrorState, Screen, Skeleton, Text, TopicChip } from '@/ui';
 import { space } from '@/ui/tokens';
@@ -17,7 +18,10 @@ export default function Onboarding() {
   const api = useApi();
   const qc = useQueryClient();
   const topics = useTopics();
-  const [picked, setPicked] = useState<string[]>([]);
+  const me = useMe();
+  // A reader changing topics (from Account) starts from the ones they follow.
+  const [choice, setChoice] = useState<string[] | null>(null);
+  const picked = choice ?? me.data?.topics ?? [];
   const save = useMutation({
     mutationFn: (ids: string[]) => call(api!.PUT('/v1/me/topics', { body: { topics: ids } })),
     onSuccess: (me) => {
@@ -28,7 +32,7 @@ export default function Onboarding() {
     },
   });
   const toggle = (id: string) =>
-    setPicked((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]));
+    setChoice(picked.includes(id) ? picked.filter((x) => x !== id) : [...picked, id]);
   const enough = picked.length >= MIN_TOPICS;
 
   return (
@@ -87,6 +91,7 @@ export default function Onboarding() {
           <Button variant="secondary" label="Try a demo reader" testID="onboarding-demo" />
         </Link>
       </View>
+      <FooterLinks />
     </Screen>
   );
 }

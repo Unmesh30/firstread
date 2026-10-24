@@ -23,6 +23,7 @@ import {
 } from '@/ui';
 import { space } from '@/ui/tokens';
 
+import { GdeltCredit } from '../credits';
 import { DEGRADED_NOTE } from '../feed/notices';
 
 export const WHY_TITLE = 'Why am I seeing this?';
@@ -92,6 +93,7 @@ export function WhyDetails({ why, topicName }: { why: WhyResponse; topicName: st
           </View>
         </>
       ) : null}
+      <GdeltCredit prefix="Headline:" />
     </View>
   );
 }
