@@ -150,11 +150,12 @@ flowchart LR
 | GET | `/healthz` | none | Liveness |
 | GET | `/readyz` | none | DB + Redis reachable, model loaded (with its tag) |
 | GET | `/v1/feed?limit=20&cursor=` | user | Ranked feed page; `next_cursor` is opaque; pages never repeat; a click or hide re-ranks the rest |
-| POST | `/v1/events` | user | Batch (≤ 100) of `impression`/`click`/`like`/`hide`/`dwell` events; idempotent by client `event_id` |
+| POST | `/v1/events` | user | Batch (≤ 100, ≤ 64 KiB) of `impression`/`click`/`like`/`hide`/`dwell` events; idempotent by client `event_id` |
 | GET | `/v1/topics` | none | Topic list |
 | PUT | `/v1/me/topics` | user | Set followed topics (onboarding; 3–13) |
 | GET | `/v1/me` | user | Profile summary |
 | DELETE | `/v1/me` | user | Delete my data (204 only when every copy is gone) |
+| DELETE | `/v1/me/hidden-sources/{domain}` | user | Show a hidden source again (P4, ADR 0016 amendment) |
 | GET | `/v1/demo/personas` | none | Demo readers, from the pool snapshot (no database read) |
 | POST | `/v1/demo/personas/{id}/activate?replace=false` | user | Load a persona's history and topics; 409 `history_exists` for a reader with their own history or topics unless `replace=true` |
 | GET | `/v1/articles/{id}/why` | user | The blend's components and reasons for this article, recomputed for the caller |
