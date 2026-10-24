@@ -219,7 +219,7 @@ class Probe:
         print(f"  persona probe at {now:%m-%d %H:%M}: {len(snap.personas)} personas", flush=True)
 
 
-async def run() -> None:
+async def run() -> dict[str, Any]:
     ingest = IngestSettings()
     dsn = with_database(ingest.database_url.get_secret_value(), DB)
     base_redis = ingest.redis_url.get_secret_value()
@@ -240,11 +240,12 @@ async def run() -> None:
             transport = httpx.ASGITransport(app=app)
             async with httpx.AsyncClient(transport=transport, base_url="http://replay") as client:
                 probe = Probe(app.state.services, client, signer)
-                await replay.main(DAYS, parse_slot(END), DB, REDIS_DB, fresh=True,
-                                  after_run=probe.after_run, write_reports=False)  # fmt: skip
-    OUT.mkdir(parents=True, exist_ok=True)
-    RAW.write_text(json.dumps(probe.out, indent=1) + "\n")
-    print(f"wrote {RAW}")
+                result = await replay.main(
+                    DAYS, parse_slot(END), DB, REDIS_DB, fresh=True,
+                    after_run=probe.after_run, write_reports=False,
+                )  # fmt: skip
+    # Per-run ingestion summaries (counts only, no headlines) next to the probes.
+    return probe.out | {"runs": result.runs}
 
 
 # ---- report ----
@@ -405,9 +406,17 @@ def report() -> None:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=("run", "report"))
+    parser.add_argument(
+        "--out", type=Path, default=OUT,
+        help="run only: where report.json goes (keep earlier runs by giving a new folder)",
+    )  # fmt: skip
     args = parser.parse_args()
     if args.command == "run":
-        asyncio.run(run())
+        out = asyncio.run(run())
+        args.out.mkdir(parents=True, exist_ok=True)
+        raw = args.out / RAW.name
+        raw.write_text(json.dumps(out, indent=1, default=str) + "\n")
+        print(f"wrote {raw}")
     else:
         report()
 
