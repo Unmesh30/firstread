@@ -4,6 +4,7 @@ import { StyleSheet, View } from 'react-native';
 
 import { useMe, useTopics } from '@/features/me';
 import { Divider, Text, useTheme } from '@/ui';
+import { shownAt } from '@/ui/responsive';
 import { space } from '@/ui/tokens';
 
 export const PANEL_WIDTH = 280;
@@ -18,6 +19,7 @@ export function SidePanel() {
     <View
       role="complementary"
       aria-label="About your feed"
+      {...shownAt('expanded')}
       style={[styles.panel, { borderLeftColor: colors.border }]}
     >
       <Text variant="title" serif role="heading" aria-level={2}>

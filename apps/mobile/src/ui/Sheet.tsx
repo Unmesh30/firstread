@@ -7,6 +7,7 @@ import { Modal, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { useBreakpoint } from '@/hooks/useBreakpoint';
+import { useHydrated } from '@/hooks/useHydrated';
 import { useReducedMotion } from '@/hooks/useReducedMotion';
 
 import { IconButton } from './IconButton';
@@ -29,6 +30,9 @@ export function Sheet({ visible, title, onClose, children, level = 2, testID }: 
   const insets = useSafeAreaInsets();
   const reduced = useReducedMotion();
   const wide = useBreakpoint().breakpoint !== 'compact';
+  // react-native-web's Modal portals into document.body, which the static HTML lacks.
+  const hydrated = useHydrated();
+  if (!hydrated) return null;
   return (
     <Modal
       visible={visible}

@@ -3,6 +3,7 @@
 import { ScrollViewStyleReset, useServerDocumentContext } from 'expo-router/html';
 import type { PropsWithChildren } from 'react';
 
+import { responsiveCss } from '@/ui/responsive';
 import { colors } from '@/ui/tokens';
 
 // Paint the right background before any JavaScript runs, so dark mode never flashes white.
@@ -12,7 +13,7 @@ html, body { background-color: ${colors.light.background}; color: ${colors.light
   html, body { background-color: ${colors.dark.background}; color: ${colors.dark.text}; }
 }
 :root { color-scheme: light dark; }
-`;
+${responsiveCss}`;
 
 export default function Root({ children }: PropsWithChildren) {
   const { htmlAttributes, bodyAttributes, headNodes, bodyNodes } = useServerDocumentContext();
