@@ -167,3 +167,68 @@ def test_section_pages_are_dropped(
         NOW,
     )
     assert (out == "section_page") is section_page, out
+
+
+@pytest.mark.parametrize(
+    ("title", "rule"),
+    [
+        # AP's rolling digests (titles from the 3-day replay)
+        ("AP News Summary at 2:50 p.m. EDT", "ap_digest"),
+        ("AP News Summary at 12:44 a.m. EDT", "ap_digest"),
+        ("AP News in Brief at 9:04 p.m. EDT", "ap_digest"),
+        ("AP News in Brief at 12:04 a.m. EDT \u2013 Winnipeg Free Press", "ap_digest"),
+        ("AP News Digest 6 a.m.", "ap_digest"),
+        ("AP News Digest 12 p.m. - Daily Sitka Sentinel", "ap_digest"),
+        ("ap news summary at 7:08 pm est", "ap_digest"),
+        # weather forecasts named only by a date
+        ("Weather forecast for October 14th", "dated_weather_forecast"),
+        ("Weather Forecast For Wednesday October 14", "dated_weather_forecast"),
+        ("Weather forecast, October 14", "dated_weather_forecast"),
+        ("Weather Forecast for Monday, October 12, 2026", "dated_weather_forecast"),
+        ("Weather & Atmospheric Forecast October 12th", "dated_weather_forecast"),
+        ("Weather forecast for Oct. 14", "dated_weather_forecast"),
+    ],
+)
+def test_templated_non_articles_are_dropped(title: str, rule: str) -> None:
+    out = normalize(replace(BASE, title=title, description=None), NOW)
+    assert out == f"junk_title:{rule}"
+
+
+@pytest.mark.parametrize(
+    "title",
+    [
+        # near-misses of ap_digest: a headline, another outlet's digest, no time
+        "AP News: Senate passes the budget after a late vote",
+        "AP News Summary: Senate passes the budget",
+        "AP news summary shows strikes spreading at 3 plants",
+        "Iran News in Brief \u2013 October 12, 2026",
+        "World News in Brief: Gaza braces for winter amid attacks",
+        "Pacific News In Brief For 13 October",
+        "The AP news summary at 2:50 p.m. EDT is late today",
+        # near-misses of dated_weather_forecast: a place, a storm, a warning, content
+        "Omaha morning weather forecast for Tuesday, October 13",
+        "Orangeville forecast for Wednesday, October 14th",
+        "FOX29 First Alert Weather Forecast: Oct. 12, 2026",
+        "Weather forecast: High pressure building this week",
+        "Weather forecast for October 14: Hurricane Milton nears Florida",
+        "Weather forecast, October 14 - Storm warning for the coast",
+        "Bulgaria issues weather warnings over heavy rain forecast for October 13",
+        "Weather forecast for Dublin on October 14",
+        "IMF raises its forecast for world growth this year",
+    ],
+)
+def test_near_misses_of_templated_non_articles_are_kept(title: str) -> None:
+    out = normalize(replace(BASE, title=title, description=None), NOW)
+    assert isinstance(out, Candidate), out
+
+
+def test_normalize_all_counts_templated_non_articles_by_pattern() -> None:
+    items = [
+        BASE,
+        replace(BASE, title="AP News Summary at 2:50 p.m. EDT"),
+        replace(BASE, title="AP News in Brief at 9:04 p.m. EDT"),
+        replace(BASE, title="Weather forecast for October 14th"),
+    ]
+    kept, dropped = normalize_all(items, NOW)
+    assert [c.title for c in kept] == ["Earthquake hits northern Japan"]
+    assert dropped == {"junk_title:ap_digest": 2, "junk_title:dated_weather_forecast": 1}

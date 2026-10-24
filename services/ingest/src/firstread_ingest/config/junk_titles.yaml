@@ -87,3 +87,29 @@ outlet_words:
   - gazette
   - tribune
   - daily
+# Templated non-articles (ADR 0007, P3e amendment). Each one is a page that changes
+# content through the day under a near-identical title, so ingestion clusters
+# different pages as one story (ADR 0013) and they pass the personas' 6-word rule.
+# Anchored at both ends and matched case-insensitively with Python `re.search` on the
+# title after the outlet suffix is stripped. Each name is a drop reason
+# (junk_title:<name>) in the run summary. Derived from the 3-day replay's titles.
+patterns:
+  # AP's rolling digests, republished by member papers:
+  #   dropped: "AP News Summary at 2:50 p.m. EDT", "AP News in Brief at 9:04 p.m. EDT",
+  #            "AP News Digest 6 a.m."
+  #   kept:    "AP News: Senate passes the budget" (a headline after the brand)
+  #            "Iran News in Brief – October 12, 2026" (not AP; out of scope)
+  # A trailing " - <outlet>" is allowed: whatever follows, the page is still a digest.
+  ap_digest: >-
+    ^ap news (summary|in brief|digest),? (at )?\d{1,2}(:\d{2})? ?[ap]\.? ?m\.?( [ecmp][sd]?t)?(\s+[-|–—]\s+.{1,80})?$
+  # A weather forecast named only by its date: no place, storm or warning.
+  #   dropped: "Weather forecast for October 14th", "Weather Forecast For Wednesday
+  #            October 14", "Weather forecast, October 14",
+  #            "Weather Forecast for Monday, October 12, 2026",
+  #            "Weather & Atmospheric Forecast October 12th"
+  #   kept:    "Omaha morning weather forecast for Tuesday, October 13" (a place)
+  #            "Weather forecast: High pressure building this week" (content)
+  #            "Weather forecast, October 14 - Storm warning for the coast" (no suffix
+  #            allowed here: what follows a date can be real weather news)
+  dated_weather_forecast: >-
+    ^weather( (and|&) atmospheric)? forecast,?( for)?( (mon|tues|wednes|thurs|fri|satur|sun)day,?)? (jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)[a-z]*\.? \d{1,2}(st|nd|rd|th)?(,? 20\d{2})?\.?$
