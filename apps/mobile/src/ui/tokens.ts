@@ -54,6 +54,23 @@ const dark: typeof light = {
 export const colors: Record<ThemeName, typeof light> = { light, dark };
 export type Colors = typeof light;
 
+/**
+ * Before hydration (web only) the theme hands out these CSS variables instead of
+ * colors: the static HTML can't know the reader's scheme, but +html.tsx defines the
+ * variables per scheme (and per stored choice), so dark pages are dark before any
+ * JavaScript runs. react-native-web passes `var(...)` values through untouched.
+ */
+export const colorVars = Object.fromEntries(
+  Object.keys(light).map((k) => [k, `var(--fr-${k})`]),
+) as Colors;
+
+/** `--fr-<token>: <value>;` for every color of a theme (the CSS behind colorVars). */
+export function colorVarDeclarations(name: ThemeName): string {
+  return Object.entries(colors[name])
+    .map(([k, v]) => `--fr-${k}: ${v};`)
+    .join(' ');
+}
+
 /** Text (≥ 4.5:1) and UI-component (≥ 3:1) pairs the components actually use. */
 export const contrastPairs: { fg: keyof Colors; bg: keyof Colors; min: 4.5 | 3 }[] = [
   { fg: 'text', bg: 'background', min: 4.5 },
