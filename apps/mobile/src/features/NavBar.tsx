@@ -85,7 +85,8 @@ const styles = StyleSheet.create({
   brand: { marginRight: 'auto' },
   items: { flexDirection: 'row' },
   itemsBottom: { justifyContent: 'space-around' },
-  item: { minHeight: HIT + 8, justifyContent: 'center', flex: 1 },
+  // Links render as <a display:block> on web; flex centers the label in the bar.
+  item: { display: 'flex', minHeight: HIT + 8, justifyContent: 'center', flex: 1 },
   // Content-sized and never shrunk: `flex: 0` is a 0% basis on web, which wrapped "For You".
   itemTop: { flexGrow: 0, flexShrink: 0, flexBasis: 'auto', paddingHorizontal: space.md },
   itemInner: { alignItems: 'center', gap: 2, paddingVertical: space.xs },
