@@ -273,6 +273,28 @@ async def test_clicked_hidden_hidden_source_seen_and_read_stories_are_excluded(
     assert from_source.domain not in {by_id[i].domain for i in got if i in by_id}
 
 
+async def test_unhiding_a_source_re_ranks_the_next_page(api: LiveApi) -> None:
+    arts = await seed(api)
+    by_id = {str(a.id): a for a in arts}
+    uid = uuid.uuid4()
+    await onboard(api, uid)
+    first = await page(api, uid, limit=5)
+    before = (await stored_slate(api, uid)).hidden_sig
+    victim = by_id[ids(first)[0]]
+    await events(api, uid, ev("hide", victim.id, scope="source"))
+    second = await page(api, uid, first["next_cursor"], limit=5)
+    hidden = await stored_slate(api, uid)
+    assert hidden.hidden_sig != before
+    assert victim.domain not in {by_id[i.id].domain for i in hidden.remaining() if i.id in by_id}
+    r = await api.client.delete(f"/v1/me/hidden-sources/{victim.domain}", headers=api.auth(uid))
+    assert r.status_code == 200, r.text
+    third = await page(api, uid, second["next_cursor"], limit=5)
+    shown = await stored_slate(api, uid)
+    assert shown.hidden_sig == before  # the same hidden set as before the hide
+    assert victim.domain in {by_id[i.id].domain for i in shown.remaining() if i.id in by_id}
+    assert not set(ids(third)) & (set(ids(first)) | set(ids(second)))  # still no repeats
+
+
 async def story_with_copies(api: LiveApi, arts: list[Seeded], n: int = 4) -> set[str]:
     """``n`` more articles of the feed's top story (other outlets, ≈ the same vector)."""
     uid = uuid.uuid4()

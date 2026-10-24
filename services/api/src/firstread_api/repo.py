@@ -97,6 +97,18 @@ async def set_topics(q: Q, uid: uuid.UUID, topics: Sequence[str]) -> None:
     )
 
 
+async def unhide_source(q: Q, uid: uuid.UUID, domain: str) -> None:
+    """Drop one domain from the reader's hidden sources (a no-op if it isn't there).
+    The feed's hidden signature includes this list, so the next page re-ranks."""
+    await q.execute(
+        "profile_unhide_source",
+        "update public.profiles set hidden_sources = array_remove(hidden_sources, $2), "
+        "updated_at = now() where user_id = $1 and $2 = any(hidden_sources)",
+        uid,
+        domain,
+    )
+
+
 async def me(q: Q, uid: uuid.UUID) -> dict[str, Any]:
     prof = await q.fetchrow(
         "me_profile",

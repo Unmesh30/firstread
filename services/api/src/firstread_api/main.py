@@ -12,7 +12,8 @@ from redis.backoff import NoBackoff
 
 from firstread_api import __version__, errors
 from firstread_api.articles_cache import ArticlesCache
-from firstread_api.auth import JWKSCache, Verifier
+from firstread_api.auth import DEV_HEADER, JWKSCache, Verifier
+from firstread_api.bodylimit import BodyLimit
 from firstread_api.config import Settings, get_settings
 from firstread_api.deps import Services
 from firstread_api.encoder import MicroBatcher, UserEncoder
@@ -127,12 +128,18 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     )
     app.state.settings = settings
     errors.install(app)
+    # Inside CORS (so a 413 carries CORS headers) and inside the request context (so it
+    # carries a request_id): middleware added first runs innermost.
+    app.add_middleware(BodyLimit)
+    allow_headers = ["Authorization", "Content-Type", REQUEST_ID_HEADER]
+    if settings.auth_dev_bypass and settings.app_env in ("local", "test"):
+        allow_headers.append(DEV_HEADER)  # the app's local sign-in (P4); prod refuses the bypass
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.cors_origins,
         allow_credentials=False,  # bearer tokens, not cookies
         allow_methods=["GET", "POST", "PUT", "DELETE"],
-        allow_headers=["Authorization", "Content-Type", REQUEST_ID_HEADER],
+        allow_headers=allow_headers,
         expose_headers=[REQUEST_ID_HEADER, "Server-Timing", "Retry-After"],
         max_age=600,
     )

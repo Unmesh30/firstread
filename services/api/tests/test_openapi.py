@@ -9,6 +9,7 @@ EXPECTED_OPERATIONS = {
     ("get", "/v1/me"): "getMe",
     ("put", "/v1/me/topics"): "setMyTopics",
     ("delete", "/v1/me"): "deleteMe",
+    ("delete", "/v1/me/hidden-sources/{domain}"): "unhideSource",
     ("post", "/v1/events"): "postEvents",
     ("get", "/v1/feed"): "getFeed",
     ("get", "/v1/articles/{article_id}/why"): "getWhy",
