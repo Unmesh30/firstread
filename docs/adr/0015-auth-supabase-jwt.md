@@ -75,3 +75,8 @@ Facts checked on 2026-10-18:
 - Auth adds no network call per request; the JWKS is fetched at most every 10 minutes per instance.
 - A Supabase Auth outage longer than the TTL makes authenticated endpoints 503. Public ones (`/v1/topics`, P3e's `/v1/stats` and personas list) keep working.
 - The token tests sign with a locally generated P-256 key (`firstread_api.testing.Signer`); the k6 run in P3e uses the same signer with `AUTH_LOCAL_JWKS_FILE`.
+
+## Amendment (2026-10-24, P4a): the app's dev sign-in through CORS, and a body cap for events
+
+- **`X-Dev-User` is an allowed CORS header only when the dev bypass is on** (`AUTH_DEV_BYPASS` with `APP_ENV` local or test). The P4 app signs in on the local stack with that header from a browser, so its preflight must pass there. Prod refuses to start with the bypass (above), so the header is never allowed in production; a test checks both configurations.
+- **`POST /v1/events` takes at most 64 KiB** (`firstread_api/bodylimit.py`, 413 `payload_too_large` in the shared error shape, with CORS headers and a `request_id`). 64 KiB is the browser's limit for a `fetch(…, {keepalive: true})` body ([MDN, RequestInit](https://developer.mozilla.org/en-US/docs/Web/API/RequestInit)), which is how the app flushes its event queue when a page closes. A declared `Content-Length` above the cap is refused before reading; a chunked body is read up to the cap. The check runs before auth and parsing. The app itself sends at most 100 events and 60 KB per batch (ADR 0020, P4).

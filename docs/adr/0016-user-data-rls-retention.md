@@ -114,3 +114,10 @@ The 350 MB guard is reached around 400 sessions a day.
 - One click costs 3 Redis commands; a batch of impressions 2; a hide 2 (ADR 0011).
 - A Redis loss costs one rebuild per active reader (≤ ~40 KB of egress each), not lost data.
 - The CI `supabase` job proves the cascade, owner-only reads, no anon access, no writes, an untouched `auth`, and pgvector ≥ 0.8.
+
+## Amendment (2026-10-24, P4a): showing a hidden source again
+
+- **`DELETE /v1/me/hidden-sources/{domain}`** (operationId `unhideSource`, writes rate limit) removes one domain from `profiles.hidden_sources` and returns `MeResponse`. The owner chose an undo toast plus this endpoint for P4, so Account can list hidden sources with "Show again".
+- **Hidden articles stay hidden:** they come from hide events, which are history, not a preference. Only the source preference can be undone after the 5 s undo window (the app holds a hide event until its toast closes, ADR 0020).
+- **No Redis command:** hidden sources live only in `profiles`, and the feed's hidden signature includes them (ADR 0017), so the next cursor page re-ranks with the source back. A domain that isn't hidden is a 200 no-op; the domain is matched case-insensitively (stored lower-case).
+- Tests: removal, the no-op, a bad domain (422), owner scoping, article hides kept, and the re-rank on the next page (`test_unhiding_a_source_re_ranks_the_next_page`).
