@@ -193,6 +193,37 @@ async def test_hides_survive_losing_redis(api: LiveApi) -> None:
     assert rs.hidden_from(await api.redis.smembers(rs.hidden_key(uid))) == {a}
 
 
+async def test_unhide_a_source_keeps_article_hides_and_is_owner_scoped(api: LiveApi) -> None:
+    uid, other = uuid.uuid4(), uuid.uuid4()
+    a, b = await articles(api, 2)
+    await api.client.post("/v1/events", json={"events": [ev("hide", a, scope="source"),
+                                                         ev("hide", b)]},
+                          headers=api.auth(uid))  # fmt: skip
+    await api.client.post("/v1/events", json={"events": [ev("hide", a, scope="source")]},
+                          headers=api.auth(other))  # fmt: skip
+    conn = await api.db()
+    try:
+        domain = await conn.fetchval("select source_domain from public.articles where id = $1", a)
+    finally:
+        await conn.close()
+    r = await api.client.delete(f"/v1/me/hidden-sources/{domain.upper()}", headers=api.auth(uid))
+    assert r.status_code == 200, r.text
+    assert r.json()["hidden_sources"] == []
+    # Not hidden (any more): a no-op. A bad domain: 422.
+    r = await api.client.delete(f"/v1/me/hidden-sources/{domain}", headers=api.auth(uid))
+    assert r.status_code == 200
+    r = await api.client.delete("/v1/me/hidden-sources/bad%20domain", headers=api.auth(uid))
+    assert r.status_code == 422
+    # The other reader's preference is untouched; the article hide stays.
+    me = (await api.client.get("/v1/me", headers=api.auth(other))).json()
+    assert me["hidden_sources"] == [domain]
+    conn = await api.db()
+    try:
+        assert await repo.hidden_for_rebuild(repo.Q(conn), uid) == [b]
+    finally:
+        await conn.close()
+
+
 async def test_last_seen_is_touched_at_most_once_a_day(api: LiveApi) -> None:
     uid = uuid.uuid4()
     h = api.auth(uid)

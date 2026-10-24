@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, Request
 from firstread_api import redis_state, repo
 from firstread_api.auth import Principal
 from firstread_api.deps import Services, ensure_profile, limit_ip, services, user
-from firstread_api.errors import ERROR_RESPONSES, request_id_of
+from firstread_api.errors import ERROR_RESPONSES, ErrorResponse, request_id_of
 from firstread_api.metrics import EVENTS
 from firstread_api.schemas import EventsBatch, EventsResult, RejectedEvent
 
@@ -14,15 +14,18 @@ log = structlog.get_logger("firstread_api.events")
 router = APIRouter(tags=["events"], dependencies=[Depends(limit_ip)], responses=ERROR_RESPONSES)
 
 
-@router.post("/v1/events", response_model=EventsResult, operation_id="postEvents")
+@router.post(
+    "/v1/events", response_model=EventsResult, operation_id="postEvents",
+    responses={413: {"model": ErrorResponse, "description": "Body over 64 KiB (bodylimit.py)"}},
+)  # fmt: skip
 async def post_events(
     body: EventsBatch,
     request: Request,
     svc: Services = Depends(services),  # noqa: B008
     who: Principal = Depends(user("events")),  # noqa: B008
 ) -> EventsResult:
-    """Record up to 100 events. Retrying a batch is safe: an ``event_id`` already stored
-    is reported as ``duplicate`` and has no further effect."""
+    """Record up to 100 events in at most 64 KiB. Retrying a batch is safe: an
+    ``event_id`` already stored is reported as ``duplicate`` and has no further effect."""
     async with svc.pool.acquire() as conn:
         q = repo.Q(conn)
         await ensure_profile(svc, q, who)

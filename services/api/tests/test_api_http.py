@@ -1,6 +1,7 @@
 """HTTP standards without a database: errors, request ids, CORS, rate limits, metrics."""
 
 import uuid
+from collections.abc import Iterator
 
 from fastapi.testclient import TestClient
 
@@ -79,6 +80,48 @@ def test_cors_allows_only_configured_origins(client: TestClient) -> None:
     assert r.headers["access-control-allow-origin"] == "https://unmesh30.github.io"
     r = client.options("/v1/topics", headers={"Origin": "https://evil.example", **pre})
     assert "access-control-allow-origin" not in r.headers
+
+
+def test_the_dev_header_passes_cors_only_with_the_dev_bypass(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    """The app's local sign-in sends X-Dev-User from the browser (P4): its preflight must
+    pass on the local stack, and the header is never allowed otherwise."""
+    pre = {
+        "Origin": "http://localhost:19006",
+        "Access-Control-Request-Method": "GET",
+        "Access-Control-Request-Headers": "x-dev-user",
+    }
+    with TestClient(create_app(make_settings(auth_dev_bypass=True))) as c:
+        r = c.options("/v1/me", headers=pre)
+        assert r.status_code == 200
+        assert "x-dev-user" in r.headers["access-control-allow-headers"].lower()
+    with TestClient(create_app(make_settings())) as c:
+        r = c.options("/v1/me", headers=pre)
+        assert r.status_code == 400  # Starlette refuses a disallowed header
+        assert "x-dev-user" not in r.headers.get("access-control-allow-headers", "").lower()
+
+
+def test_an_events_body_over_64_kib_is_a_413(client: TestClient) -> None:
+    """The cap is the browser's keepalive limit; checked before auth or parsing."""
+    big = b'{"events": [' + b" " * (64 * 1024) + b"]}"
+    r = client.post("/v1/events", content=big, headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+    body = r.json()
+    assert body["error"]["code"] == "payload_too_large"
+    assert body["request_id"] == r.headers["X-Request-ID"]
+
+    def chunks() -> Iterator[bytes]:  # no Content-Length: chunked
+        for _ in range(20):
+            yield b" " * 4096
+
+    r = client.post("/v1/events", content=chunks(), headers={"Content-Type": "application/json"})
+    assert r.status_code == 413
+    # At the cap it's parsed as usual (here: 401, no token), and other routes are uncapped.
+    ok = b'{"events": []}'.ljust(64 * 1024)
+    assert client.post("/v1/events", content=ok,
+                       headers={"Content-Type": "application/json"}).status_code == 401  # fmt: skip
+    r = client.put("/v1/me/topics", content=b" " * (70 * 1024),
+                   headers={"Content-Type": "application/json"})  # fmt: skip
+    assert r.status_code == 422  # parsed (and refused as invalid JSON), not capped
 
 
 def test_ip_rate_limit_returns_429_with_retry_after(tmp_path) -> None:  # type: ignore[no-untyped-def]

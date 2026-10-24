@@ -1,7 +1,10 @@
-"""The reader's own profile: GET/DELETE /v1/me, PUT /v1/me/topics."""
+"""The reader's own profile: GET/DELETE /v1/me, PUT /v1/me/topics and
+DELETE /v1/me/hidden-sources/{domain}."""
+
+from typing import Annotated
 
 import structlog
-from fastapi import APIRouter, Depends, Request, Response
+from fastapi import APIRouter, Depends, Path, Request, Response
 
 from firstread_api import redis_state, repo
 from firstread_api.auth import Principal
@@ -58,6 +61,25 @@ async def set_my_topics(
         await svc.redis.delete(redis_state.slate_key(who.user_id))  # the next page re-ranks
     except Exception as exc:
         log.warning("topics_slate_delete_failed", error=type(exc).__name__)
+    return await me_response(request, svc, who)
+
+
+@router.delete(
+    "/v1/me/hidden-sources/{domain}", response_model=MeResponse, operation_id="unhideSource"
+)
+async def unhide_source(
+    domain: Annotated[str, Path(min_length=1, max_length=253, pattern=r"^[A-Za-z0-9.-]+$")],
+    request: Request,
+    svc: Services = Depends(services),  # noqa: B008
+    who: Principal = Depends(user("writes")),  # noqa: B008
+) -> MeResponse:
+    """Show a hidden source again. Hidden articles stay hidden. A domain that isn't
+    hidden is a no-op (200). No Redis: the next feed page sees the changed hidden
+    signature in the profile row and re-ranks."""
+    async with svc.pool.acquire() as conn:
+        q = repo.Q(conn)
+        await ensure_profile(svc, q, who)
+        await repo.unhide_source(q, who.user_id, domain.lower())
     return await me_response(request, svc, who)
 
 

@@ -1303,7 +1303,7 @@
     },
     "/v1/events": {
       "post": {
-        "description": "Record up to 100 events. Retrying a batch is safe: an ``event_id`` already stored\nis reported as ``duplicate`` and has no further effect.",
+        "description": "Record up to 100 events in at most 64 KiB. Retrying a batch is safe: an\n``event_id`` already stored is reported as ``duplicate`` and has no further effect.",
         "operationId": "postEvents",
         "requestBody": {
           "content": {
@@ -1335,6 +1335,16 @@
               }
             },
             "description": "Unauthorized"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Body over 64 KiB (bodylimit.py)"
           },
           "422": {
             "content": {
@@ -1632,6 +1642,92 @@
           }
         },
         "summary": "Get Me",
+        "tags": [
+          "me"
+        ]
+      }
+    },
+    "/v1/me/hidden-sources/{domain}": {
+      "delete": {
+        "description": "Show a hidden source again. Hidden articles stay hidden. A domain that isn't\nhidden is a no-op (200). No Redis: the next feed page sees the changed hidden\nsignature in the profile row and re-ranks.",
+        "operationId": "unhideSource",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "domain",
+            "required": true,
+            "schema": {
+              "maxLength": 253,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9.-]+$",
+              "title": "Domain",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MeResponse"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Internal Server Error"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            },
+            "description": "Service Unavailable"
+          }
+        },
+        "summary": "Unhide Source",
         "tags": [
           "me"
         ]
