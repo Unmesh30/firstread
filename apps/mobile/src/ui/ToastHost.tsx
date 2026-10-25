@@ -1,11 +1,15 @@
 // Renders the current toast at the bottom of the screen in a polite live region. The
 // action button is a normal control, reachable with Tab. It takes focus only when asked
 // (focusAction): a keyboard reader who hid a story from the menu, whose focus would
-// otherwise fall to the top of the page, far from Undo.
-import { useEffect } from 'react';
+// otherwise fall to the top of the page, far from Undo. When the action is taken from
+// the keyboard while it has focus, focus goes to the toast's `returnFocusTo` (the
+// restored card's hide button) instead of falling to <body> with the unmounted toast.
+import { useEffect, useRef } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { focusWhenPresent } from '@/lib/focus';
+import { isKeyboardModality } from '@/lib/inputModality';
 import { subscribeLifecycle } from '@/lib/lifecycle';
 
 import { Button } from './Button';
@@ -21,6 +25,7 @@ export function ToastHost() {
   const insets = useSafeAreaInsets();
   const toast = useToasts((s) => s.toasts[0]);
   const { act, pause, resume, dismiss } = useToasts.getState();
+  const actionFocused = useRef(false);
 
   useEffect(
     () =>
@@ -54,9 +59,22 @@ export function ToastHost() {
               <Button
                 variant="secondary"
                 label={toast.actionLabel}
-                onPress={() => act(toast.id)}
-                onFocus={() => pause(toast.id, 'focus')}
-                onBlur={() => resume(toast.id, 'focus')}
+                onPress={() => {
+                  // Pointer presses focus the button too; only a key press counts here.
+                  const keyboard = actionFocused.current && isKeyboardModality();
+                  actionFocused.current = false; // it unmounts with the toast, unblurred
+                  act(toast.id);
+                  if (keyboard && toast.returnFocusTo && Platform.OS === 'web')
+                    focusWhenPresent(toast.returnFocusTo);
+                }}
+                onFocus={() => {
+                  actionFocused.current = true;
+                  pause(toast.id, 'focus');
+                }}
+                onBlur={() => {
+                  actionFocused.current = false;
+                  resume(toast.id, 'focus');
+                }}
                 testID="toast-action"
                 nativeID={ACTION_ID}
               />

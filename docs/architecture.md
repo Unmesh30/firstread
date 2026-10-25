@@ -185,7 +185,7 @@ flowchart LR
 - Every route is static HTML under `/firstread` (no dynamic segments: `/why?id=`), hydrated without mismatches; dark mode and the nav layout are right before JavaScript ([ADR 0019](adr/0019-app-architecture.md)).
 - Impressions follow the MRC rule (≥ 50% for 1 continuous second in the foreground); events are batched, retried, persisted and sent with keepalive when the page hides ([ADR 0020](adr/0020-impressions-and-event-delivery.md)). A scripted session costs 33 Redis commands (≤ 37 asserted).
 - First load 469.8 KB gzip (JS 391.5 + WOFF2 font 78.3); the Supabase chunk (65.5 KB) loads only in Supabase mode.
-- Checked by 204 Jest tests and 49 Playwright tests against the local stack, including a full axe pass in light and dark, a keyboard-only walk, reflow at 320 px and 200% zoom, and reduced motion.
+- Checked by 207 Jest tests and 49 Playwright tests against the local stack, including a full axe pass in light and dark, a keyboard-only walk, reflow at 320 px and 200% zoom, and reduced motion.
 
 ## Status by phase
 

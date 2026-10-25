@@ -56,6 +56,7 @@ P4 builds the reader app SPEC §2 describes: onboarding, a live "For You" feed t
 - Tokens are the only place colors, spacing, radii and type sizes are defined; a Jest test checks every text/background pair against WCAG 2.2 in both themes (≥ 4.5:1 text, ≥ 3:1 UI and focus).
 - Sheets and dialogs are react-native-web's `Modal` (focus moved in, trapped and returned; Esc closes, including during the fade-in since 4d).
 - Space presses checkboxes, radios and switches on web (react-native-web maps Space only for buttons).
+- **Undo takes focus only after a keyboard hide** (a recorded deviation: the P4 plan said it never takes focus by itself). The hidden card took the menu's return target with it, so focus would fall to the top of the page, 80+ Tab stops from Undo; focus on Undo also holds its timer (WCAG 2.2.1). After a keyboard Undo, focus returns to the restored card's hide button (for a source hide, the card the reader hid from), not to `<body>` with the unmounted toast. Mouse and touch hides, and an Undo clicked while focus is elsewhere, leave focus alone, and pointer users still see no focus ring.
 - Bundle budget in CI: the first page's scripts plus the preloaded font. 4d set the baseline to 469.8 KB gzip with 5% growth allowed, so the limit (493 KB) sits below the 4c size (501.2 KB).
 
 ## Alternatives considered

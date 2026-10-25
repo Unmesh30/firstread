@@ -1,7 +1,12 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen } from '@testing-library/react-native';
 
+import { useArticleActions } from '@/features/feed/actions';
+import type { FeedRow } from '@/features/feed/useFeed';
+import { focusWhenPresent } from '@/lib/focus';
 import { PausableTimer } from '@/lib/timer';
 import { ThemeProvider, ToastHost, useToasts } from '@/ui';
+import { hideButtonId } from '@/ui/ArticleCard';
 
 beforeEach(() => {
   jest.useFakeTimers();
@@ -137,5 +142,69 @@ describe('undo toast', () => {
       jest.advanceTimersByTime(5000);
     });
     expect(other).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('focus after a keyboard Undo', () => {
+  function fakeDom(appearsOnFrame: number | null) {
+    const frames: (() => void)[] = [];
+    let frame = 0;
+    const el = { focus: jest.fn() };
+    return {
+      el,
+      frames,
+      run() {
+        while (frames.length) {
+          frame++;
+          frames.shift()!();
+        }
+        return frame;
+      },
+      deps: {
+        getElementById: (id: string) =>
+          id === 'hide-button-a1' && appearsOnFrame != null && frame >= appearsOnFrame ? el : null,
+        requestAnimationFrame: (cb: () => void) => frames.push(cb),
+        cancelAnimationFrame: jest.fn(),
+      },
+    };
+  }
+
+  it('focuses the restored card’s hide button once it is back in the DOM', () => {
+    const dom = fakeDom(3);
+    focusWhenPresent(hideButtonId('a1'), dom.deps);
+    expect(dom.run()).toBe(3);
+    expect(dom.el.focus).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after about half a second if the card never returns', () => {
+    const dom = fakeDom(null);
+    focusWhenPresent(hideButtonId('a1'), dom.deps);
+    expect(dom.run()).toBe(30);
+    expect(dom.el.focus).not.toHaveBeenCalled();
+  });
+
+  it('a hide’s undo toast returns focus to that card’s hide button (story or source)', async () => {
+    const row = {
+      item: { id: 'a1', source_name: 'Example Daily', source_domain: 'daily.example.com' },
+      requestId: 'req-1',
+      position: 0,
+    } as unknown as FeedRow;
+    let hide: ReturnType<typeof useArticleActions>['hide'] = () => 0;
+    function Probe() {
+      hide = useArticleActions().hide;
+      return null;
+    }
+    await render(
+      <QueryClientProvider client={new QueryClient()}>
+        <Probe />
+      </QueryClientProvider>,
+    );
+    for (const scope of ['article', 'source'] as const) {
+      await act(async () => {
+        hide(row, scope);
+      });
+      expect(useToasts.getState().toasts.at(-1)?.returnFocusTo).toBe('hide-button-a1');
+      useToasts.getState().discardAll();
+    }
   });
 });
