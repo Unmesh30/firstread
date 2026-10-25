@@ -6,6 +6,7 @@ import { Platform } from 'react-native';
 import { keys } from '@/api/queries';
 import { useEventQueue } from '@/events/EventsProvider';
 import { openUrl } from '@/lib/platformKit';
+import { hideButtonId } from '@/ui/ArticleCard';
 import { useToasts } from '@/ui/toast';
 
 import { useFeedLocal } from './store';
@@ -66,6 +67,8 @@ export function useArticleActions() {
         actionLabel: 'Undo',
         commitOnHide: true,
         onAction: () => local().unhide(scope, key),
+        // A keyboard Undo puts focus back on the card the reader hid from.
+        returnFocusTo: hideButtonId(row.item.id),
         onExpire: () => {
           queue?.enqueue({ type: 'hide', scope, ...base(row) });
           // Account lists hidden sources; it refetches /v1/me next time it's shown.

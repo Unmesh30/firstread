@@ -277,7 +277,7 @@ const focusRing = (page: Page) =>
     return `${s.outlineStyle} ${s.outlineWidth}`;
   });
 
-test('keyboard only: skip link, onboarding, a card’s controls, hide, then Undo', async ({
+test('keyboard only: skip link, onboarding, a card’s controls, hide, Undo, back on the card', async ({
   page,
 }) => {
   await page.goto(`${BASE}/`);
@@ -330,6 +330,12 @@ test('keyboard only: skip link, onboarding, a card’s controls, hide, then Undo
   await expect(page.getByTestId('toast')).toBeVisible();
   await page.keyboard.press('Enter');
   await expect(page.getByTestId(`card-${story.id}`)).toBeVisible();
+  // The round trip ends where it started: on the restored card's hide button (not on
+  // <body> with the unmounted toast), with a visible ring, and Tab goes on to Why.
+  await expect(page.getByTestId(`hide-${story.id}`)).toBeFocused();
+  expect(await focusRing(page)).toBe('solid 2px');
+  await page.keyboard.press('Tab');
+  await expect(page.getByTestId(`why-${story.id}`)).toBeFocused();
 });
 
 /** Visible elements that stick out past the right edge (horizontal scrolling). */

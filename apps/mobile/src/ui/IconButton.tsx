@@ -13,9 +13,19 @@ export interface IconButtonProps {
   selected?: boolean;
   disabled?: boolean;
   testID?: string;
+  /** The element's id on web (to move focus to it). */
+  nativeID?: string;
 }
 
-export function IconButton({ icon, label, onPress, selected, disabled, testID }: IconButtonProps) {
+export function IconButton({
+  icon,
+  label,
+  onPress,
+  selected,
+  disabled,
+  testID,
+  nativeID,
+}: IconButtonProps) {
   const { colors } = useTheme();
   return (
     <Pressable
@@ -26,6 +36,7 @@ export function IconButton({ icon, label, onPress, selected, disabled, testID }:
       disabled={disabled}
       onPress={onPress}
       testID={testID}
+      nativeID={nativeID}
       hitSlop={4}
       style={({ hovered, pressed }) => [
         styles.base,

@@ -16,6 +16,9 @@ import { radius, space } from './tokens';
 
 export const THUMB = 88;
 
+/** The hide button's element id: focus returns there after a keyboard Undo. */
+export const hideButtonId = (id: string) => `hide-button-${id}`;
+
 export interface ArticleCardProps {
   id: string;
   title: string;
@@ -116,6 +119,7 @@ export function ArticleCard(p: ArticleCardProps) {
           label={`Hide: ${p.title}`}
           onPress={p.onHide}
           testID={`hide-${p.id}`}
+          nativeID={hideButtonId(p.id)}
         />
         <IconButton
           icon="info"

@@ -17,6 +17,11 @@ export interface ToastSpec {
   onExpire?: () => void;
   durationMs?: number;
   commitOnHide?: boolean;
+  /**
+   * The element id to focus after the action is taken from the keyboard while it has
+   * focus (web): the action button unmounts with the toast, and focus would fall to <body>.
+   */
+  returnFocusTo?: string;
 }
 
 export interface ToastItem extends ToastSpec {
