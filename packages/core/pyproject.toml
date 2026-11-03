@@ -9,7 +9,7 @@ dependencies = ["numpy>=2.5.4", "pyyaml>=6.0.3"]
 # The embedding backend (ONNX Runtime + tokenizers). ml and ingest install it;
 # the API image does not (it never embeds text). Pinned exactly: a different
 # fastembed can change vectors, which is train/serve skew.
-embed = ["fastembed==0.9.0"]
+embed = ["fastembed==0.9.1"]
 # Postgres helpers (connect with the Supabase-pooler setting, migrations).
 db = ["asyncpg==0.32.0", "pgvector==0.5.1"]
 # Downloading model releases (ingest; the API's Docker build stage). fastembed 0.9.0
